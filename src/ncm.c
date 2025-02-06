@@ -7,21 +7,10 @@
 
 #include "gfx.h"
 #include "irq.h"
+#include "main.h"
 
 uint8_t vic4cache[14];
 volatile uint8_t __far *drawing_xpointer[4][160];
-
-struct __F018 {
-  uint8_t dmalowtrig;
-  uint8_t dmahigh;
-  uint8_t dmabank;
-  uint8_t enable018;
-  uint8_t addrmb;
-  uint8_t etrig;
-};
-
-/// DMA controller
-#define DMA (*(volatile struct __F018 *)0xd700)
 
 #define Q15_16_INT_TO_Q(QVAR, WHOLE) \
   QVAR.part.whole = WHOLE;\
@@ -34,6 +23,22 @@ typedef union q15_16 {
     int16_t whole;
   } part;
 } q15_16t;
+
+uint8_t blackscreencmd[] = {0x00,               // End of token list
+                            0x07,               // Fill command
+                            0x00, 0x80,         // count $8000 bytes
+                            0x00, 0x00, 0x00,   // fill value $00
+                            0x00, 0x00, 0x05,   // destination start $050000
+                            0x00,               // command high byte
+                            0x00, 0x00,         // modulo
+                            0x00,
+                            0x03,               // Fill command
+                            0x00, 0x00,         // Count $8000 bytes
+                            0x00, 0x00, 0x00,   // Fill value $00
+                            0x00, 0x80, 0x05,   // Destination start $058000
+                            0x00,               // Command high byte
+                            0x00, 0x00          // modulo
+                           };
 
 uint8_t clrscreen01cmd[] = {0x00,               // End of token list
                             0x07,               // Fill command
@@ -136,31 +141,39 @@ void loadvic(void) {
   VICIV.colptr = (vic4cache[12] << 8) | vic4cache[13];
 }
 
-void gfx_print_parserline(uint8_t character) {
-  static uint16_t parser_printpos = 422;
+void gfx_print_splitchar(uint8_t character) {
+  static uint16_t parser_printpos = 0;
   uint16_t __far *screen_memory0 = (uint16_t __far *)(0x012000 + (0 * 0x400));
-  uint16_t __far *screen_memory2 = (uint16_t __far *)(0x012000 + (2 * 0x400));
-  if (character == '\r') {
+  if (character == CHAR_CLEARHOME) {
     for (uint16_t i = 420; i < 580; i++) {
       screen_memory0[i] = 0x0020;
-      screen_memory2[i] = 0x0020;
     }
-    screen_memory0[420] = 0x003e;
-    screen_memory2[420] = 0x003e;
-    parser_printpos = 421;
+    parser_printpos = 0;
   } else if (character == 0x14) {
     parser_printpos--;
-    screen_memory0[parser_printpos] = 0x0020;
-    screen_memory2[parser_printpos] = 0x0020;
+    screen_memory0[parser_printpos + 420] = 0x0020;
+  } else if (character == '\r') {
+    // Move to beginning of next line
+    parser_printpos = ((parser_printpos / 40) + 1) * 40;
+    // If past end, scroll the text area
+    if (parser_printpos >= 160) {
+      for (uint16_t i = 420; i < 540; i++) {
+        screen_memory0[i] = screen_memory0[i + 40];
+      }
+      for (uint16_t i = 540; i < 580; i++) {
+        screen_memory0[i] = 0x0020;
+      }
+      parser_printpos -= 40;
+    }
   } else {
     if (character < 32) {
       character = character + 0x80;
     } else if (character < 64) {
       character = character + 0x00;
     } else if (character < 96) {
-      character = character + 0xC0;
+      character = character + 0x00;
     } else if (character < 128) {
-      character = character + 0xE0;
+      character = character + 0xA0;
     } else if (character < 160) {
       character = character + 0x40;
     } else if (character < 192) {
@@ -168,10 +181,85 @@ void gfx_print_parserline(uint8_t character) {
     } else {
       character = character + 0x80;
     }
-    screen_memory0[parser_printpos] = character;
-    screen_memory2[parser_printpos] = character;
+    screen_memory0[parser_printpos + 420] = character;
     parser_printpos++;
+    // If past end, scroll the text area
+    if (parser_printpos >= 160) {
+      for (uint16_t i = 420; i < 540; i++) {
+        screen_memory0[i] = screen_memory0[i + 40];
+      }
+      for (uint16_t i = 540; i < 580; i++) {
+        screen_memory0[i] = 0x0020;
+      }
+      parser_printpos = 120;
+    }
   }
+}
+
+uint8_t my_ultoa_invert(unsigned long val, char *str, int base)
+{
+  uint8_t len = 0;
+  do
+    {
+      int v;
+
+      v   = val % base;
+      val = val / base;
+
+      if (v <= 9)
+        {
+          v += '0';
+        }
+      else
+        {
+          v += 'A' - 10;
+        }
+
+      *str++ = v;
+      len++;
+    }
+  while (val);
+
+  return len;
+}
+
+void gfx_print_splitascii(char *formatstring, ...) {
+  va_list ap;
+  va_start(ap, formatstring);
+  uint8_t *ascii_string = (uint8_t *)formatstring;
+  while (*ascii_string != 0) {
+    uint8_t petsciichar = *ascii_string;
+    if (petsciichar == '%') {
+      ascii_string++;
+      switch (*ascii_string) {
+        case 'd':
+        case 'x': {
+          char buffer[17];
+          uint32_t param = va_arg(ap, int);
+          uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'x') ? 16 : 10);
+          for (; len > 0; len--) {
+            gfx_print_splitchar(buffer[len-1]);
+          }
+          break;
+        }
+        case 'D':
+        case 'X': {
+          char buffer[17];
+          uint32_t param = va_arg(ap, unsigned long);
+          uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'X') ? 16 : 10);
+          for (; len > 0; len--) {
+            gfx_print_splitchar(buffer[len-1]);
+          }
+          break;
+        }
+      }
+      ascii_string++;
+      continue;
+    }
+    gfx_print_splitchar(petsciichar);
+    ascii_string++;
+  }
+  va_end(ap);
 }
 
 int agi_q15round(q15_16t aNumber, int16_t dirn)
@@ -328,6 +416,11 @@ void gfx_setupmem(void) {
   DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen23cmd) >> 8);
   DMA.etrig = (uint8_t)(((uint16_t)clrscreen23cmd) & 0xff);
 
+}
+
+void gfx_blackscreen(void) {
+  DMA.dmahigh = (uint8_t)(((uint16_t)blackscreencmd) >> 8);
+  DMA.etrig = (uint8_t)(((uint16_t)blackscreencmd) & 0xff);
 }
 
 void gfx_cleargfx(uint8_t screen_num) {

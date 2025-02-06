@@ -9,6 +9,7 @@
 #include "gfx.h"
 #include "volume.h"
 #include "pic.h"
+#include "main.h"
 
 typedef struct fill_info {
     int16_t x1;
@@ -62,9 +63,6 @@ void draw_relative_line(uint8_t coord) {
     last_relative_x = last_relative_x + rel_x;
     last_relative_y = last_relative_y + rel_y;
 }
-
-#define POKE(X, Y) (*(volatile uint8_t*)(X)) = Y
-#define PEEK(X) (*(volatile uint8_t*)(X))
 
 uint8_t can_fill(uint8_t x, uint8_t y) {
     if ((pic_on == 0) && (priority_on == 0)) {

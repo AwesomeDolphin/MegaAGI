@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,13 +14,9 @@
 #include "volume.h"
 #include "simplefile.h"
 #include "sprite.h"
+#include "logic.h"
 #include "memmanage.h"
-
-#define ASCIIKEY (*(volatile uint8_t *)0xd610)
-#define PETSCIIKEY (*(volatile uint8_t *)0xd619)
-#define VICREGS ((volatile uint8_t *)0xd000)
-#define POKE(X, Y) (*(volatile uint8_t*)(X)) = Y
-#define PEEK(X) (*(volatile uint8_t*)(X))
+#include "main.h"
 
 volatile uint8_t view_x = 40;
 volatile uint8_t view_y = 40;
@@ -35,6 +32,9 @@ static uint8_t keypress_f5;
 volatile uint8_t drawing_screen = 2;
 volatile uint8_t viewing_screen = 0;
 volatile uint8_t frame_dirty;
+static char command_buffer[38];
+static uint8_t cmd_buf_ptr = 0;
+
 
 /*
     0000 = inv
@@ -127,6 +127,18 @@ void handle_movement_keys(void) {
     }
 }*/
 
+void engine_player_control(bool enable) {
+
+}
+
+void engine_unblock(void) {
+
+}
+
+void engine_horizon(uint8_t horizon_line) {
+
+}
+
 void parse_debug_command(char *command) {
     char *cmd = strtok(command, " ");
     if (0 == strcmp(cmd, "PIC")) {
@@ -165,21 +177,25 @@ void parse_debug_command(char *command) {
     }
 }
 
-void run_loop(void) {
-    static char command_buffer[38];
-    static uint8_t cmd_buf_ptr = 0;
+void engine_clear_keyboard(void) {
+    command_buffer[0] = 0;
+    cmd_buf_ptr=0;
+    gfx_print_splitascii("\r>");
+}
 
+void run_loop(void) {
+    view_init();
     gfx_switchto();
-    draw_pic(0, picture, 0);
-    gfx_copygfx(0);
-    sprite_set_view(0, 0);
-    sprite_set_position(0, 120, 120);
-    gfx_print_parserline('\r');
+    gfx_blackscreen();
+    gfx_print_splitchar(CHAR_CLEARHOME);
     gfx_showgfx(0);
     hook_irq();
-    sprite_draw(0);
-    frame_dirty = 1;
-    while(frame_dirty);
+    gfx_print_splitascii("Welcome to AGI demo!\r");
+    logic_init();
+    while (1) {
+        logic_run(0);
+        gfx_print_splitascii("Logic cycle ended\r");
+    }
     while (1) {
         handle_movement_joystick();
         if (frame_counter == 0) {
@@ -189,17 +205,18 @@ void run_loop(void) {
                 if (petscii == 0x14) {
                     if (cmd_buf_ptr > 0) {
                         cmd_buf_ptr--;
-                        gfx_print_parserline(petscii);
+                        gfx_print_splitchar(petscii);
                     }
                 } else if (petscii == 0x0d) {
                     command_buffer[cmd_buf_ptr] = 0;
                     parse_debug_command(command_buffer);
                     cmd_buf_ptr=0;
-                    gfx_print_parserline(petscii);
+                    gfx_print_splitchar(petscii);
+                    gfx_print_splitchar('>');
                 } else {
                     if (cmd_buf_ptr < 37) {
                         command_buffer[cmd_buf_ptr] = petscii;
-                        gfx_print_parserline(petscii);
+                        gfx_print_splitchar(petscii);
                         cmd_buf_ptr++;
                     }
                 }

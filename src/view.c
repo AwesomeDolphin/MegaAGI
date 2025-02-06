@@ -13,57 +13,46 @@
 #include "volume.h"
 #include "view.h"
 
-uint8_t view_backbuf[1024];
-bool dirty;
-volatile uint8_t view_w;
-volatile uint8_t view_h;
-#define ASCIIKEY (*(volatile uint8_t *)0xd610)
-volatile uint8_t was_mirrored;
+#pragma clang section bss="extradata"
+__far static uint16_t views[256];
+#pragma clang section bss=""
+
 extern volatile uint8_t drawing_screen;
 
-uint8_t get_priority(uint8_t y) {
-    if (y == 168) {
-        return 15;
+uint8_t priorities[169];
+
+void setup_priorities(void) {
+    uint8_t priority_level = 4;
+    for (uint8_t counter = 0; counter < 169; counter++) {
+        switch(counter) {
+            case 168:
+            case 156:
+            case 144:
+            case 132:
+            case 120:
+            case 108:
+            case 96:
+            case 84:
+            case 72:
+            case 60:
+            case 48:
+                priority_level++;
+                break;
+        }
+        priorities[counter] = priority_level;
     }
-    if (y > 156) {
-        return 14;
-    }
-    if (y > 144) {
-        return 13;
-    }
-    if (y > 132) {
-        return 12;
-    }
-    if (y > 120) {
-        return 11;
-    }
-    if (y > 108) {
-        return 10;
-    }
-    if (y > 96) {
-        return 9;
-    }
-    if (y > 84) {
-        return 8;
-    }
-    if (y > 72) {
-        return 7;
-    }
-    if (y > 60) {
-        return 6;
-    }
-    if (y > 48) {
-        return 5;
-    }
-    return 4;
 }
 
-void draw_cel_forward(uint8_t __far *cel_data, int16_t x, int16_t y) {
-    uint8_t objprio = get_priority(y + view_h);
-    uint8_t right_side = x + view_w;
+void draw_cel_forward(view_info_t *info) {
+    uint8_t objprio = priorities[info->y_pos + info->height];
+    uint8_t right_side = info->x_pos + info->width;
+
+    uint8_t __far *cel_data = chipmem_base + info->cel_offset;
+    info->backbuffer_offset = chipmem_alloc(info->height * info->width);
+    uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
     uint8_t view_trans = cel_data[2] & 0x0f;
-    int16_t cur_x = x;
-    int16_t cur_y = y;
+    int16_t cur_x = info->x_pos;
+    int16_t cur_y = info->y_pos;
     uint16_t cel_offset = 3;
     uint16_t pixel_offset = 0;
     uint8_t draw_row = 0;
@@ -76,7 +65,7 @@ void draw_cel_forward(uint8_t __far *cel_data, int16_t x, int16_t y) {
                 view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
                 pixel_offset++;
             }
-            cur_x = x;
+            cur_x = info->x_pos;
             cur_y++;
             draw_row++;
         } else {
@@ -93,128 +82,80 @@ void draw_cel_forward(uint8_t __far *cel_data, int16_t x, int16_t y) {
             }
         }
         cel_offset++;
-    } while (draw_row < view_h);
+    } while (draw_row < info->height);
 }
 
-void draw_cel_backward(uint8_t __far *cel_data, int16_t x, int16_t y) {
-    uint8_t objprio = get_priority(y + view_h);
-    uint8_t right_side = x + view_w;
-    uint8_t view_trans = cel_data[2] & 0x0f;
-    int16_t cur_x = right_side;
-    int16_t cur_y = y;
-    uint16_t cel_offset = 3;
-    uint16_t pixel_offset = 0;
-    uint8_t draw_row = 0;
-
-    do {
-        uint8_t pixcol = cel_data[cel_offset] >> 4;
-        uint8_t pixcnt = cel_data[cel_offset] & 0x0f;
-        if ((pixcol == 0) && (pixcnt == 0)) {
-            for (; cur_x >= x; cur_x--) {
-                view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
-                pixel_offset++;
-            }
-            cur_x = right_side;
-            cur_y++;
-            draw_row++;
-        } else {
-            for (uint8_t count = 0; count < pixcnt; count++) {
-                view_backbuf[pixel_offset] = gfx_get(drawing_screen, cur_x, cur_y);
-                pixel_offset++;
-                if (pixcol != view_trans) {
-                    uint8_t pix_prio = gfx_getprio(drawing_screen + 1, cur_x, cur_y);
-                    if (objprio >= pix_prio) {
-                        gfx_plotput(drawing_screen, cur_x, cur_y, pixcol);
-                    }
-                }
-                cur_x--;
-            }
-        }
-        cel_offset++;
-    } while (draw_row < view_h);
-}
-
-void draw_cel(uint16_t loop_offset, uint8_t loop_index, uint8_t cel, uint8_t x, uint8_t y) {
-    uint8_t __far *loop_data = chipmem_base + loop_offset;
+void draw_cel(view_info_t *info, uint8_t cel) {
+    uint8_t __far *loop_data = chipmem_base + info->loop_offset;
     uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
-    uint16_t cel_base = *cell_ptr | ((*(cell_ptr + 1)) << 8);
-    uint8_t __far *cel_data = loop_data + cel_base;
+    info->cel_offset = *cell_ptr | ((*(cell_ptr + 1)) << 8);
 
-    view_w = cel_data[0];
-    view_h = cel_data[1];
+    uint8_t __far *cel_data = loop_data + info->cel_offset;
+    info->width  = cel_data[0];
+    info->height = cel_data[1];
+
     uint8_t mirrored = cel_data[2] & 0x80;
     uint8_t source_loop = (cel_data[2] & 0x70) >> 4;
-    if (!mirrored || (mirrored && (source_loop == loop_index))) {
-        draw_cel_forward(cel_data, x, y);
-        was_mirrored = 0;
-    } else {
-        draw_cel_backward(cel_data, x, y);
-        was_mirrored = 1;
-    }
-    dirty = true;
+    draw_cel_forward(info);
 }
 
-void erase_view(int16_t x, int16_t y) {
-    if (!dirty) {
-        return;
-    }
+void erase_view(view_info_t *info) {
     uint16_t pixel_offset = 0;
-    uint8_t right_side = x + view_w;
-    uint8_t bottom_side = y + view_h;
-    if (was_mirrored) {
-        for (int16_t cur_y = y; cur_y < bottom_side; cur_y++) {
-            for (int16_t cur_x = right_side; cur_x >= x; cur_x--) {
-                gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
-                pixel_offset++;
-            }
-        }
-    } else {
-        for (uint8_t cur_y = y; cur_y < bottom_side; cur_y++) {
-            for (uint8_t cur_x = x; cur_x < right_side; cur_x++) {
-                gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
-                pixel_offset++;
-            }
+    uint8_t right_side = info->x_pos + info->width;
+    uint8_t bottom_side = info->y_pos + info->height;
+    uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
+
+    for (int16_t cur_y = info->y_pos; cur_y < bottom_side; cur_y++) {
+        for (int16_t cur_x = right_side; cur_x >= info->x_pos; cur_x--) {
+            gfx_plotput(drawing_screen, cur_x, cur_y, view_backbuf[pixel_offset]);
+            pixel_offset++;
         }
     }
-    dirty = false;
+
+    chipmem_free(info->backbuffer_offset);
 }
 
-uint8_t get_num_cels(uint16_t loop_offset) {
-    uint8_t __far *loop_data = chipmem_base + loop_offset;
-    return loop_data[0];
+bool select_loop(view_info_t *info, uint8_t loop_num) {
+    uint8_t __far *view_data = chipmem_base + info->view_offset;
+    if (loop_num < info->number_of_loops) {
+        uint8_t __far *loop_ptr = view_data + (loop_num * 2) + 5;
+        uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
+        uint8_t __far *loop_data = chipmem_base + loop_offset;
+        info->loop_offset = loop_offset;
+        info->number_of_cels = loop_data[0];
+        return true;
+    }
+    return false;
 }
 
-uint16_t select_loop(uint16_t view_offset, uint8_t loop_num) {
-    uint8_t __far *view_data = chipmem_base + view_offset;
-    uint8_t num_loops = view_data[2];
-    if (loop_num < num_loops) {
-        uint8_t __far *loop_data = view_data + (loop_num * 2) + 5;
-        uint16_t loop_offset = *loop_data | ((*(loop_data + 1)) << 8);
-        return loop_offset + view_offset;
+void view_set(view_info_t *info, uint8_t view_num) {
+    info->view_offset = views[view_num];
+    uint8_t __far *view_data = chipmem_base + info->view_offset;
+    info->number_of_loops = view_data[2];
+}
+
+bool view_load(uint8_t view_num) {
+    if (views[view_num] == 0) {
+        uint16_t length;
+        uint16_t view_offset = load_volume_object(voView, view_num, &length);
+        if (view_offset == 0) {
+            return false;
+        }
+        views[view_num] = view_offset;
     }
-    else {
-        return 0;
+    return true;
+}
+
+void view_unload(uint8_t view_num) {
+    if (views[view_num] != 0) {
+        chipmem_free(views[view_num]);
+        views[view_num] = 0;
     }
 }
 
-uint8_t get_num_loops(uint16_t view_offset) {
-    uint8_t __far *view_data = chipmem_base + view_offset;
-    return view_data[2];
-}
-
-uint16_t load_view(uint8_t view_num) {
-
-    uint8_t __huge *view_file;
-    uint16_t length;
-    view_file = locate_volume_object(voView, view_num, &length);
-    if (view_file == NULL) {
-        return 0;
+void view_init(void) {
+    setup_priorities();
+    for (int i = 0; i < 256; i++) {
+        views[i] = 0;
     }
-    uint16_t view_offset = chipmem_alloc(length);
-    uint8_t __far *view_target = chipmem_base + view_offset;
-    for (uint16_t counter = 0; counter < length; counter++) {
-        view_target[counter] = view_file[counter];
-    }
-    dirty = false;
-    return view_offset;
 }

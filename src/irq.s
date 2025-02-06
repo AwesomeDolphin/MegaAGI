@@ -1,11 +1,13 @@
             .extern _Zp
             .extern irq_handler
             .extern _InterruptChain
+            .extern viewing_screen
 
 VECTOR:     .equlab 0xff8d
 LINESTEPL:  .equlab 0xd058
 CHRXSCL:    .equlab 0xd05a
 CHRCOUNT:   .equlab 0xd05e
+SCRNPTRMSB: .equlab 0xd061
 
             .section code
 
@@ -88,6 +90,8 @@ waitraster:
             sta CHRCOUNT
             lda #80
             sta LINESTEPL
+            lda #0x20
+            sta SCRNPTRMSB
 
             lda #0x01
             sta irqlvl
@@ -106,6 +110,11 @@ _irq_rt_background:
             sta CHRCOUNT
             lda #40
             sta LINESTEPL
+            lda viewing_screen
+            asl a
+            asl a
+            ora #0x20
+            sta SCRNPTRMSB
 
             lda #0x00
             sta irqlvl

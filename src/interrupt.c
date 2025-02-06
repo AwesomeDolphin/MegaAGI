@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <mega65.h>
+#include <stdbool.h>
 
 #include "engine.h"
 #include "sound.h"

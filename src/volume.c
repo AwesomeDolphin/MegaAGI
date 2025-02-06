@@ -3,6 +3,9 @@
 #include <string.h>
 #include <mega65.h>
 
+#include "gfx.h"
+#include "main.h"
+#include "memmanage.h"
 #include "simplefile.h"
 #include "volume.h"
 
@@ -34,8 +37,9 @@ uint8_t load_directory_file(char *dir_file_name, voldir_entry_t *entries) {
     uint8_t entrybuf[768];
     simpleopen(dir_file_name, strlen(dir_file_name));
     uint16_t entries_read = simpleread(&entrybuf[0]);
-    entries_read += simpleread(&entrybuf[256]);
-    entries_read += simpleread(&entrybuf[512]);
+    entries_read += simpleread(&entrybuf[255]);
+    entries_read += simpleread(&entrybuf[510]);
+    entries_read += simpleread(&entrybuf[765]);
     uint16_t entry_index = 0;
     for (entry_num = 0; entry_num < entries_read / 3; entry_num++) {
         entries[entry_num].volume_number = entrybuf[entry_index + 0] >> 4;
@@ -88,6 +92,37 @@ uint8_t __huge *locate_volume_object(volobj_kind_t kind, uint8_t volobj_num, uin
   } else {
       return NULL;
   }
+}
+
+uint8_t copyattogamcmd[] = {0x80, 0x00,         // Source extended address
+                            0x00,               // End of token list
+                            0x00,               // Copy command
+                            0x00, 0x00,         // count $0000 bytes
+                            0x00, 0x00, 0x00,   // source start $000000
+                            0x00, 0x00, 0x04,   // destination start $040000
+                            0x00,               // command high byte
+                            0x00, 0x00,         // modulo
+                           };
+
+uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length) {
+    uint8_t __huge *volobj_file;
+    uint16_t length;
+    volobj_file = locate_volume_object(kind, volobj_num, &length);
+    if (volobj_file == NULL) {
+        return 0;
+    }
+    copyattogamcmd[1] = ((uint32_t)volobj_file & 0xff00000) >> 20;
+    copyattogamcmd[8] = ((uint32_t)volobj_file & 0x00f0000) >> 16;
+    copyattogamcmd[7] = ((uint32_t)volobj_file & 0x000ff00) >> 8;
+    copyattogamcmd[6] = (uint32_t)volobj_file & 0x00000ff;
+    copyattogamcmd[5] = (length & 0xff00) >> 8;
+    copyattogamcmd[4] = length & 0xff;
+    uint16_t target_offset = chipmem_alloc(length);
+    copyattogamcmd[10] = (target_offset & 0xff00) >> 8;
+    copyattogamcmd[9] = (target_offset & 0xff);
+    DMA.dmahigh = (uint8_t)(((uint16_t)copyattogamcmd) >> 8);
+    DMA.etrig = (uint8_t)(((uint16_t)copyattogamcmd) & 0xff);
+    return target_offset;
 }
 
 void load_volume_files(void) {

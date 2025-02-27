@@ -6,13 +6,18 @@
 #include <calypsi/intrinsics6502.h>
 #include <mega65.h>
 
+#include "engine.h"
+#include "logic.h"
 #include "memmanage.h"
 #include "sprite.h"
 #include "view.h"
+#include "gfx.h"
 
 #pragma clang section bss="extradata"
 __far agisprite_t sprites[256];
+__far uint8_t animated_sprites[256];
 #pragma clang section bss=""
+uint8_t animated_sprite_count;
 
 void autoselect_loop(uint8_t sprite_num) {
     agisprite_t sprite = sprites[sprite_num];
@@ -128,26 +133,46 @@ uint8_t sprite_move(uint8_t sprite_num) {
         break;
     }
 
-    sprite.view_info.x_pos += view_dx;
-    sprite.view_info.y_pos += view_dy;
-    if (sprite.view_info.x_pos == -1) {
-        sprite.view_info.x_pos = 0;
+    logic_vars[2] = 0;
+    int16_t new_xpos = sprite.view_info.x_pos + view_dx;
+    int16_t new_ypos = sprite.view_info.y_pos + view_dy;
+    if (new_xpos == -1) {
+        logic_vars[2] = 4;
         view_dx = 0;
-    } else if (sprite.view_info.x_pos > (159 - sprite.view_info.width)) {
-        sprite.view_info.x_pos = 159 - sprite.view_info.width;
+    } else if (new_xpos > (159 - sprite.view_info.width)) {
+        logic_vars[2] = 2;
         view_dx = 0;
-    }
+    } 
     
-    if (sprite.view_info.y_pos == -1) {
-        sprite.view_info.y_pos = 0;
+    if ((new_ypos - sprite.view_info.height) == -1) {
+        logic_vars[2] = 1;
         view_dy = 0;
-    } else if (sprite.view_info.y_pos > (167 - sprite.view_info.height)) {
-        sprite.view_info.y_pos = 167 - sprite.view_info.height;
+    } else if (sprite.observe_horizon && (new_ypos <= horizon_line)) {
+        logic_vars[2] = 1;
+        view_dy = 0;
+    } else if (new_ypos > 167) {
+        logic_vars[2] = 3;
         view_dy = 0;
     }
 
-    sprites[sprite_num] = sprite;
-    return ((view_dx != 0) || (view_dy != 0));
+    if (gfx_getprio(new_xpos, new_ypos) < 4) {
+        view_dx = 0;
+        view_dy = 0;
+    }
+
+    if (gfx_getprio(new_xpos + sprite.view_info.width, new_ypos) < 4) {
+        view_dx = 0;
+        view_dy = 0;
+    }
+
+    if ((view_dx != 0) || (view_dy != 0)) {
+        sprite.view_info.x_pos = sprite.view_info.x_pos + view_dx;
+        sprite.view_info.y_pos = sprite.view_info.y_pos + view_dy;
+        sprites[sprite_num] = sprite;
+        return true;
+    }
+
+    return false;
 }
 
 void sprite_set_direction(uint8_t sprite_num, uint8_t direction) {
@@ -162,14 +187,16 @@ void sprite_set_position(uint8_t sprite_num, uint8_t pos_x, uint8_t pos_y) {
 
 void sprite_erase(uint8_t sprite_num) {
     agisprite_t sprite = sprites[sprite_num];
+    if (!sprite.drawable) {
+        return;
+    }
     erase_view(&sprite.view_info);
 }
 
 void sprite_draw(uint8_t sprite_num) {
     agisprite_t sprite = sprites[sprite_num];
-    sprite.cel_index++;
-    if (sprite.cel_index == sprite.view_info.number_of_cels) {
-        sprite.cel_index = 0;
+    if (!sprite.drawable) {
+        return;
     }
     draw_cel(&sprite.view_info, sprite.cel_index);
     sprites[sprite_num] = sprite;
@@ -181,12 +208,14 @@ void sprite_stop_all(void) {
 
 void sprite_unanimate_all(void) {
     for (uint16_t sprite_num = 0; sprite_num < 256; sprite_num++) {
-        sprites[sprite_num].animated = false;
+        sprites[sprite_num].drawable = false;
     }
+    animated_sprite_count = 0;
 }
 
-void sprite_animate(uint8_t sprite_num) {
-    sprites[sprite_num].animated = true;
+void sprite_mark_drawable(uint8_t sprite_num) {
+    sprites[sprite_num].drawable = true;
+    sprites[sprite_num].cycling = true;
 }
 
 void sprite_setedge(uint8_t sprite_num, uint8_t edgenum) {
@@ -195,13 +224,13 @@ void sprite_setedge(uint8_t sprite_num, uint8_t edgenum) {
             sprites[sprite_num].view_info.y_pos = 166;
             break;
         case 2:
-            sprites[sprite_num].view_info.x_pos = 1;
+            sprites[sprite_num].view_info.x_pos = 2;
             break;
         case 3:
-            sprites[sprite_num].view_info.y_pos = 36;
+            sprites[sprite_num].view_info.y_pos = horizon_line + sprites[sprite_num].view_info.height;
             break;
         case 4:
-            sprites[sprite_num].view_info.x_pos = 158;
+            sprites[sprite_num].view_info.x_pos = 157 - sprites[sprite_num].view_info.width;
             break;
     }
 }
@@ -209,14 +238,49 @@ void sprite_setedge(uint8_t sprite_num, uint8_t edgenum) {
 void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
     agisprite_t sprite = sprites[sprite_num];
 
-    view_load(view_number);
     sprite.view_number = view_number;
     sprite.object_dir = 0;
     sprite.cel_index = 0;
     sprite.loop_index = 0;
+    view_set(&sprite.view_info, view_number);
+    select_loop(&sprite.view_info, 0);
     sprites[sprite_num] = sprite;
 }
 
 uint8_t sprite_get_view(uint8_t sprite_num) {
     return sprites[sprite_num].view_number;
+}
+
+void sprite_update_sprites(void) {
+    for (int i = 0; i < animated_sprite_count; i++) {
+    }
+}
+
+void sprite_draw_animated(void) {
+    for (int i = 0; i < animated_sprite_count; i++) {
+        agisprite_t sprite = sprites[animated_sprites[i]];
+        if (sprite.updatable) {
+            sprite_move(animated_sprites[i]);            
+            if (sprite.cycling) {
+                sprite.cel_index++;
+                if (sprite.cel_index == sprite.view_info.number_of_cels) {
+                    sprite.cel_index = 0;
+                }
+            }
+            sprites[animated_sprites[i]] = sprite;
+        }
+        sprite_draw(animated_sprites[i]);
+    }
+}
+
+void sprite_erase_animated(void) {
+    for (int i = animated_sprite_count; i > 0; i--) {
+        if (sprites[animated_sprites[i-1]].updatable) {
+            sprite_erase(animated_sprites[i-1]);
+        } 
+    }
+}
+
+void sprite_init(void) {
+    animated_sprite_count = 0;
 }

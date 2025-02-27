@@ -1,6 +1,9 @@
 #ifndef PIC_H
 #define PIC_H
 
-uint8_t draw_pic(uint8_t screen_num, uint8_t pic_num, uint8_t draw_mode);
+uint8_t draw_pic(void);
+void pic_load(uint8_t pic_num);
+void pic_discard(uint8_t pic_num);
+
 
 #endif

@@ -5,6 +5,7 @@
 
 #include "sound.h"
 #include "irq.h"
+#include "logic.h"
 #include "simplefile.h"
 #include "volume.h"
 
@@ -15,13 +16,18 @@ volatile uint16_t voice_offsets[3];
 volatile uint8_t voice_stopped[3] = {0};
 volatile uint16_t durations[3] = {0};
 volatile uint8_t voice_holds[3];
+volatile uint8_t flag_end;
+volatile uint8_t sound_running;
 
-void play_sound(uint8_t sound_num) {
+void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     uint16_t length;
     sound_file = locate_volume_object(voSound, sound_num, &length);
     if (sound_file == NULL) {
         return;
     }
+
+    flag_end = flag_at_end;
+
     voice_offsets[0] = (sound_file[1] << 8) | sound_file[0];
     voice_offsets[1] = (sound_file[3] << 8) | sound_file[2];
     voice_offsets[2] = (sound_file[5] << 8) | sound_file[4];
@@ -37,6 +43,8 @@ void play_sound(uint8_t sound_num) {
     SID1.v3.sr = 0xc0;
     SID1.v2.pw = 0x200;
 
+    sound_running = 1;
+
     durations[0] = 1;
     durations[1] = 1;
     durations[2] = 1;
@@ -45,15 +53,31 @@ void play_sound(uint8_t sound_num) {
     voice_stopped[2] = 0;
 }
 
+void sound_stop(void) {
+    if (sound_running) {
+        sound_running = 0;
+        voice_stopped[0] = 1;
+        voice_stopped[1] = 1;
+        voice_stopped[2] = 1;
+        SID1.v1.ctrl = 0x00;
+        SID1.v2.ctrl = 0x00;
+        SID1.v3.ctrl = 0x00;
+        SID1.amp = 0x00;
+        logic_set_flag(flag_end);
+    }
+}
+
 void wait_sound(void) {
     while (!voice_stopped[0] || !voice_stopped[1] || !voice_stopped[2]) {
     }
 }
 
 void sound_interrupt_handler(void) {
+    uint8_t acted = 0;
     for (uint8_t voice=0; voice < 3; voice++) {
         --durations[voice];
         if (!voice_stopped[voice]) {
+            acted = 1;
             uint16_t voice_offset = voice_offsets[voice];
             volatile struct __sid_voice *sid;
             switch(voice) {
@@ -96,5 +120,8 @@ void sound_interrupt_handler(void) {
                 }
             }
         }
+    }
+    if (!acted) {
+        sound_stop();
     }
 }

@@ -21,6 +21,7 @@
 volatile uint8_t view_x = 40;
 volatile uint8_t view_y = 40;
 volatile uint8_t frame_counter;
+volatile uint8_t run_cycles;
 static uint8_t picture = 1;
 static uint8_t keypress_up;
 static uint8_t keypress_down;
@@ -29,12 +30,13 @@ static uint8_t keypress_right;
 static uint8_t last_cursorreg;
 static uint8_t last_columnzero;
 static uint8_t keypress_f5;
-volatile uint8_t drawing_screen = 2;
-volatile uint8_t viewing_screen = 0;
 volatile uint8_t frame_dirty;
+volatile bool run_engine;
+volatile bool engine_running;
 static char command_buffer[38];
 static uint8_t cmd_buf_ptr = 0;
-
+static bool input_ok;
+uint8_t horizon_line;
 
 /*
     0000 = inv
@@ -135,8 +137,8 @@ void engine_unblock(void) {
 
 }
 
-void engine_horizon(uint8_t horizon_line) {
-
+void engine_statusline(bool enable) {
+    
 }
 
 void parse_debug_command(char *command) {
@@ -149,20 +151,13 @@ void parse_debug_command(char *command) {
         sprite_erase(0);
         sprite_set_direction(0,0);
         uint8_t pic_num = atoi(arg);
-        draw_pic(drawing_screen, pic_num, 0);
-        sprite_draw(0);
-        drawing_screen ^= viewing_screen;
-        viewing_screen ^= drawing_screen;
-        drawing_screen ^= viewing_screen;
-        gfx_showgfx(viewing_screen);
-        gfx_copygfx(viewing_screen);
     } else if (0 == strcmp(cmd, "SOUND")) {
         char *arg = strtok(NULL, " ");
         if (arg == NULL) {
             return;
         }
         uint8_t sound_num = atoi(arg);
-        play_sound(sound_num);
+        //play_sound(sound_num);
     } else if (0 == strcmp(cmd, "VIEW")) {
         char *arg = strtok(NULL, " ");
         if (arg == NULL) {
@@ -180,24 +175,47 @@ void parse_debug_command(char *command) {
 void engine_clear_keyboard(void) {
     command_buffer[0] = 0;
     cmd_buf_ptr=0;
-    gfx_print_splitascii("\r>");
+    ASCIIKEY = 0;
+    //gfx_print_splitascii(">");
+}
+
+void engine_allowinput(bool allowed) {
+    input_ok = allowed;
 }
 
 void run_loop(void) {
     view_init();
+    sprite_init();
     gfx_switchto();
     gfx_blackscreen();
-    gfx_print_splitchar(CHAR_CLEARHOME);
-    gfx_showgfx(0);
-    hook_irq();
-    gfx_print_splitascii("Welcome to AGI demo!\r");
     logic_init();
+    frame_counter = 0;
+    run_cycles = 0;
+    run_engine = false;
+    engine_running = false;
+    hook_irq();
+    input_ok = false;
     while (1) {
-        logic_run(0);
-        gfx_print_splitascii("Logic cycle ended\r");
+        while(!run_engine);
+        engine_running = true;
+        run_engine = false;
+
+        run_cycles++;
+        if (run_cycles > logic_vars[10]) {
+            sprite_erase_animated();
+            handle_movement_joystick();
+            if (sprite_move(0)) {
+                logic_vars[6] = sprites[0].object_dir;
+            } else {
+                logic_vars[6] = 0;
+            }
+            logic_run(0);
+            sprite_draw_animated();
+            run_cycles = 0;
+        }
+        engine_running = false;
     }
     while (1) {
-        handle_movement_joystick();
         if (frame_counter == 0) {
             if (ASCIIKEY != 0) {
                 uint8_t petscii = PETSCIIKEY;
@@ -205,18 +223,18 @@ void run_loop(void) {
                 if (petscii == 0x14) {
                     if (cmd_buf_ptr > 0) {
                         cmd_buf_ptr--;
-                        gfx_print_splitchar(petscii);
+                        //gfx_print_splitchar(petscii);
                     }
                 } else if (petscii == 0x0d) {
                     command_buffer[cmd_buf_ptr] = 0;
                     parse_debug_command(command_buffer);
                     cmd_buf_ptr=0;
-                    gfx_print_splitchar(petscii);
-                    gfx_print_splitchar('>');
+                    //gfx_print_splitchar(petscii);
+                    //gfx_print_splitchar('>');
                 } else {
                     if (cmd_buf_ptr < 37) {
                         command_buffer[cmd_buf_ptr] = petscii;
-                        gfx_print_splitchar(petscii);
+                        //gfx_print_splitchar(petscii);
                         cmd_buf_ptr++;
                     }
                 }
@@ -233,16 +251,11 @@ void run_loop(void) {
 
 void engine_interrupt_handler(void) {
     frame_counter++;
-    if (frame_counter < 2) {
+    if (frame_counter < 3) {
         return;
     }
-    frame_counter = 0;
-    if (frame_dirty) {
-        drawing_screen ^= viewing_screen;
-        viewing_screen ^= drawing_screen;
-        drawing_screen ^= viewing_screen;
-        gfx_showgfx(viewing_screen);
-        gfx_copygfx(viewing_screen);
-        frame_dirty = 0;
+    if (gfx_flippage()) {
+        run_engine = true;
+        frame_counter = 0;
     }
 }

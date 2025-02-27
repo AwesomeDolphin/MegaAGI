@@ -10,6 +10,7 @@
 #include "volume.h"
 #include "pic.h"
 #include "main.h"
+#include "memmanage.h"
 
 typedef struct fill_info {
     int16_t x1;
@@ -26,7 +27,8 @@ static    uint8_t priority_on;
 static uint8_t last_relative_x;
 static uint8_t last_relative_y;
 static uint16_t fill_pointer;
-static uint8_t drawing_screen;
+static uint16_t pic_length;
+static uint16_t pic_offset;
 
 #pragma clang section bss="extradata"
 __far static fill_info_t fills[128];
@@ -34,19 +36,19 @@ __far static fill_info_t fills[128];
 
 void pset(uint8_t x, uint8_t y) {
     if (pic_on) {
-        gfx_plotput(drawing_screen, x, y, pic_color);
+        gfx_plotput(x, y, pic_color);
     }
     if (priority_on) {
-        gfx_plotput(drawing_screen+1, x, y, priority_color);
+        gfx_plotput(x, y, priority_color | 0x80);
     }
 }
 
 void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
     if (pic_on) {
-        gfx_drawslowline(drawing_screen, x1, y1, x2, y2, pic_color);
+        gfx_drawslowline(x1, y1, x2, y2, pic_color);
     }
     if (priority_on) {
-        gfx_drawslowline(drawing_screen+1, x1, y1, x2, y2, priority_color);
+        gfx_drawslowline(x1, y1, x2, y2, priority_color | 0x80);
     }
 }
 
@@ -75,9 +77,9 @@ uint8_t can_fill(uint8_t x, uint8_t y) {
         return 0;
     }
     if (pic_on == 0) {
-        return (gfx_get(drawing_screen + 1, x, y) == 4);
+        return (gfx_getprio(x, y) == 4);
     }
-    return (gfx_get(drawing_screen, x, y) == 15);
+    return (gfx_get(x, y) == 15);
 }
 
 uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
@@ -136,16 +138,11 @@ uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
     return max_depth;
 }
 
-uint8_t draw_pic(uint8_t screen_num, uint8_t pic_num, uint8_t draw_mode) {
-    drawing_screen = screen_num;
-    gfx_cleargfx(drawing_screen);
+uint8_t draw_pic(void) {
+    gfx_cleargfx();
     uint8_t max_depth = 1;
-    uint8_t __huge *pic_file;
-    uint16_t length;
-    pic_file = locate_volume_object(voPic, pic_num, &length);
-    if (pic_file == NULL) {
-        return 0;
-    }
+    uint8_t __far *pic_file;
+    pic_file = chipmem_base + pic_offset;
 
     pic_on = 0;
     priority_on = 0;
@@ -232,7 +229,8 @@ uint8_t draw_pic(uint8_t screen_num, uint8_t pic_num, uint8_t draw_mode) {
                 break;
             case 0xFA:
             case 0xFF:
-                return max_depth;
+                index = 0xffff;
+                break;
             default:
                 gfx_switchfrom();
                 while (ASCIIKEY==0);
@@ -240,6 +238,23 @@ uint8_t draw_pic(uint8_t screen_num, uint8_t pic_num, uint8_t draw_mode) {
                 gfx_switchto();
                 return 0;
         }
-    } while (index < length);
+    } while (index < pic_length);
+    pic_color = 0;
+    pic_on = 1;
+    priority_color = 4;
+    priority_on = 1;
+    draw_line(0, 167, 199, 167);
     return max_depth;
+}
+
+void pic_load(uint8_t pic_num) {
+    pic_offset = load_volume_object(voPic, pic_num, &pic_length);
+    if (pic_offset == 0) {
+        gfx_print_ascii(0, 0, "FAULT: Failed to load pic %d.", pic_num);
+        return;
+    }
+}
+
+void pic_discard(uint8_t pic_num) {
+    chipmem_free(pic_offset);
 }

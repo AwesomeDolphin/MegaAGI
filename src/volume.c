@@ -111,6 +111,7 @@ uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *ob
     if (volobj_file == NULL) {
         return 0;
     }
+    *object_length = length;
     copyattogamcmd[1] = ((uint32_t)volobj_file & 0xff00000) >> 20;
     copyattogamcmd[8] = ((uint32_t)volobj_file & 0x00f0000) >> 16;
     copyattogamcmd[7] = ((uint32_t)volobj_file & 0x000ff00) >> 8;

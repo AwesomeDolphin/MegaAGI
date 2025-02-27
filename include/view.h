@@ -14,6 +14,8 @@ typedef struct view_info {
     uint8_t height;
     int16_t x_pos;
     int16_t y_pos;
+    bool priority_override;
+    uint8_t priority;
 } view_info_t;
 
 void draw_cel(view_info_t *info, uint8_t cel);
@@ -23,6 +25,7 @@ uint8_t get_num_loops(uint8_t view_number);
 void view_set(view_info_t *info, uint8_t view_num);
 bool view_load(uint8_t view_num);
 void view_unload(uint8_t view_num);
+void view_purge(uint16_t freed_offset);
 void view_init(void);
 
 #endif

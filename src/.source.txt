@@ -1,75 +1,72 @@
-        .extern _Zp
+            .extern _Zp
+            .extern irq_handler
+            .extern _InterruptChain
+            .extern viewing_screen
 
-CHKIN:  .equlab 0xffc6
-OPEN:   .equlab 0xffc0
-CLRCHN: .equlab 0xffcc
-SETLFS: .equlab 0xffba
-SETNAM: .equlab 0xffbd
-CHRIN:  .equlab 0xffcf
-CHROUT: .equlab 0xffd2
-READST: .equlab 0xffb7
-CLOSE:  .equlab 0xffc3
+VECTOR:     .equlab 0xff8d
+LINESTEPL:  .equlab 0xd058
+CHRXSCL:    .equlab 0xd05a
+CHRCOUNT:   .equlab 0xd05e
+SCRNPTRMSB: .equlab 0xd061
 
-        .section code
-        .public simpleopen
-simpleopen:
-        ldx zp:_Zp+0
-        ldy zp:_Zp+1
-        jsr SETNAM
-        lda #0x02
-        ldx #0x08
-        ldy #0x02
-        jsr SETLFS
-        jsr OPEN
-        jmp CLRCHN
+            .section code
 
-        .public simpleread
-simpleread:
-        ldx #0x02
-        jsr CHKIN
-        ldy #0x00
-readnext:
-        jsr CHRIN
-        tax
-        jsr READST
-        and #0x02
-        bne readfail
-        txa
-        sta (zp:_Zp+0),y
-        jsr READST
-        iny
-        and #0x40
-        bne readeoi
-        cpy #0xff
-        bne readnext
+vectab:     .space 56
 
-readeoi:
-        jsr CLRCHN
-        tya
-        rts
+            .align 256
+            .public basepage
+basepage:   .space 256
 
-readfail:
-        lda #0x00
-        jmp CLRCHN
+            .public hook_irq
+hook_irq:  
+            ldx #.byte0 vectab
+            ldy #.byte1 vectab
+            sec
+            jsr VECTOR
 
-        .public simplewrite
-simplewrite:
-        jmp CHROUT
+            lda vectab + 0
+            sta _InterruptChain + 0
+            lda vectab + 1
+            sta _InterruptChain + 1
 
-        .public simpleprint
-simpleprint:
-        ldy #0x00
-print$:
-        lda (zp:_Zp+0),y
-        beq doneprint$
-        jsr CHROUT
-        iny
-        
-        jmp print$
-doneprint$:
-        rts
+            lda #.byte0 _irq_rt
+            sta vectab + 0
+            lda #.byte1 _irq_rt
+            sta vectab + 1
 
-        .public simpleclose
-simpleclose:
-        lda #0x02
-        jmp CLOSE
+            sei
+            ldx #.byte0 vectab
+            ldy #.byte1 vectab
+            clc
+            jsr VECTOR
+
+            lda #0x1b
+            sta 0xd011
+
+            cli
+
+            rts
+
+            .public unhook_irq
+unhook_irq:
+            ldx _InterruptChain + 0
+            stx vectab + 0
+            ldx _InterruptChain + 1
+            stx vectab + 1
+
+            sei
+            ldx #.byte0 vectab
+            ldy #.byte1 vectab
+            clc
+            jsr VECTOR
+            cli
+
+            lda #0x00
+            sta zp:_Zp+0
+            sta zp:_Zp+1
+            rts
+
+            .public _irq_rt
+_irq_rt:
+            jmp irq_handler
+

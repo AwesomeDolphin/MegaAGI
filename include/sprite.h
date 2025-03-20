@@ -20,6 +20,7 @@ typedef struct {
     bool observe_blocks;
     bool on_water;
     bool wander;
+    bool frozen;
 
     bool cycling;
 } agisprite_t;

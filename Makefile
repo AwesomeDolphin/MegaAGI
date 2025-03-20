@@ -11,22 +11,22 @@ OBJS = $(ASM_SRCS:%.s=obj/%.o) $(C_SRCS:%.c=obj/%.o)
 OBJS_DEBUG = $(ASM_SRCS:%.s=obj/%-debug.o) $(C_SRCS:%.c=obj/%-debug.o)
 
 obj/%.o: %.s
-	as6502 --target=mega65 --list-file=$(@:%.o=%.lst) -o $@ $<
+	as6502 --target=mega65 --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%.o: %.c
-	cc6502 --target=mega65 -O2 $(INC) --list-file=$(@:%.o=%.lst) -o $@ $<
+	cc6502 --target=mega65 -O2 $(INC) --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%-debug.o: %.s
-	as6502 --target=mega65 --debug --list-file=$(@:%.o=%.lst) -o $@ $<
+	as6502 --target=mega65 --debug --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%-debug.o: %.c
-	cc6502 --target=mega65 --debug --list-file=$(@:%.o=%.lst) -o $@ $<
+	cc6502 --target=mega65 --debug --list-file=$(@:%.o=%.clst) -o $@ $<
 
 agi.prg:  $(OBJS)
-	ln6502 --target=mega65 mega65-agi.scm -o $@ $^  --output-format=prg --list-file=agi-mega65.lst
+	ln6502 --target=mega65 mega65-agi.scm -o $@ $^  --output-format=prg --list-file=agi-mega65.cmap
 
 agi.elf: $(OBJS_DEBUG)
-	ln6502 --target=mega65 mega65-agi.scm --debug -o $@ $^ --list-file=agi-debug.lst --semi-hosted
+	ln6502 --target=mega65 mega65-agi.scm --debug -o $@ $^ --list-file=agi-debug.cmap --semi-hosted
 
 agi.d81: agi.prg
 	$(C1541) -format "agi,a1" d81 agi.d81
@@ -40,5 +40,5 @@ agi.d81: agi.prg
 	$(C1541) -attach agi.d81 -write volumes/VOL.2 vol.2,s
 
 clean:
-	-rm $(OBJS) $(OBJS:%.o=%.lst) $(OBJS_DEBUG) $(OBJS_DEBUG:%.o=%.lst)
-	-rm agi.elf agi.prg agi-mega65.lst agi-debug.lst
+	-rm $(OBJS) $(OBJS:%.o=%.clst) $(OBJS_DEBUG) $(OBJS_DEBUG:%.o=%.clst)
+	-rm agi.elf agi.prg agi-mega65.cmap agi-debug.cmap

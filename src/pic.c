@@ -243,7 +243,7 @@ uint8_t draw_pic(void) {
     pic_on = 1;
     priority_color = 4;
     priority_on = 1;
-    draw_line(0, 167, 199, 167);
+    draw_line(0, 167, 159, 167);
     return max_depth;
 }
 

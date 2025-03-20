@@ -13,6 +13,7 @@
 uint8_t vic4cache[14];
 volatile uint8_t __far *drawing_xpointer[2][160];
 static uint16_t printpos = 0;
+static uint16_t endpos;
 volatile uint8_t drawing_screen = 1;
 volatile uint8_t viewing_screen = 0;
 static volatile bool stop_flip;
@@ -154,7 +155,7 @@ void loadvic(void) {
   VICIV.colptr = (vic4cache[12] << 8) | vic4cache[13];
 }
 
-void gfx_print_asciichar(uint8_t character) {
+void gfx_print_asciichar(uint8_t character, bool reverse) {
   if (character < 32) {
     character = character + 0x80;
   } else if (character < 64) {
@@ -170,10 +171,24 @@ void gfx_print_asciichar(uint8_t character) {
   } else {
     character = character + 0x80;
   }
+  if (reverse) {
+    character = character ^ 0x80;
+  }
   screen_memory_0[printpos] = character;
   screen_memory_1[printpos] = character;
   color_memory[printpos] = 0x0100;
   printpos++;
+}
+
+void gfx_print_scncode(uint8_t scncode) {
+  screen_memory_0[printpos] = scncode;
+  screen_memory_1[printpos] = scncode;
+  color_memory[printpos] = 0x0100;
+  printpos++;
+}
+
+void gfx_set_printpos(uint8_t x, uint8_t y) {
+  printpos = (y * 61) + 20 + x; 
 }
 
 uint8_t my_ultoa_invert(unsigned long val, char *str, int base)
@@ -203,12 +218,28 @@ uint8_t my_ultoa_invert(unsigned long val, char *str, int base)
   return len;
 }
 
-void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
+void gfx_begin_print(uint8_t x, uint8_t y) {
   printpos = (y * 61) + 20;
-  uint16_t endpos = printpos+40;
+  endpos = printpos+40;
   screen_memory_0[printpos] = x * 8;
   screen_memory_1[printpos] = x * 8;
   printpos++;
+}
+
+void gfx_end_print(void) {
+  if (printpos < endpos) {
+    screen_memory_0[printpos] = 0x140;
+    screen_memory_1[printpos] = 0x140;
+    color_memory[printpos] = 0x0010;       
+  } else if (printpos == endpos) {
+    screen_memory_0[printpos] = 0x0020;
+    screen_memory_1[printpos] = 0x0020;
+    color_memory[printpos] = 0x0100;       
+  }
+}
+
+void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
+  gfx_begin_print(x,y);
   va_list ap;
   va_start(ap, formatstring);
   uint8_t *ascii_string = (uint8_t *)formatstring;
@@ -223,7 +254,7 @@ void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
           uint32_t param = va_arg(ap, unsigned int);
           uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'x') ? 16 : 10);
           for (; len > 0; len--) {
-            gfx_print_asciichar(buffer[len-1]);
+            gfx_print_asciichar(buffer[len-1], false);
           }
           break;
         }
@@ -233,7 +264,7 @@ void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
           uint32_t param = va_arg(ap, unsigned long);
           uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'X') ? 16 : 10);
           for (; len > 0; len--) {
-            gfx_print_asciichar(buffer[len-1]);
+            gfx_print_asciichar(buffer[len-1], false);
           }
           break;
         }
@@ -241,19 +272,11 @@ void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
       ascii_string++;
       continue;
     }
-    gfx_print_asciichar(petsciichar);
+    gfx_print_asciichar(petsciichar, false);
     ascii_string++;
   }
   va_end(ap);
-  if (printpos < endpos) {
-    screen_memory_0[printpos] = 0x140;
-    screen_memory_1[printpos] = 0x140;
-    color_memory[printpos] = 0x0010;       
-  } else if (printpos == endpos) {
-    screen_memory_0[printpos] = 0x0020;
-    screen_memory_1[printpos] = 0x0020;
-    color_memory[printpos] = 0x0100;       
-  }
+  gfx_end_print();
 }
 
 void gfx_clear_line(uint8_t y) {
@@ -290,6 +313,7 @@ int agi_q15round(q15_16t aNumber, int16_t dirn)
 }
 
 void gfx_plotput(uint8_t x, uint8_t y, uint8_t color) {
+  if (y > 167) {POKE(0xD020,7); while(1);}
   if (color & 0x80) {
     uint8_t highcolor[16] = {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0};
     uint8_t highpix = x & 1;
@@ -304,8 +328,8 @@ void gfx_plotput(uint8_t x, uint8_t y, uint8_t color) {
   } else {
     uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
     uint16_t row = y * 8;
-    volatile uint8_t __far *target_pixel;
-    target_pixel = drawing_xpointer[drawing_screen][x] + row;
+    volatile uint8_t __far *target_pixel = drawing_xpointer[drawing_screen][x];
+    target_pixel += row;
     *target_pixel = colorval[color];
     }
 }
@@ -487,7 +511,7 @@ void gfx_switchto(void) {
     
     gfx_setupmem();
 
-    VICIV.ctrl1 = 0x0b;
+    VICIV.ctrl1 = 0x1b;
     VICIV.ctrl2 = VICIV.ctrl2 | 0x10;
     VICIV.ctrla = VICIV.ctrla | VIC3_PAL_MASK;
     VICIV.ctrlb = VICIV.ctrlb & ~(VIC3_H640_MASK | VIC3_V400_MASK);

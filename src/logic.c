@@ -39,7 +39,7 @@ static uint8_t __far *program_counter;
 static uint8_t __far *logic_strings;
 static char game_id[8];
 static uint8_t logic_stack_ptr;
-static uint8_t local_string[40];
+static uint8_t local_string[256];
 
 void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {
     *dest_string = *src_string;
@@ -61,12 +61,14 @@ void logic_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string) {
 
 void logic_set_flag(uint8_t flag) {
     uint8_t flag_reg = (flag >> 3);
-    logic_flags[flag_reg] = logic_flags[flag_reg] | (1 << (flag & 0x07));
+    uint8_t flag_reg_val = (1 << (flag & 0x07));
+    logic_flags[flag_reg] |= flag_reg_val;
 }
 
 void logic_reset_flag(uint8_t flag) {
     uint8_t flag_reg = (flag >> 3);
-    logic_flags[flag_reg] &= ~(logic_flags[flag_reg] | (1 << (flag & 0x07)));
+    uint8_t flag_reg_val = ~(1 << (flag & 0x07));
+    logic_flags[flag_reg] &= flag_reg_val;
 }
 
 uint16_t logic_locate_message(uint8_t logic_num, uint8_t message_num) {
@@ -278,7 +280,7 @@ void logic_run(uint8_t logic_num) {
                 sprite_stop_all();
                 sprite_unanimate_all();
                 chipmem_free_unlocked();
-                engine_player_control(true);
+                player_control = true;
                 engine_unblock();
                 horizon_line = 36;
                 logic_vars[1] = logic_vars[0];
@@ -302,14 +304,11 @@ void logic_run(uint8_t logic_num) {
             }
             case 0x16: {
                 // call
-                // TODO: Restore direct call
-                /*
                 logic_stack_ptr--;
                 logic_stack[logic_stack_ptr].return_address = program_counter + 2;
                 logic_stack[logic_stack_ptr].return_logic_num = logic_num;
                 logic_num = program_counter[1];
-                program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);*/
-                program_counter += 2;
+                program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
                 break;
             }
             case 0x17: {
@@ -370,6 +369,12 @@ void logic_run(uint8_t logic_num) {
             case 0x23: {
                 // draw
                 sprite_mark_drawable(program_counter[1]);
+                program_counter += 2;
+                break;
+            }
+            case 0x24: {
+                // erase
+                sprites[program_counter[1]].drawable = false;
                 program_counter += 2;
                 break;
             }
@@ -496,8 +501,32 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 2;
                 break;
             }
+            case 0x4D: {
+                // stop.motion
+                sprites[program_counter[1]].object_dir = 0;
+                sprites[program_counter[1]].frozen = true;
+                player_control = false;
+                program_counter += 2;
+                break;
+            }
+            case 0x4E: {
+                // stop.motion
+                sprites[program_counter[1]].object_dir = 0;
+                sprites[program_counter[1]].frozen = false;
+                player_control = true;
+                program_counter += 2;
+                break;
+            }
+            case 0x53: {
+                // follow.ego
+                program_counter += 4;
+                break;
+            }
             case 0x54: {
-                sprites[program_counter[1]].wander = false;
+                sprites[program_counter[1]].wander = true;
+                if (program_counter[1] == 0) {
+                    player_control = false;
+                }
                 program_counter += 2;
                 break;
             }
@@ -525,6 +554,22 @@ void logic_run(uint8_t logic_num) {
             case 0x64: {
                 sound_stop();
                 program_counter += 1;
+                break;
+            }
+            case 0x65: {
+                // print
+                uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[1]);
+                logic_strcpy_far_near(local_string, src_string);
+                engine_display_dialog(local_string);
+                program_counter += 2;
+                break;
+            }
+            case 0x66: {
+                // print.v
+                uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[1]]);
+                logic_strcpy_far_near(local_string, src_string);
+                engine_display_dialog(local_string);
+                program_counter += 2;
                 break;
             }
             case 0x67: {
@@ -596,11 +641,24 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 4;
                 break;
             }
-            case 0x8e: {
+            case 0x83: {
+                // program.control
+                player_control = false;
+                program_counter += 1;
+                break;
+            }
+            case 0x84: {
+                // player.control
+                player_control = true;
+                program_counter += 1;
+                break;
+            }
+            case 0x8E: {
+                // script.size
                 program_counter += 2;
                 break;
             }
-            case 0x8f: {
+            case 0x8F: {
                 uint16_t message_offset = logic_locate_message(logic_num, program_counter[1]);
                 for (uint16_t counter = 0; counter < 7; counter++) {
                     game_id[counter] = logic_infos[logic_num].text_offset[message_offset + counter];

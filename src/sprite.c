@@ -94,6 +94,9 @@ uint8_t sprite_move(uint8_t sprite_num) {
     int16_t view_dx;
     int16_t view_dy;
     agisprite_t sprite = sprites[sprite_num];
+    if (sprite.frozen) {
+        return false;
+    }
     switch (sprite.object_dir) {
         case 0:
         view_dx = 0;
@@ -133,45 +136,77 @@ uint8_t sprite_move(uint8_t sprite_num) {
         break;
     }
 
-    logic_vars[2] = 0;
+    uint8_t ego_border = 0;
     int16_t new_xpos = sprite.view_info.x_pos + view_dx;
     int16_t new_ypos = sprite.view_info.y_pos + view_dy;
-    if (new_xpos == -1) {
-        logic_vars[2] = 4;
-        view_dx = 0;
+    if (new_xpos == 0) {
+        ego_border = 4;
+        sprite.object_dir = 0;
     } else if (new_xpos > (159 - sprite.view_info.width)) {
-        logic_vars[2] = 2;
-        view_dx = 0;
+        ego_border = 2;
+        sprite.object_dir = 0;
     } 
     
     if ((new_ypos - sprite.view_info.height) == -1) {
-        logic_vars[2] = 1;
-        view_dy = 0;
+        ego_border = 1;
+        sprite.object_dir = 0;
     } else if (sprite.observe_horizon && (new_ypos <= horizon_line)) {
-        logic_vars[2] = 1;
-        view_dy = 0;
+        ego_border = 1;
+        sprite.object_dir = 0;
     } else if (new_ypos > 167) {
-        logic_vars[2] = 3;
-        view_dy = 0;
+        ego_border = 3;
+        sprite.object_dir = 0;
     }
 
-    if (gfx_getprio(new_xpos, new_ypos) < 4) {
-        view_dx = 0;
-        view_dy = 0;
+    uint8_t left_prio = gfx_getprio(new_xpos, new_ypos);
+    uint8_t right_prio = gfx_getprio(new_xpos + sprite.view_info.width, new_ypos);
+    if ((left_prio == 0) || (right_prio == 0)) {
+        sprite.object_dir = 0;
     }
 
-    if (gfx_getprio(new_xpos + sprite.view_info.width, new_ypos) < 4) {
-        view_dx = 0;
-        view_dy = 0;
+    if (((left_prio == 1) || (right_prio == 1)) && sprite.observe_blocks){
+        sprite.object_dir = 0;
     }
 
-    if ((view_dx != 0) || (view_dy != 0)) {
+    if ((left_prio == 2) || (right_prio == 2)) {
+        if (sprite_num == 0) {
+            logic_set_flag(3);
+        } 
+    } else {
+        if (sprite_num == 0) {
+            logic_reset_flag(3);
+        } 
+    }
+
+    if ((left_prio == 3) && (right_prio == 3)) {
+        if (sprite_num == 0) {
+            logic_set_flag(0);
+        } 
+        if (!sprite.on_water) {
+            sprite.object_dir = 0;
+        }
+    } else {
+        if (sprite_num == 0) {
+            logic_reset_flag(0);
+        } 
+        if (sprite.on_water) {
+            sprite.object_dir = 0;
+        }
+    }
+
+    if (sprite_num == 0) {
+        logic_vars[2] = ego_border;
+        logic_vars[6] = sprite.object_dir;
+    } 
+    
+    if (sprite.object_dir != 0) {
         sprite.view_info.x_pos = sprite.view_info.x_pos + view_dx;
         sprite.view_info.y_pos = sprite.view_info.y_pos + view_dy;
         sprites[sprite_num] = sprite;
         return true;
     }
 
+    sprites[sprite_num].object_dir = 0;
     return false;
 }
 
@@ -251,23 +286,30 @@ uint8_t sprite_get_view(uint8_t sprite_num) {
     return sprites[sprite_num].view_number;
 }
 
-void sprite_update_sprites(void) {
-    for (int i = 0; i < animated_sprite_count; i++) {
+void sprite_update_sprite(uint8_t sprite_num) {
+    sprite_move(sprite_num);            
+    agisprite_t sprite = sprites[sprite_num];
+    if (sprite.wander) {
+        if (sprite.object_dir == 0)
+        {
+            sprite.object_dir = (rand() % 7) + 1;
+        }
+        
     }
+    if (sprite.cycling) {
+        sprite.cel_index++;
+        if (sprite.cel_index == sprite.view_info.number_of_cels) {
+            sprite.cel_index = 0;
+        }
+    }
+    sprites[sprite_num] = sprite;
 }
 
 void sprite_draw_animated(void) {
     for (int i = 0; i < animated_sprite_count; i++) {
         agisprite_t sprite = sprites[animated_sprites[i]];
         if (sprite.updatable) {
-            sprite_move(animated_sprites[i]);            
-            if (sprite.cycling) {
-                sprite.cel_index++;
-                if (sprite.cel_index == sprite.view_info.number_of_cels) {
-                    sprite.cel_index = 0;
-                }
-            }
-            sprites[animated_sprites[i]] = sprite;
+            sprite_update_sprite(animated_sprites[i]);
         }
         sprite_draw(animated_sprites[i]);
     }

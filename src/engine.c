@@ -37,7 +37,114 @@ static char command_buffer[38];
 static uint8_t cmd_buf_ptr = 0;
 static bool input_ok;
 uint8_t horizon_line;
+bool player_control;
+uint8_t dialog_first;
+uint8_t dialog_last;
+uint16_t dialog_time;
 
+void engine_display_dialog(uint8_t *message_string) {
+    uint8_t box_width = 0;
+    uint8_t box_height = 0;
+    uint8_t line_length = 0;
+    uint8_t word_length = 0;
+    uint8_t msg_char;
+    uint8_t *msg_ptr = message_string;
+    uint8_t *last_word = msg_ptr;
+
+    do {
+        msg_char = *msg_ptr;
+        if (msg_char > 32) {
+            word_length++;
+        } else {
+            if ((msg_char == 32) && (line_length + word_length + 1) < 35) {
+                line_length += word_length + 1;
+                word_length = 0;
+                last_word = msg_ptr;
+            } else {
+                if (line_length > box_width) {
+                    box_width = line_length - 1;
+                }
+                box_height++;
+                line_length = 0;
+                *last_word = '\n';
+            }
+        }
+        msg_ptr++;
+    } while (*msg_ptr != 0);
+
+    uint8_t x_start = 20 - (box_width / 2) - 1;
+    uint8_t y_start = 15 - (box_height / 2) - 1;
+    dialog_first = y_start;
+
+    msg_ptr = message_string;
+    line_length = 0;
+
+    gfx_begin_print(x_start, y_start);
+    gfx_print_scncode(0xEC);
+    while (line_length < box_width) {
+        gfx_print_scncode(0XE2);
+        line_length++;
+    }
+    gfx_print_scncode(0xFB);
+    gfx_end_print();
+
+    y_start++;
+    gfx_begin_print(x_start, y_start);
+    gfx_print_scncode(0x61);
+    do {
+        msg_char = *msg_ptr;
+        if (msg_char >= 32) {
+            gfx_print_asciichar(msg_char, true);
+            line_length++;
+        } else {
+            while (line_length < box_width) {
+                gfx_print_asciichar(' ', true);
+                line_length++;
+            }
+            gfx_print_scncode(0xE1);
+            gfx_end_print();
+            y_start++;
+            gfx_begin_print(x_start, y_start);
+            gfx_print_scncode(0x61);
+            line_length = 0;
+        }
+        msg_ptr++;
+    } while (*msg_ptr != 0);
+    while (line_length < box_width) {
+        gfx_print_asciichar(' ', true);
+        line_length++;
+    }
+    gfx_print_scncode(0xE1);
+    gfx_end_print();
+
+    y_start++;
+    dialog_last = y_start;
+    line_length = 0;
+    gfx_begin_print(x_start, y_start);
+    gfx_print_scncode(0xFC);
+    while (line_length < box_width) {
+        gfx_print_scncode(0X62);
+        line_length++;
+    }
+    gfx_print_scncode(0xFE);
+    gfx_end_print();
+
+    dialog_time = logic_vars[21];
+    if (dialog_time > 0) {
+        dialog_time = (dialog_time * 15) / 10;
+    } else {
+        dialog_time = 0xffff;
+    }
+}
+
+void engine_dialog_close(void) {
+    for (uint8_t line = dialog_first; line <= dialog_last; line++)
+    {
+        gfx_clear_line(line);
+    }
+    dialog_first = 0;
+    dialog_last = 0;
+}
 /*
     0000 = inv
     0001 = inv
@@ -58,6 +165,10 @@ uint8_t horizon_line;
 */
 
 void handle_movement_joystick(void) {
+    if (!player_control) {
+        return;
+    }
+
     const uint8_t joystick_direction[16] = {
         0, 0, 0, 0, 0, 4, 2, 3,
         0, 6, 8, 7, 0, 5, 1, 0
@@ -129,10 +240,6 @@ void handle_movement_keys(void) {
     }
 }*/
 
-void engine_player_control(bool enable) {
-
-}
-
 void engine_unblock(void) {
 
 }
@@ -176,11 +283,54 @@ void engine_clear_keyboard(void) {
     command_buffer[0] = 0;
     cmd_buf_ptr=0;
     ASCIIKEY = 0;
-    //gfx_print_splitascii(">");
+    gfx_print_ascii(0, 22, ">                                       ");
 }
 
 void engine_allowinput(bool allowed) {
     input_ok = allowed;
+    if (input_ok) {
+        engine_clear_keyboard();
+    } else {
+        gfx_print_ascii(0, 22, "                                        ");
+    }
+}
+
+void engine_handleinput(void) {
+    if (dialog_first != dialog_last)
+    {
+        if (ASCIIKEY != 0) {
+            ASCIIKEY = 0;
+            engine_dialog_close();
+        }
+        return;
+    }
+    if (!input_ok) {
+        return;
+    }
+    if (ASCIIKEY != 0) {
+        uint8_t petscii = PETSCIIKEY;
+        ASCIIKEY = 0;
+        if (petscii == 0x14) {
+            if (cmd_buf_ptr > 0) {
+                cmd_buf_ptr--;
+                gfx_set_printpos(cmd_buf_ptr + 3, 22);
+                gfx_print_asciichar(petscii, false);
+            }
+        } else if (petscii == 0x0d) {
+            command_buffer[cmd_buf_ptr] = 0;
+            parse_debug_command(command_buffer);
+            engine_clear_keyboard();
+        } else {
+            if (cmd_buf_ptr < 37) {
+                command_buffer[cmd_buf_ptr] = petscii;
+                gfx_set_printpos(cmd_buf_ptr + 3, 22);
+                gfx_print_asciichar(petscii, false);
+                cmd_buf_ptr++;
+            }
+        }
+    }
+
+
 }
 
 void run_loop(void) {
@@ -195,57 +345,32 @@ void run_loop(void) {
     engine_running = false;
     hook_irq();
     input_ok = false;
+    player_control = true;
+    dialog_first = 0;
+    dialog_last = 0;
     while (1) {
         while(!run_engine);
         engine_running = true;
         run_engine = false;
 
         run_cycles++;
-        if (run_cycles > logic_vars[10]) {
+        if (dialog_first != dialog_last) {
+            if (dialog_time != 0xffff) {
+                dialog_time--;
+                if (dialog_time == 0) {
+                    engine_dialog_close();
+                }
+            }
+        }
+        if (run_cycles >= logic_vars[10]) {
+            engine_handleinput();
             sprite_erase_animated();
             handle_movement_joystick();
-            if (sprite_move(0)) {
-                logic_vars[6] = sprites[0].object_dir;
-            } else {
-                logic_vars[6] = 0;
-            }
             logic_run(0);
             sprite_draw_animated();
             run_cycles = 0;
         }
         engine_running = false;
-    }
-    while (1) {
-        if (frame_counter == 0) {
-            if (ASCIIKEY != 0) {
-                uint8_t petscii = PETSCIIKEY;
-                ASCIIKEY = 0;
-                if (petscii == 0x14) {
-                    if (cmd_buf_ptr > 0) {
-                        cmd_buf_ptr--;
-                        //gfx_print_splitchar(petscii);
-                    }
-                } else if (petscii == 0x0d) {
-                    command_buffer[cmd_buf_ptr] = 0;
-                    parse_debug_command(command_buffer);
-                    cmd_buf_ptr=0;
-                    //gfx_print_splitchar(petscii);
-                    //gfx_print_splitchar('>');
-                } else {
-                    if (cmd_buf_ptr < 37) {
-                        command_buffer[cmd_buf_ptr] = petscii;
-                        //gfx_print_splitchar(petscii);
-                        cmd_buf_ptr++;
-                    }
-                }
-            }
-
-            if (sprite_move(0)) {
-                sprite_draw(0);
-                frame_dirty = 1;
-            }
-            while(frame_dirty);
-        }
     }
 }
 

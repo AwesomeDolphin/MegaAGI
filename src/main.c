@@ -30,6 +30,7 @@ int main () {
   simplewrite(0x0b);
   simplewrite(0x0e);
   simpleprint("AGI DEMO!\r");
+  POKE(1,133);
 
   memmanage_init();
   

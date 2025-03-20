@@ -16,7 +16,7 @@
                 "__INT16_TYPE__ = short",
                 "__UINT16_TYPE__ = unsigned short"
             ],
-            "compilerPath": "C:\\Program Files (x86)\\Calypsi-6502\\bin\\cc6502.exe",
+            "compilerPath": "",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64"

@@ -317,9 +317,7 @@ void sprite_draw_animated(void) {
 
 void sprite_erase_animated(void) {
     for (int i = animated_sprite_count; i > 0; i--) {
-        if (sprites[animated_sprites[i-1]].updatable) {
-            sprite_erase(animated_sprites[i-1]);
-        } 
+        sprite_erase(animated_sprites[i-1]);
     }
 }
 

@@ -2,7 +2,7 @@ VPATH = src
 
 # Common source files
 ASM_SRCS = simplefile.s irq.s
-C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c
+C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c parser.c init.c
 C1541 = c1541
 INC = -I./include
 
@@ -22,15 +22,16 @@ obj/%-debug.o: %.s
 obj/%-debug.o: %.c
 	cc6502 --target=mega65 --debug --list-file=$(@:%.o=%.clst) -o $@ $<
 
-agi.prg:  $(OBJS)
-	ln6502 --target=mega65 mega65-agi.scm -o $@ $^  --output-format=prg --list-file=agi-mega65.cmap
+agi.prg:  mega65-agi.scm $(OBJS)
+	ln6502 --target=mega65 -o $@ $^ --raw-multiple-memories --output-format=prg --list-file=agi-mega65.cmap
 
 agi.elf: $(OBJS_DEBUG)
-	ln6502 --target=mega65 mega65-agi.scm --debug -o $@ $^ --list-file=agi-debug.cmap --semi-hosted
+	ln6502 --target=mega65 --debug -o $@ $^ --list-file=agi-debug.cmap --semi-hosted
 
 agi.d81: agi.prg
 	$(C1541) -format "agi,a1" d81 agi.d81
 	$(C1541) -attach agi.d81 -write agi.prg agi.c65
+	$(C1541) -attach agi.d81 -write nographics.raw nographics,s
 	$(C1541) -attach agi.d81 -write volumes/LOGDIR logdir,s
 	$(C1541) -attach agi.d81 -write volumes/PICDIR picdir,s
 	$(C1541) -attach agi.d81 -write volumes/SNDDIR snddir,s
@@ -38,6 +39,7 @@ agi.d81: agi.prg
 	$(C1541) -attach agi.d81 -write volumes/VOL.0 vol.0,s
 	$(C1541) -attach agi.d81 -write volumes/VOL.1 vol.1,s
 	$(C1541) -attach agi.d81 -write volumes/VOL.2 vol.2,s
+	$(C1541) -attach agi.d81 -write volumes/WORDS.TOK words.tok,s
 
 clean:
 	-rm $(OBJS) $(OBJS:%.o=%.clst) $(OBJS_DEBUG) $(OBJS_DEBUG:%.o=%.clst)

@@ -9,8 +9,6 @@
 #include "simplefile.h"
 #include "volume.h"
 
-#define ASCIIKEY (*(volatile uint8_t *)0xd610)
-
 typedef struct voldir_entry {
     uint8_t volume_number;
     uint32_t offset;
@@ -20,11 +18,14 @@ uint8_t __huge *attic_memory = (uint8_t __huge *)0x8000000;
 
 static uint8_t __huge *volume_files[16] = {0};
 #pragma clang section bss="extradata"
-static voldir_entry_t logic_directory[256];
-static voldir_entry_t pic_directory[256];
-static voldir_entry_t sound_directory[256];
-static voldir_entry_t view_directory[256];
+__far static voldir_entry_t logic_directory[256];
+__far static voldir_entry_t pic_directory[256];
+__far static voldir_entry_t sound_directory[256];
+__far static voldir_entry_t view_directory[256];
 #pragma clang section bss=""
+
+#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+
 
 static uint8_t volumes;
 static uint8_t logic_files;
@@ -32,7 +33,7 @@ static uint8_t pic_files;
 static uint8_t sound_files;
 static uint8_t view_files;
 
-uint8_t load_directory_file(char *dir_file_name, voldir_entry_t *entries) {
+uint8_t load_directory_file(char *dir_file_name, voldir_entry_t __far *entries) {
     uint8_t entry_num = 0;
     uint8_t entrybuf[768];
     simpleopen(dir_file_name, strlen(dir_file_name));
@@ -58,7 +59,7 @@ void load_directory_files(void) {
 }
 
 uint8_t __huge *locate_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length) {
-  voldir_entry_t *volobj_entry = NULL;
+  voldir_entry_t __far *volobj_entry = NULL;
   switch (kind) {
     case voLogic:
       if (volobj_num < logic_files) {
@@ -111,6 +112,7 @@ uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *ob
     if (volobj_file == NULL) {
         return 0;
     }
+
     *object_length = length;
     copyattogamcmd[1] = ((uint32_t)volobj_file & 0xff00000) >> 20;
     copyattogamcmd[8] = ((uint32_t)volobj_file & 0x00f0000) >> 16;
@@ -127,34 +129,60 @@ uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *ob
 }
 
 void load_volume_files(void) {
-    char vol_name[32];
-    strcpy(vol_name, "VOL.0,S,R");
-    uint8_t __huge *volume_cache = attic_memory;
-    uint8_t buffer[2048];
-    int vol_number = 0;
-    for (vol_number = 0; vol_number < 15; vol_number++) {
-      simpleopen(vol_name, strlen(vol_name));
-      vol_name[4]++; 
-      volume_files[vol_number] = volume_cache;
-      size_t bytes_read;
-      uint32_t volume_size = 0;
-      do {
-        bytes_read = simpleread(buffer);
-        if (bytes_read > 0) {
-          for (size_t idx = 0; idx < bytes_read; idx++) {
-            volume_cache[idx] = buffer[idx];
-          }
-          volume_size += bytes_read;
-          volume_cache += bytes_read;
+  char vol_name[32];
+  strcpy(vol_name, "VOL.0,S,R");
+  uint8_t __huge *volume_cache = attic_memory;
+  uint8_t buffer[256];
+  int vol_number = 0;
+  for (vol_number = 0; vol_number < 15; vol_number++) {
+    simpleopen(vol_name, strlen(vol_name));
+    vol_name[4]++; 
+    volume_files[vol_number] = volume_cache;
+    size_t bytes_read;
+    uint32_t volume_size = 0;
+    do {
+      bytes_read = simpleread(buffer);
+      if (bytes_read > 0) {
+        for (size_t idx = 0; idx < bytes_read; idx++) {
+          volume_cache[idx] = buffer[idx];
         }
-      } while (bytes_read > 0);
-      if (volume_size == 0) {
-          volume_files[vol_number] = 0;
-          simpleclose();
-          break;
+        volume_size += bytes_read;
+        volume_cache += bytes_read;
       }
-      simpleclose();
+    } while (bytes_read > 0);
+    if (volume_size == 0) {
+        volume_files[vol_number] = 0;
+        simpleclose();
+        break;
     }
-    volumes = vol_number - 1;
+    simpleclose();
+  }
+  volumes = vol_number - 1;
+}
+
+void load_words_file(void) {
+  char vol_name[32];
+  strcpy(vol_name, "WORDS.TOK,S,R");
+  uint16_t words_offset = chipmem2_alloc(8000);
+  uint8_t __far *words_target = chipmem2_base + words_offset;
+  uint8_t buffer[256];
+
+  simpleopen(vol_name, strlen(vol_name));
+  size_t bytes_read;
+  uint32_t words_size = 0;
+  do {
+    bytes_read = simpleread(buffer);
+
+    if (bytes_read > 0) {
+      for (size_t idx = 0; idx < bytes_read; idx++) {
+        words_target[idx] = buffer[idx];
+      }
+      words_size += bytes_read;
+      words_target += bytes_read;
+    }
+  } while (bytes_read > 0);
+  simpleclose();
+  chipmem2_free(words_offset);
+  chipmem2_alloc(words_size);
 }
 

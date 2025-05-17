@@ -15,6 +15,11 @@
             ]
         },
         {
+            "label" : "senddisk",
+            "command" : "mega65_ftp",
+            "args" : ["-e", "-c", "put agi.d81"]
+        },
+        {
             "label": "clean",
             "type": "shell",
             "command": "make -k clean",

@@ -1,6 +1,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include "stdbool.h"
+
 struct __F018 {
   uint8_t dmalowtrig;
   uint8_t dmahigh;

@@ -13,77 +13,58 @@
 #include "memmanage.h"
 #include "volume.h"
 #include "view.h"
+#include "irq.h"
 
 #pragma clang section bss="extradata"
 __far static uint16_t views[256];
 #pragma clang section bss=""
 
-uint8_t priorities[169];
-
-void setup_priorities(void) {
-    uint8_t priority_level = 4;
-    for (uint8_t counter = 0; counter < 169; counter++) {
-        switch(counter) {
-            case 168:
-            case 156:
-            case 144:
-            case 132:
-            case 120:
-            case 108:
-            case 96:
-            case 84:
-            case 72:
-            case 60:
-            case 48:
-                priority_level++;
-                break;
-        }
-        priorities[counter] = priority_level;
-    }
-}
+static uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+static uint8_t drawview_trans;
+static int16_t drawview_left;
+static int16_t drawview_top;
+static uint8_t drawview_right;
+static uint8_t drawview_bottom;
+static uint8_t objprio;
+static uint8_t highprio;
+static uint8_t lowprio;
 
 void draw_cel_uncompressed(view_info_t *info) {
-    uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-
     uint8_t __far *cel_data = chipmem_base + info->cel_offset;
     info->backbuffer_offset = chipmem_alloc(info->height * info->width);
     uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
-    uint8_t view_trans = colorval[cel_data[2] & 0x0f];
-    int16_t view_left = info->x_pos;
-    int16_t view_top = info->y_pos - info->height + 1;
-    uint8_t view_right = info->x_pos + info->width;
-    uint8_t view_bottom = info->y_pos;
     uint16_t pixel_offset = 0;
 
-    uint8_t objprio;
-    if (info->priority_override) {
-        objprio = colorval[info->priority];
-    } else {
-        objprio = colorval[priorities[view_bottom]];
-    }
+    drawview_trans = colorval[cel_data[2] & 0x0f];
+    drawview_left = info->x_pos;
+    drawview_top = info->y_pos - info->height + 1;
+    drawview_right = info->x_pos + info->width;
+    drawview_bottom = info->y_pos;
+
+    objprio = colorval[info->priority];
+    highprio = objprio & 0xf0;
+    lowprio = objprio & 0x0f;
 
     cel_data += 3;
-    for (int16_t draw_col = view_left; draw_col < view_right; draw_col++) {
-        if ((draw_col < 0) || (draw_col > 159)) {
+    for (int16_t draw_col = drawview_left; draw_col < drawview_right; draw_col++) {
+        if ((draw_col == 0) || (draw_col > 158)) {
             continue;
         }
-        volatile uint8_t __far *draw_pointer = drawing_xpointer[drawing_screen][draw_col] + (view_top * 8);
+        volatile uint8_t *draw_pointer = fastdrawing_xpointer[draw_col] + (drawview_top * 8);
         uint8_t xcolumn = draw_col >> 1;
         uint8_t highpix = draw_col & 1;
-        volatile uint8_t __far *priority_pointer = &priority_screen[(view_top * 80) + xcolumn];
-        uint8_t search_length = 0;
+        volatile uint8_t __far *priority_pointer = &priority_screen[(drawview_top * 80) + xcolumn];
         uint8_t prioval;
         if (highpix) {
-            for (int16_t draw_row = view_top; draw_row <= view_bottom; draw_row++) {
+            for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
                 if ((draw_row < 0) || (draw_row > 167)) {
                     continue;
                 }
                 prioval = *priority_pointer & 0xf0;
                 priority_pointer += 80;
-                search_length--;
                 view_backbuf[pixel_offset] = *draw_pointer;
-                if (*cel_data != view_trans) {
-                    if ((prioval) <= (objprio & 0xf0)) {
+                if (*cel_data != drawview_trans) {
+                    if ((prioval) <= highprio) {
                         *draw_pointer = *cel_data;
                     }
                 }
@@ -92,13 +73,12 @@ void draw_cel_uncompressed(view_info_t *info) {
                 cel_data++;
             }
         } else {
-            for (int16_t draw_row = view_top; draw_row <= view_bottom; draw_row++) {
+            for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
                 prioval = *priority_pointer & 0x0f;
                 priority_pointer += 80;
-                search_length--;
                 view_backbuf[pixel_offset] = *draw_pointer;
-                if (*cel_data != view_trans) {
-                    if ((prioval) <= (objprio & 0x0f)) {
+                if (*cel_data != drawview_trans) {
+                    if ((prioval) <= lowprio) {
                         *draw_pointer = *cel_data;
                     }
                 }
@@ -124,16 +104,16 @@ void draw_cel(view_info_t *info, uint8_t cel) {
 
 void erase_view(view_info_t *info) {
     uint16_t pixel_offset = 0;
-    int16_t view_left = info->x_pos;
-    int16_t view_top = info->y_pos - info->height + 1;
-    uint8_t view_right = info->x_pos + info->width;
-    uint8_t view_bottom = info->y_pos;
+    drawview_left = info->x_pos;
+    drawview_top = info->y_pos - info->height + 1;
+    drawview_right = info->x_pos + info->width;
+    drawview_bottom = info->y_pos;
     uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
 
-    for (int16_t draw_col = view_left; draw_col < view_right; draw_col++) {
-        if ((draw_col > 0) && (draw_col < 160)) {
-            volatile uint8_t __far *draw_pointer = drawing_xpointer[drawing_screen][draw_col] + (view_top * 8);
-            for (int16_t draw_row = view_top; draw_row <= view_bottom; draw_row++) {
+    for (int16_t draw_col = drawview_left; draw_col < drawview_right; draw_col++) {
+        if ((draw_col > 0) && (draw_col < 159)) {
+            volatile uint8_t *draw_pointer = fastdrawing_xpointer[draw_col] + (drawview_top * 8);
+            for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
                 if ((draw_row > 0) && (draw_row < 168)) {
                     *draw_pointer = view_backbuf[pixel_offset];
                     draw_pointer += 8;
@@ -142,8 +122,6 @@ void erase_view(view_info_t *info) {
             }
         }
     }
-
-    chipmem_free(info->backbuffer_offset);
 }
 
 bool select_loop(view_info_t *info, uint8_t loop_num) {
@@ -275,7 +253,6 @@ void view_purge(uint16_t freed_offset) {
 }
 
 void view_init(void) {
-    setup_priorities();
     for (int i = 0; i < 256; i++) {
         views[i] = 0;
     }

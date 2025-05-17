@@ -12,15 +12,21 @@
 #include "sound.h"
 #include "view.h"
 #include "volume.h"
+#include "parser.h"
 #include "simplefile.h"
+#include "sound.h"
 #include "sprite.h"
 #include "logic.h"
 #include "memmanage.h"
 #include "main.h"
 
+volatile uint8_t frame_counter;
+volatile bool run_engine;
+
+#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+
 volatile uint8_t view_x = 40;
 volatile uint8_t view_y = 40;
-volatile uint8_t frame_counter;
 volatile uint8_t run_cycles;
 static uint8_t picture = 1;
 static uint8_t keypress_up;
@@ -31,7 +37,6 @@ static uint8_t last_cursorreg;
 static uint8_t last_columnzero;
 static uint8_t keypress_f5;
 volatile uint8_t frame_dirty;
-volatile bool run_engine;
 volatile bool engine_running;
 static char command_buffer[38];
 static uint8_t cmd_buf_ptr = 0;
@@ -41,36 +46,56 @@ bool player_control;
 uint8_t dialog_first;
 uint8_t dialog_last;
 uint16_t dialog_time;
+uint8_t box_width = 0;
+uint8_t box_height = 0;
+uint8_t line_length = 0;
+uint8_t word_length = 0;
+uint8_t msg_char;
+uint8_t *msg_ptr;
+uint8_t *last_word;
+
+static const uint8_t joystick_direction[16] = {
+    0, 0, 0, 0, 0, 4, 2, 3,
+    0, 6, 8, 7, 0, 5, 1, 0
+};
 
 void engine_display_dialog(uint8_t *message_string) {
-    uint8_t box_width = 0;
-    uint8_t box_height = 0;
-    uint8_t line_length = 0;
-    uint8_t word_length = 0;
-    uint8_t msg_char;
-    uint8_t *msg_ptr = message_string;
-    uint8_t *last_word = msg_ptr;
-
+    msg_ptr = message_string;
+    last_word = msg_ptr;
+    word_length = 0;
+    line_length = 0;
+    box_width = 0;
+    box_height = 1;
+    
     do {
         msg_char = *msg_ptr;
         if (msg_char > 32) {
             word_length++;
         } else {
-            if ((msg_char == 32) && (line_length + word_length + 1) < 35) {
-                line_length += word_length + 1;
-                word_length = 0;
-                last_word = msg_ptr;
+            bool wordfits = (line_length + word_length + 1) < 35;
+            if (wordfits) {
+                if (msg_char == 32) {
+                    line_length += word_length + 1;
+                    word_length = 0;
+                    last_word = msg_ptr;
+                } else {
+                    line_length += word_length;
+                    if (line_length > box_width) {
+                        box_width = line_length;
+                    }
+                }
             } else {
                 if (line_length > box_width) {
                     box_width = line_length - 1;
                 }
                 box_height++;
-                line_length = 0;
+                line_length = word_length + 1;
+                word_length = 0;
                 *last_word = '\n';
             }
         }
         msg_ptr++;
-    } while (*msg_ptr != 0);
+    } while (msg_char != 0);
 
     uint8_t x_start = 20 - (box_width / 2) - 1;
     uint8_t y_start = 15 - (box_height / 2) - 1;
@@ -88,6 +113,7 @@ void engine_display_dialog(uint8_t *message_string) {
     gfx_print_scncode(0xFB);
     gfx_end_print();
 
+    line_length = 0;
     y_start++;
     gfx_begin_print(x_start, y_start);
     gfx_print_scncode(0x61);
@@ -169,10 +195,6 @@ void handle_movement_joystick(void) {
         return;
     }
 
-    const uint8_t joystick_direction[16] = {
-        0, 0, 0, 0, 0, 4, 2, 3,
-        0, 6, 8, 7, 0, 5, 1, 0
-    };
     uint8_t port2joy = PEEK(0xDC00) & 0x0f;
     uint8_t new_object_dir = joystick_direction[port2joy];
     sprite_set_direction(0, new_object_dir);
@@ -248,37 +270,6 @@ void engine_statusline(bool enable) {
     
 }
 
-void parse_debug_command(char *command) {
-    char *cmd = strtok(command, " ");
-    if (0 == strcmp(cmd, "PIC")) {
-        char *arg = strtok(NULL, " ");
-        if (arg == NULL) {
-            return;
-        }
-        sprite_erase(0);
-        sprite_set_direction(0,0);
-        uint8_t pic_num = atoi(arg);
-    } else if (0 == strcmp(cmd, "SOUND")) {
-        char *arg = strtok(NULL, " ");
-        if (arg == NULL) {
-            return;
-        }
-        uint8_t sound_num = atoi(arg);
-        //play_sound(sound_num);
-    } else if (0 == strcmp(cmd, "VIEW")) {
-        char *arg = strtok(NULL, " ");
-        if (arg == NULL) {
-            return;
-        }
-        sprite_erase(0);
-        uint8_t view_number = atoi(arg);
-        sprite_set_position(0, 40, 40);
-        sprite_set_view(0, view_number);
-        sprite_draw(0);
-        frame_dirty = 1;
-    }
-}
-
 void engine_clear_keyboard(void) {
     command_buffer[0] = 0;
     cmd_buf_ptr=0;
@@ -307,24 +298,24 @@ void engine_handleinput(void) {
     if (!input_ok) {
         return;
     }
-    if (ASCIIKEY != 0) {
-        uint8_t petscii = PETSCIIKEY;
+    uint8_t ascii_key = ASCIIKEY;
+    if (ascii_key != 0) {
         ASCIIKEY = 0;
-        if (petscii == 0x14) {
+        if (ascii_key == 0x14) {
             if (cmd_buf_ptr > 0) {
                 cmd_buf_ptr--;
                 gfx_set_printpos(cmd_buf_ptr + 3, 22);
-                gfx_print_asciichar(petscii, false);
+                gfx_print_asciichar(' ', false);
             }
-        } else if (petscii == 0x0d) {
+        } else if (ascii_key == 0x0d) {
             command_buffer[cmd_buf_ptr] = 0;
-            parse_debug_command(command_buffer);
+            parser_decode_string(command_buffer);
             engine_clear_keyboard();
         } else {
             if (cmd_buf_ptr < 37) {
-                command_buffer[cmd_buf_ptr] = petscii;
+                command_buffer[cmd_buf_ptr] = ascii_key;
                 gfx_set_printpos(cmd_buf_ptr + 3, 22);
-                gfx_print_asciichar(petscii, false);
+                gfx_print_asciichar(ascii_key, false);
                 cmd_buf_ptr++;
             }
         }
@@ -339,6 +330,7 @@ void run_loop(void) {
     gfx_switchto();
     gfx_blackscreen();
     logic_init();
+    parser_init();
     frame_counter = 0;
     run_cycles = 0;
     run_engine = false;
@@ -363,6 +355,8 @@ void run_loop(void) {
             }
         }
         if (run_cycles >= logic_vars[10]) {
+            logic_reset_flag(2);
+            logic_reset_flag(4);
             engine_handleinput();
             sprite_erase_animated();
             handle_movement_joystick();
@@ -374,13 +368,24 @@ void run_loop(void) {
     }
 }
 
+#pragma clang section bss="" data="" rodata="" text=""
+
+__attribute__((interrupt))
 void engine_interrupt_handler(void) {
-    frame_counter++;
-    if (frame_counter < 3) {
+    volatile uint8_t __far *far_irr = (uint8_t __far *)0xffd3019;
+    if (!((*far_irr) & 0x01)) {
+        // not a raster interrupt, ignore
         return;
+      }
+
+    sound_interrupt_handler();
+    
+    frame_counter++;
+    if (frame_counter >= 3) {
+        if (gfx_flippage()) {
+            run_engine = true;
+            frame_counter = 0;
+        }
     }
-    if (gfx_flippage()) {
-        run_engine = true;
-        frame_counter = 0;
-    }
+    *far_irr = *far_irr; // ack interrupt
 }

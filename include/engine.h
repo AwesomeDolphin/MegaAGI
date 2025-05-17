@@ -1,6 +1,8 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
+#include "main.h"
+
 extern uint8_t horizon_line;
 extern bool player_control;
 
@@ -11,5 +13,6 @@ void engine_unblock(void);
 void engine_clear_keyboard(void);
 void engine_allowinput(bool allowed);
 void engine_statusline(bool enable);
+void engine_dialog_close(void);
 
 #endif

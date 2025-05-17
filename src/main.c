@@ -6,6 +6,7 @@
 #include <mega65.h>
 
 #include "gfx.h"
+#include "init.h"
 #include "pic.h"
 #include "sound.h"
 #include "view.h"
@@ -32,13 +33,18 @@ int main () {
   simpleprint("AGI DEMO!\r");
   POKE(1,133);
 
+  simpleprint("LOADING HIMEM...\r");
+  init_load_raw();
+
   memmanage_init();
   
   simpleprint("LOADING VOLUME FILES...\r");
   load_volume_files();
   simpleprint("LOADING DIRECTORY FILES...\r");
   load_directory_files();
-
+  simpleprint("LOADING WORDS.TOK...\r");
+  load_words_file();
+  
   VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
   run_loop();
 

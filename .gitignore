@@ -2,4 +2,9 @@ obj/*.o
 obj/*.lst
 *.lst
 *.prg
+*.raw
+obj/
+*.d81
+*.cmap
+volumes/
 

@@ -2,6 +2,8 @@
             .extern irq_handler
             .extern _InterruptChain
             .extern viewing_screen
+            .extern engine_interrupt_handler
+            .extern my_quad
 
 VECTOR:     .equlab 0xff8d
 LINESTEPL:  .equlab 0xd058
@@ -19,6 +21,35 @@ basepage:   .space 256
 
             .public hook_irq
 hook_irq:  
+		lda #0x00
+		ldx #0x00
+		ldy #0x00
+		ldz #0xB0
+		map
+            ldz #0x00
+            ldy #0x05
+            ldx #0x7f
+            lda #0xfe
+            stq my_quad
+            ldz #0x00
+            lda #.byte0 engine_interrupt_handler
+            sta 0xfffe
+            sta [my_quad],z
+            ldx #0xff
+            stx my_quad + 1
+            sta [my_quad],z
+            inz
+            lda #.byte1 engine_interrupt_handler
+            sta 0xffff
+            ldx #0x7f
+            stx my_quad + 1
+            sta [my_quad],z
+            ldx #0xff
+            stx my_quad + 1
+            sta [my_quad],z
+		eom
+		rts
+
             ldx #.byte0 vectab
             ldy #.byte1 vectab
             sec
@@ -70,3 +101,30 @@ unhook_irq:
 _irq_rt:
             jmp irq_handler
 
+            .public select_graphics0_mem
+select_graphics0_mem:  
+		lda #0x00
+		ldx #0x00
+		ldy #0x80
+		ldz #0xF4
+		map
+		eom
+		rts
+            .public select_graphics1_mem
+select_graphics1_mem:  
+		lda #0x00
+		ldx #0x00
+		ldy #0x00
+		ldz #0xF5
+		map
+		eom
+		rts
+            .public select_execution_mem
+select_execution_mem:  
+		lda #0x00
+		ldx #0x00
+		ldy #0x00
+		ldz #0xB0
+		map
+		eom
+		rts

@@ -19,6 +19,7 @@
             "name": "(MEGA65) Launch",
             "type": "cppvsdbg",
             "request": "launch",
+            "preLaunchTask": "senddisk",
             "program": "C:\\CommandLineApps\\etherload.exe",
             "args": ["-r", "-m", "agi.d81", "-5", "--ntsc", "agi.prg"],
             "stopAtEntry": false,

@@ -6,6 +6,7 @@
 #include <mega65.h>
 #include <math.h>
 
+#include "engine.h"
 #include "gfx.h"
 #include "volume.h"
 #include "pic.h"
@@ -19,7 +20,11 @@ typedef struct fill_info {
     int16_t dy;
 } fill_info_t;
 
-#define ASCIIKEY (*(volatile uint8_t *)0xd610)
+#pragma clang section bss="extradata"
+__far static fill_info_t fills[128];
+#pragma clang section bss=""
+
+#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
 static    uint8_t pic_color;
 static    uint8_t priority_color;
 static    uint8_t pic_on;
@@ -29,10 +34,6 @@ static uint8_t last_relative_y;
 static uint16_t fill_pointer;
 static uint16_t pic_length;
 static uint16_t pic_offset;
-
-#pragma clang section bss="extradata"
-__far static fill_info_t fills[128];
-#pragma clang section bss=""
 
 void pset(uint8_t x, uint8_t y) {
     if (pic_on) {
@@ -139,7 +140,8 @@ uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
 }
 
 uint8_t draw_pic(void) {
-    gfx_cleargfx();
+    gfx_cleargfx(true);
+    engine_dialog_close();
     uint8_t max_depth = 1;
     uint8_t __far *pic_file;
     pic_file = chipmem_base + pic_offset;

@@ -11,28 +11,31 @@
 #include "logic.h"
 #include "main.h"
 #include "memmanage.h"
+#include "parser.h"
 #include "pic.h"
 #include "sound.h"
 #include "sprite.h"
 #include "view.h"
 #include "volume.h"
 
-uint8_t __far *logic_vars = NULL;
-uint8_t __far *logic_flags = NULL;
-
 typedef struct logic_info {
     uint16_t offset;
     uint8_t __far *text_offset;
 } logic_info_t;
 
+#pragma clang section bss="extradata"
+__far static logic_info_t logic_infos[256];
+#pragma clang section bss=""
+
+#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+
+uint8_t __far *logic_vars = NULL;
+uint8_t __far *logic_flags = NULL;
+
 typedef struct logic_stack_entry {
     uint8_t __far *return_address;
     uint8_t return_logic_num;
 } logic_stack_entry_t;
-
-#pragma clang section bss="extradata"
-__far static logic_info_t logic_infos[256];
-#pragma clang section bss=""
 
 static logic_stack_entry_t logic_stack[16];
 static uint8_t __far *program_counter;
@@ -111,12 +114,17 @@ bool logic_test_commands(void) {
             result = ((logic_flags[program_counter[1] >> 3]) >> (program_counter[1] & 0x07)) & 0x01;
             program_counter += 2;
             break;
-        case 0x0B:
+        case 0x0B: {
             // posn test
-            // TODO: implement posn test
-            result = false;
+            view_info_t vi = sprites[program_counter[1]].view_info;
+            if ((program_counter[2] <= vi.x_pos) && (vi.x_pos <= program_counter[4]) && (program_counter[3] <= vi.y_pos) && (vi.y_pos <= program_counter[5])) {
+                result = true;
+            } else {
+                result = false;
+            }
             program_counter += 6;
             break;
+        }
         case 0x0C:
             // controller test
             // TODO: implement controller test
@@ -129,11 +137,48 @@ bool logic_test_commands(void) {
             program_counter += 1;
             break;
         case 0x0E:
+        {
             // said test
-            // TODO: implement parser test
-            result = false;
-            program_counter += 2 + (program_counter[1] * 2);
+            bool player_entry = ((logic_flags[2 >> 3]) >> (2 & 0x07)) & 0x01;
+            bool accepted_entry = ((logic_flags[4 >> 3]) >> (4 & 0x07)) & 0x01;
+            uint8_t numwords = program_counter[1];
+            if (!player_entry || accepted_entry) {
+                result = false;
+            } else {
+                result = true;
+                uint16_t wordnum;
+                for (uint8_t i = 0; i < numwords; i++) {
+                    uint8_t argpos = (i * 2) + 2;
+                    wordnum = program_counter[argpos];
+                    wordnum |= program_counter[argpos + 1] << 8;
+                    if (wordnum == 1) {
+                        // Matches any, keep going
+                    } else if (wordnum == 9999) {
+                        // matches anything
+                        break;
+                    } else if (i >= parser_word_index) { 
+                        // expected more than provided
+                        result = false;
+                        break;
+                    } else if (wordnum != parser_word_numbers[i]) {
+                        result = false;
+                        break;
+                    }
+                }
+                if (result) {
+                    if (wordnum != 9999) {
+                        if (numwords != parser_word_index) {
+                            result = false;
+                        }
+                    }
+                }
+                if (result) {
+                    logic_set_flag(4);
+                }
+            }
+            program_counter += 2 + (numwords * 2);
             break;
+        }
         default:
             gfx_print_ascii(0, 0, "FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
@@ -184,10 +229,20 @@ bool logic_test(void) {
 }
 
 void logic_run(uint8_t logic_num) {
+    static bool debug=false;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
-        //gfx_print_splitascii("A:%X\r", (uint32_t)program_counter);
-        //gfx_print_splitascii("B:%x\r", *program_counter);
+        if (logic_num == 53) {
+            //debug = true;
+        }
+        if (debug) {
+            gfx_print_ascii(0,0,"A:%x %X", logic_num, (uint32_t)program_counter);
+            gfx_print_ascii(0,1,"B:%x", *program_counter);
+            while(ASCIIKEY==0) {
+    
+            }
+            ASCIIKEY=0;
+        }
         switch (*program_counter) {
             case 0x00: {
                 // return
@@ -281,6 +336,7 @@ void logic_run(uint8_t logic_num) {
                 sprite_unanimate_all();
                 chipmem_free_unlocked();
                 player_control = true;
+                sprites[0].frozen = false;
                 engine_unblock();
                 horizon_line = 36;
                 logic_vars[1] = logic_vars[0];
@@ -360,8 +416,11 @@ void logic_run(uint8_t logic_num) {
             case 0x21: {
                 // animate_obj
                 animated_sprites[animated_sprite_count] = program_counter[1];
+                sprites[program_counter[1]].view_info.priority_override = false;
                 sprites[program_counter[1]].observe_horizon = true;
+                sprites[program_counter[1]].observe_blocks = true;
                 sprites[program_counter[1]].updatable = true;
+                sprites[program_counter[1]].step_size = 1;
                 animated_sprite_count++;
                 program_counter += 2;
                 break;
@@ -382,13 +441,15 @@ void logic_run(uint8_t logic_num) {
                 // position
                 sprites[program_counter[1]].view_info.x_pos = program_counter[2];
                 sprites[program_counter[1]].view_info.y_pos = program_counter[3];
+                sprite_update_prio(program_counter[1]);
                 program_counter += 4;
                 break;
             }
             case 0x26: { 
-                // position
+                // position.v
                 sprites[program_counter[1]].view_info.x_pos = logic_vars[program_counter[2]];
                 sprites[program_counter[1]].view_info.y_pos = logic_vars[program_counter[3]];
+                sprite_update_prio(program_counter[1]);
                 program_counter += 4;
                 break;
             }
@@ -396,6 +457,22 @@ void logic_run(uint8_t logic_num) {
                 // get.posn
                 logic_vars[program_counter[2]] = sprites[program_counter[1]].view_info.x_pos;
                 logic_vars[program_counter[3]] = sprites[program_counter[1]].view_info.y_pos;
+                program_counter += 4;
+                break;
+            }
+            case 0x28: { 
+                // reposition
+                int16_t x_offset = logic_vars[program_counter[2]];
+                int16_t y_offset = logic_vars[program_counter[3]];
+                if (x_offset & 0x80) {
+                    x_offset |= 0xff00;
+                }
+                if (y_offset & 0x80) {
+                    y_offset |= 0xff00;
+                }
+                sprites[program_counter[1]].view_info.x_pos += x_offset;
+                sprites[program_counter[1]].view_info.y_pos += y_offset;
+                sprite_update_prio(program_counter[1]);
                 program_counter += 4;
                 break;
             }
@@ -408,6 +485,22 @@ void logic_run(uint8_t logic_num) {
             case 0x2A: {
                 // set.view.v
                 sprite_set_view(program_counter[1], logic_vars[program_counter[2]]);
+                program_counter += 3;
+                break;
+            }
+            case 0x2B: {
+                // set.loop
+                agisprite_t sprite = sprites[program_counter[1]];
+                sprite.loop_index = program_counter[2];
+                sprite.loop_offset = select_loop(&sprite.view_info, program_counter[2]);
+                program_counter += 3;
+                break;
+            }
+            case 0x2C: {
+                // set.loop.v
+                agisprite_t sprite = sprites[program_counter[1]];
+                sprite.loop_index = logic_vars[program_counter[2]];
+                sprite.loop_offset = select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
                 program_counter += 3;
                 break;
             }
@@ -501,20 +594,83 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 2;
                 break;
             }
+            case 0x48: {
+                // normal.cycle
+                sprites[program_counter[1]].reverse = false;
+                program_counter += 2;
+                break;
+            }
+            case 0x49: { 
+                // end.of.loop
+                sprites[program_counter[1]].cycling = false;
+                sprites[program_counter[1]].end_of_loop = program_counter[2];
+                sprites[program_counter[1]].reverse = false;
+                sprites[program_counter[1]].cel_index = 0;
+                program_counter += 3;
+                break;
+            }
+            case 0x4A: {
+                // reverse.cycle
+                sprites[program_counter[1]].reverse = false;
+                program_counter += 2;
+                break;
+            }
+            case 0x4B: { 
+                // end.of.loop
+                sprites[program_counter[1]].cycling = false;
+                sprites[program_counter[1]].end_of_loop = program_counter[2];
+                sprites[program_counter[1]].reverse = true;
+                sprites[program_counter[1]].cel_index = sprites[program_counter[1]].view_info.number_of_cels - 1;
+                program_counter += 3;
+                break;
+            }
+            case 0x4C: {
+                // cycle.time
+                sprites[program_counter[1]].cycle_time = logic_vars[program_counter[2]];
+                sprites[program_counter[1]].cycle_count = logic_vars[program_counter[2]];
+                program_counter += 3;
+                break;
+            }
             case 0x4D: {
                 // stop.motion
+                if (program_counter[1] == 0) {
+                    player_control = false;
+                }
                 sprites[program_counter[1]].object_dir = 0;
                 sprites[program_counter[1]].frozen = true;
-                player_control = false;
                 program_counter += 2;
                 break;
             }
             case 0x4E: {
-                // stop.motion
+                // start.motion
+                if (program_counter[1] == 0) {
+                    player_control = true;
+                }
                 sprites[program_counter[1]].object_dir = 0;
                 sprites[program_counter[1]].frozen = false;
-                player_control = true;
                 program_counter += 2;
+                break;
+            }
+            case 0x51: {
+                // move.obj
+                sprites[program_counter[1]].x_destination = program_counter[2];
+                sprites[program_counter[1]].y_destination = program_counter[3];
+                if (program_counter[4] > 0) {
+                    sprites[program_counter[1]].speed = program_counter[4];
+                } else {
+                    sprites[program_counter[1]].speed = sprites[program_counter[1]].step_size;
+                }
+                sprites[program_counter[1]].move_complete = program_counter[5];
+                program_counter += 6;
+                break;
+            }
+            case 0x52: {
+                // move.obj
+                sprites[program_counter[1]].x_destination = logic_vars[program_counter[2]];
+                sprites[program_counter[1]].y_destination = logic_vars[program_counter[3]];
+                sprites[program_counter[1]].speed = program_counter[4];
+                sprites[program_counter[1]].move_complete = program_counter[5];
+                program_counter += 6;
                 break;
             }
             case 0x53: {
@@ -524,6 +680,7 @@ void logic_run(uint8_t logic_num) {
             }
             case 0x54: {
                 sprites[program_counter[1]].wander = true;
+                sprites[program_counter[1]].wander_dir = 0;
                 if (program_counter[1] == 0) {
                     player_control = false;
                 }
@@ -596,9 +753,28 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 4;
                 break;
             }
+            case 0x6A: {
+                // text.screen
+                engine_allowinput(false);
+                gfx_set_textmode(true);
+                program_counter += 1;
+                break;
+            }
+            case 0x6B: {
+                // graphics 
+                gfx_set_textmode(false);
+                engine_allowinput(true);
+                program_counter += 1;
+                break;
+            }
             case 0x6C: {
                 // set.cursor.char
                 program_counter += 2;
+                break;
+            }
+            case 0x6D: {
+                // set.text.attribute
+                program_counter += 3;
                 break;
             }
             case 0x6F: {
@@ -640,6 +816,28 @@ void logic_run(uint8_t logic_num) {
                 // set.key
                 program_counter += 4;
                 break;
+            }
+            case 0x80: {
+                // restart.game
+                sprite_stop_all();
+                sprite_unanimate_all();
+                chipmem_free_unlocked();
+                engine_allowinput(false);
+                player_control = true;
+                engine_dialog_close();
+                engine_unblock();
+                horizon_line = 36;
+                for (int counter = 0; counter < 256; counter++) {
+                    logic_vars[counter] = 0;
+                }
+                for (int counter = 0; counter < 32; counter++) {
+                    logic_flags[counter] = 0;
+                }
+                logic_set_flag(5);
+                logic_set_flag(6);
+                sprite_clearall();
+                engine_clear_keyboard();
+                return;
             }
             case 0x83: {
                 // program.control
@@ -722,6 +920,7 @@ void logic_load(uint8_t logic_num) {
     if (logic_infos[logic_num].offset != 0) {
         return;
     }
+
     logic_infos[logic_num].offset = load_volume_object(voLogic, logic_num, &length);
     if (logic_infos[logic_num].offset == 0) {
         gfx_print_ascii(0, 0, "FAULT: Failed to load logic %d.", logic_num);

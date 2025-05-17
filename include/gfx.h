@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 extern volatile uint8_t __far *drawing_xpointer[2][160];
+extern uint8_t *fastdrawing_xpointer[160];
 extern volatile uint8_t drawing_screen;
 extern __far uint8_t priority_screen[16384];
 
@@ -20,10 +21,11 @@ void gfx_set_printpos(uint8_t x, uint8_t y);
 void gfx_clear_line(uint8_t y);
 void gfx_setupmem(void);
 void gfx_blackscreen(void);
-void gfx_cleargfx(void);
+void gfx_cleargfx(bool preserve_text);
 bool gfx_flippage(void);
 void gfx_hold_flip(bool hold);
 void gfx_switchto(void);
 void gfx_switchfrom(void);
+void gfx_set_textmode(bool enable_text);
 
 #endif

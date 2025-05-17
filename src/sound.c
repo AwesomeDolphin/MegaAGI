@@ -9,7 +9,7 @@
 #include "simplefile.h"
 #include "volume.h"
 
-#define ASCIIKEY (*(volatile uint8_t *)0xd610)
+#define FARSID1 (*(volatile struct __sid __far *)0xffd3400)
 
 uint8_t __huge *sound_file;
 volatile uint16_t voice_offsets[3];
@@ -79,16 +79,16 @@ void sound_interrupt_handler(void) {
         if (!voice_stopped[voice]) {
             acted = 1;
             uint16_t voice_offset = voice_offsets[voice];
-            volatile struct __sid_voice *sid;
+            volatile struct __sid_voice __far *sid;
             switch(voice) {
                 case 0:
-                    sid = &SID1.v1;
+                    sid = &FARSID1.v1;
                     break;
                 case 1:
-                    sid = &SID1.v2;
+                    sid = &FARSID1.v2;
                     break;
                 case 2:
-                    sid = &SID1.v3;
+                    sid = &FARSID1.v3;
                     break;
             }
             if (durations[voice] < voice_holds[voice]) {

@@ -1,31 +1,19 @@
-This is a graphical/sound demo version only.
+This version can play several screens of KQ1 (AGI 2 version from GOG). I'm not even testing other AGI games, and KQ1 was originally an AGI 1 game. It is likely not as demanding as some of the later AGI 2 releases.
 
-The parser is not present, nor is the logic interpreter, so there is no gameplay functionality.
+To build the D81, you will need to do the following:
+	c1541 -format "agi,a1" d81 agi.d81
+	c1541 -attach agi.d81 -write agi.prg agi.c65
+	c1541 -attach agi.d81 -write nographics.raw nographics,s
+	c1541 -attach agi.d81 -write volumes/LOGDIR logdir,s
+	c1541 -attach agi.d81 -write volumes/PICDIR picdir,s
+	c1541 -attach agi.d81 -write volumes/SNDDIR snddir,s
+	c1541 -attach agi.d81 -write volumes/VIEWDIR viewdir,s
+	c1541 -attach agi.d81 -write volumes/VOL.0 vol.0,s
+	c1541 -attach agi.d81 -write volumes/VOL.1 vol.1,s
+	c1541 -attach agi.d81 -write volumes/VOL.2 vol.2,s
+	c1541 -attach agi.d81 -write volumes/WORDS.TOK words.tok,s
 
-To use this, place agi.prg on a D81 with the following files from a AGI game:
-PICDIR
-SNDDIR
-VIEWDIR
-VOL.0
-VOL.1
-...
-VOL.n
+You will need to get the game data files from GOG.
 
-When it starts up, it will load PIC 0, and VIEW 0. This is a valid case for Kings Quest 1.
-You can change the picture with the command (must use lower case):
-> pic n
+Eventually, you will get a crash. The entire inventory system is not implemented, so trying to pick something up will get a fault. Plus, several important logic statements are not implemented and will crash, such as random.
 
-You can change the view with the command:
-> view n
-
-You can play a sound with the command:
-> sound n
-
-Sound 0 is the Kings Quest 1 title music, and sound 60 is the Space Quest 1 title music.
-
-AGI games can be purchased from GOG, and contain all the files broken out nicely.
-
-The drawing commands 0xF9 and 0xFA are not implemented, this will break a couple of games.
-
-Larger VIEWs will flicker as they are moved around. Optimization is still required.
-Also, I am using NCM mode, so a back-buffer system will come at some point.

@@ -68,11 +68,6 @@ void sprite_draw_animated(void) {
         if (sprites[animated_sprites[i]].updatable) {
             sprite_update_sprite(animated_sprites[i]);
         }
-        if (sprites[animated_sprites[i]].speed > 0) {
-            agisprite_t sprite = sprites[animated_sprites[i]];
-            sprite_move_at_speed(&sprite);
-            sprites[animated_sprites[i]] = sprite;
-        }
     }
 
     sprite_sort();
@@ -148,276 +143,188 @@ void setup_priorities(void) {
     }
 }
 
-void sprite_update_prio(uint8_t sprite_num) {
-    if (!sprites[sprite_num].view_info.priority_override) {
-        sprites[sprite_num].view_info.priority = priorities[sprites[sprite_num].view_info.y_pos];
-    }
-}
-
 void sprite_move_at_speed(agisprite_t *sprite) {
 
     int16_t x1 = sprite->view_info.x_pos;
     int16_t y1 = sprite->view_info.y_pos;
-    int16_t x2 = sprite->x_destination;
-    int16_t y2 = sprite->y_destination;
-    int16_t z = sprite->speed;
+    int16_t x2 = sprite->prg_x_destination;
+    int16_t y2 = sprite->prg_y_destination;
+    int16_t z = sprite->prg_speed_squared;
 
-    // Calculate displacement vector components
     int16_t dx = x2 - x1;
     int16_t dy = y2 - y1;
     
-    // Handle special cases to avoid division by zero
-    if (dx == 0 && dy == 0) {
-        // Target is same as current position
-        sprite->view_info.x_pos = x1;
-        sprite->view_info.y_pos = y1; 
-        logic_set_flag(sprite->move_complete);
-        sprite->speed = 0;
-        return;
-    }
-    
-    // Compute Manhattan distance (|dx| + |dy|)
-    int16_t abs_dx = abs(dx);
-    int16_t abs_dy = abs(dy);
-    int16_t manhattan = abs_dx + abs_dy;
+    int16_t distance_squared = dx*dx + dy*dy;
     
     // Check if z exceeds the distance
-    if (z >= manhattan) {
+    if (z >= distance_squared) {
         // We would reach or pass the target, so just go to target
         sprite->view_info.x_pos = x2;
         sprite->view_info.y_pos = y2;
-        logic_set_flag(sprite->move_complete);
-        sprite->speed = 0;
+        logic_set_flag(sprite->prg_complete_flag);
+        sprite->prg_speed = 0;
+        sprite->object_dir = 0;
+        sprite->prg_movetype = pmmNone;
         return;
     }
 
-    // Scale the movement by z/manhattan
-    // Using integer division with rounding
-    sprite->view_info.x_pos = x1 + (dx * z) / manhattan;
-    sprite->view_info.y_pos = y1 + (dy * z) / manhattan;
-    
-    // Handle remainder bias by adding 1 in direction of larger component
-    int16_t remainder = z % manhattan;
-    if (remainder > 0) {
-        if (abs_dx > abs_dy) {
-            // Add one more step in x direction
-            sprite->view_info.x_pos += (dx > 0) ? 1 : -1;
-        } else {
-            // Add one more step in y direction
-            sprite->view_info.y_pos += (dy > 0) ? 1 : -1;
-        }
-    }
-}
-
-void autoselect_loop(uint8_t sprite_num) {
-    agisprite_t sprite = sprites[sprite_num];
-    if (sprite.view_info.number_of_loops == 1) {
-        return;
-    }
-    if (sprite.view_info.number_of_loops < 4) {
-        switch(sprite.object_dir) {
-            case 2:
-            sprite.loop_index = 0;
-            sprite.loop_offset = select_loop(&sprite.view_info, 0);
-            break;
-            case 3:
-            sprite.loop_index = 0;
-            sprite.loop_offset = select_loop(&sprite.view_info, 0);
-            break;
-            case 4:
-            sprite.loop_index = 0;
-            sprite.loop_offset = select_loop(&sprite.view_info, 0);
-            break;
-            case 6:
-            sprite.loop_index = 1;
-            sprite.loop_offset = select_loop(&sprite.view_info, 1);
-            break;
-            case 7:
-            sprite.loop_index = 1;
-            sprite.loop_offset = select_loop(&sprite.view_info, 1);
-            break;
-            case 8:
-            sprite.loop_index = 1;
-            sprite.loop_offset = select_loop(&sprite.view_info, 1);
-            break;
-        }
+    if (abs(dx) > abs(dy) * 2) {
+        sprite->object_dir = (dx > 0) ? 3 : 7; // Right or Left
+    } else if (abs(dy) > abs(dx) * 2) {
+        sprite->object_dir = (dy > 0) ? 5 : 1; // Down or Up
     } else {
-        switch(sprite.object_dir) {
-            case 1:
-            sprite.loop_index = 3;
-            sprite.loop_offset = select_loop(&sprite.view_info, 3);
-            break;
-            case 2:
-            sprite.loop_index = 0;
-            sprite.loop_offset = select_loop(&sprite.view_info, 0);
-            break;
-            case 3:
-            sprite.loop_index = 0;
-            sprite.loop_offset = select_loop(&sprite.view_info, 0);
-            break;
-            case 4:
-            sprite.loop_index = 0;
-            sprite.loop_offset = select_loop(&sprite.view_info, 0);
-            break;
-            case 5:
-            sprite.loop_index = 2;
-            sprite.loop_offset = select_loop(&sprite.view_info, 2);
-            break;
-            case 6:
-            sprite.loop_index = 1;
-            sprite.loop_offset = select_loop(&sprite.view_info, 1);
-            break;
-            case 7:
-            sprite.loop_index = 1;
-            sprite.loop_offset = select_loop(&sprite.view_info, 1);
-            break;
-            case 8:
-            sprite.loop_index = 1;
-            sprite.loop_offset = select_loop(&sprite.view_info, 1);
-            break;
-        }
+        if (dx > 0 && dy > 0) sprite->object_dir = 4; // Down-Right
+        if (dx > 0 && dy < 0) sprite->object_dir = 2; // Up-Right
+        if (dx < 0 && dy > 0) sprite->object_dir = 6; // Down-Left
+        if (dx < 0 && dy < 0) sprite->object_dir = 8; // Up-Left
     }
-    sprites[sprite_num] = sprite;
 }
 
-uint8_t sprite_move(uint8_t sprite_num) {
+void autoselect_loop(agisprite_t *sprite) {
+    if (sprite->view_info.number_of_loops == 1) {
+        return;
+    }
+    uint8_t new_loop = 0xff;
+
+    if (sprite->view_info.number_of_loops < 4) {
+        uint8_t loop_indexes[9] = {255, 255, 0, 0, 0, 255, 1, 1, 1};
+        new_loop = loop_indexes[sprite->object_dir];
+    } else {
+        uint8_t loop_indexes[9] = {255, 3, 0, 0, 0, 2, 1, 1, 1};
+        new_loop = loop_indexes[sprite->object_dir];
+    }
+    if (new_loop != 255) {
+        if (new_loop != sprite->loop_index) {
+            sprite->loop_index = new_loop;
+            sprite->loop_offset = select_loop(&sprite->view_info, new_loop);
+        }
+    }
+}
+
+uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
     int16_t view_dx;
     int16_t view_dy;
-    agisprite_t sprite = sprites[sprite_num];
-    if (sprite.frozen) {
+    if (sprite->frozen) {
         return false;
     }
-    switch (sprite.object_dir) {
+    switch (sprite->object_dir) {
         case 0:
         view_dx = 0;
         view_dy = 0;
         break;
         case 1:
         view_dx = 0;
-        view_dy = -sprite.step_size;
+        view_dy = -speed;
         break;
         case 2:
-        view_dx = sprite.step_size;
-        view_dy = -sprite.step_size;
+        view_dx = speed;
+        view_dy = -speed;
         break;
         case 3:
-        view_dx = sprite.step_size;
+        view_dx = speed;
         view_dy = 0;
         break;
         case 4:
-        view_dx = sprite.step_size;
-        view_dy = sprite.step_size;
+        view_dx = speed;
+        view_dy = speed;
         break;
         case 5:
         view_dx = 0;
-        view_dy = sprite.step_size;
+        view_dy = speed;
         break;
         case 6:
-        view_dx = -sprite.step_size;
-        view_dy = sprite.step_size;
+        view_dx = -speed;
+        view_dy = speed;
         break;
         case 7:
-        view_dx = -sprite.step_size;
+        view_dx = -speed;
         view_dy = 0;
         break;
         case 8:
-        view_dx = -sprite.step_size;
-        view_dy = -sprite.step_size;
+        view_dx = -speed;
+        view_dy = -speed;
         break;
     }
 
     uint8_t ego_border = 0;
-    int16_t new_xpos = sprite.view_info.x_pos + view_dx;
-    int16_t new_ypos = sprite.view_info.y_pos + view_dy;
+    int16_t new_xpos = sprite->view_info.x_pos + view_dx;
+    int16_t new_ypos = sprite->view_info.y_pos + view_dy;
     if (new_xpos <= -1) {
-        if (sprite_num == 0) {
+        if (sprite->ego) {
             ego_border = 4;
         }
-        sprite.object_dir = 0;
-    } else if (new_xpos > (160 - sprite.view_info.width)) {
-        if (sprite_num == 0) {
+        sprite->object_dir = 0;
+    } else if (new_xpos > (160 - sprite->view_info.width)) {
+        if (sprite->ego) {
             ego_border = 2;
         }
-        sprite.object_dir = 0;
+        sprite->object_dir = 0;
     } 
     
-    if ((new_ypos - sprite.view_info.height) <= -1) {
-        if (sprite_num == 0) {
+    if ((new_ypos - sprite->view_info.height) <= -1) {
+        if (sprite->ego) {
             ego_border = 1;
         }
-        sprite.object_dir = 0;
-    } else if (sprite.observe_horizon && (new_ypos <= horizon_line)) {
+        sprite->object_dir = 0;
+    } else if (sprite->observe_horizon && (new_ypos <= horizon_line)) {
         ego_border = 1;
-        sprite.object_dir = 0;
+        sprite->object_dir = 0;
     } else if (new_ypos > 167) {
-        if (sprite_num == 0) {
+        if (sprite->ego) {
             ego_border = 3;
         }
-        sprite.object_dir = 0;
+        sprite->object_dir = 0;
     }
 
     uint8_t left_prio = gfx_getprio(new_xpos, new_ypos);
-    uint8_t right_prio = gfx_getprio(new_xpos + sprite.view_info.width - 1, new_ypos);
+    uint8_t right_prio = gfx_getprio(new_xpos + sprite->view_info.width - 1, new_ypos);
     if ((left_prio == 0) || (right_prio == 0)) {
-        sprite.object_dir = 0;
+        sprite->object_dir = 0;
     }
 
-    if (((left_prio == 1) || (right_prio == 1)) && sprite.observe_blocks){
-        sprite.object_dir = 0;
+    if (((left_prio == 1) || (right_prio == 1)) && sprite->observe_blocks){
+        sprite->object_dir = 0;
     }
 
     if ((left_prio == 2) || (right_prio == 2)) {
-        if (sprite_num == 0) {
+        if (sprite->ego) {
             logic_set_flag(3);
         } 
     } else {
-        if (sprite_num == 0) {
+        if (sprite->ego) {
             logic_reset_flag(3);
         } 
     }
 
     if ((left_prio == 3) && (right_prio == 3)) {
-        if (sprite_num == 0) {
+        if (sprite->ego) {
             logic_set_flag(0);
         } 
-        if (!sprite.on_water) {
-            sprite.object_dir = 0;
+        if (!sprite->on_water) {
+            sprite->object_dir = 0;
         }
     } else {
-        if (sprite_num == 0) {
+        if (sprite->ego) {
             logic_reset_flag(0);
         } 
-        if (sprite.on_water) {
-            sprite.object_dir = 0;
+        if (sprite->on_water) {
+            sprite->object_dir = 0;
         }
     }
 
-    if (sprite_num == 0) {
+    if (sprite->ego) {
         logic_vars[2] = ego_border;
-        logic_vars[6] = sprite.object_dir;
+        logic_vars[6] = sprite->object_dir;
     } 
     
-    if (sprite.object_dir != 0) {
-        sprite.view_info.x_pos = sprite.view_info.x_pos + view_dx;
-        sprite.view_info.y_pos = sprite.view_info.y_pos + view_dy;
-        sprites[sprite_num] = sprite;
-        sprite_update_prio(sprite_num);
+    if (sprite->object_dir != 0) {
+        sprite->view_info.x_pos = sprite->view_info.x_pos + view_dx;
+        sprite->view_info.y_pos = sprite->view_info.y_pos + view_dy;
         return true;
     }
 
-    sprites[sprite_num].object_dir = 0;
+    sprite->object_dir = 0;
     return false;
-}
-
-void sprite_set_direction(uint8_t sprite_num, uint8_t direction) {
-    sprites[sprite_num].object_dir = direction;
-    autoselect_loop(sprite_num);
-}
-
-void sprite_set_position(uint8_t sprite_num, uint8_t pos_x, uint8_t pos_y) {
-    sprites[sprite_num].view_info.x_pos = pos_x;
-    sprites[sprite_num].view_info.y_pos = pos_y;
-    sprite_update_prio(sprite_num);
 }
 
 void sprite_stop_all(void) {
@@ -441,14 +348,12 @@ void sprite_setedge(uint8_t sprite_num, uint8_t edgenum) {
     switch(edgenum) {
         case 1:
             sprites[sprite_num].view_info.y_pos = 167;
-            sprite_update_prio(sprite_num);
             break;
         case 2:
             sprites[sprite_num].view_info.x_pos = 0;
             break;
         case 3:
             sprites[sprite_num].view_info.y_pos = horizon_line + sprites[sprite_num].view_info.height;
-            sprite_update_prio(sprite_num);
             break;
         case 4:
             sprites[sprite_num].view_info.x_pos = 160 - sprites[sprite_num].view_info.width;
@@ -476,19 +381,57 @@ uint8_t sprite_get_view(uint8_t sprite_num) {
 }
 
 void sprite_update_sprite(uint8_t sprite_num) {
-    sprite_move(sprite_num);            
-    agisprite_t sprite = sprites[sprite_num];
-    if (sprite.wander) {
-        if (sprite.object_dir == 0)
-        {
-            uint8_t rand_dir = (rand() % 3);
-            uint8_t new_dir = wander_pointers[sprite.wander_dir][rand_dir];
-            sprite_set_direction(sprite_num, new_dir);
-            sprite = sprites[sprite_num];
-            sprite.wander_dir = new_dir;
-        }
-        
+    agisprite_t sprite = sprites[sprite_num]; 
+    uint8_t speed = 1;
+    switch (sprite.prg_movetype) {
+        case pmmNone:
+            speed = sprite.step_size;
+        break;
+        case pmmFollowWander:
+            sprite.prg_timer++;
+            if (sprite.prg_timer >= 5) {
+                sprite.prg_movetype = pmmFollow;
+                speed = sprite.prg_speed;
+                sprite.prg_x_destination = sprites[0].view_info.x_pos;
+                sprite.prg_y_destination = sprites[0].view_info.y_pos;
+                sprite_move_at_speed(&sprite);
+            }
+        case pmmWander:
+            speed = sprite.step_size;
+            if (sprite.object_dir == 0)
+            {
+                uint8_t rand_dir = (rand() % 3);
+                uint8_t new_dir = wander_pointers[sprite.prg_dir][rand_dir];
+                sprite.object_dir = new_dir;
+                sprite.prg_dir = new_dir;
+            }
+        break;
+        case pmmMoveTo:
+            speed = sprite.prg_speed;
+            sprite_move_at_speed(&sprite);
+        break;
+        case pmmFollow:
+            if (sprite.object_dir == 0) {
+                sprite.prg_movetype = pmmFollowWander;
+                sprite.prg_timer = 0;
+            } else {
+                speed = sprite.prg_speed;
+                sprite.prg_x_destination = sprites[0].view_info.x_pos;
+                sprite.prg_y_destination = sprites[0].view_info.y_pos;
+                sprite_move_at_speed(&sprite);
+            }
+        break;
+        default:
+        break;
     }
+
+    sprite_move(&sprite, speed);
+    if (!sprite.view_info.priority_override) {
+        sprite.view_info.priority = priorities[sprite.view_info.y_pos];
+    }
+
+    autoselect_loop(&sprite);
+
     sprite.cycle_count--;
     if (sprite.cycle_count == 0) {
         sprite.cycle_count  = sprite.cycle_time;

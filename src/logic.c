@@ -421,6 +421,12 @@ void logic_run(uint8_t logic_num) {
                 sprites[program_counter[1]].observe_blocks = true;
                 sprites[program_counter[1]].updatable = true;
                 sprites[program_counter[1]].step_size = 1;
+                if (program_counter[1] == 0) {
+                    sprites[program_counter[1]].ego = true;
+                } else {
+                    sprites[program_counter[1]].ego = false;
+                }
+                sprites[program_counter[1]].prg_movetype = pmmNone;
                 animated_sprite_count++;
                 program_counter += 2;
                 break;
@@ -441,7 +447,9 @@ void logic_run(uint8_t logic_num) {
                 // position
                 sprites[program_counter[1]].view_info.x_pos = program_counter[2];
                 sprites[program_counter[1]].view_info.y_pos = program_counter[3];
-                sprite_update_prio(program_counter[1]);
+                if (!sprites[program_counter[1]].view_info.priority_override) {
+                    sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
+                }
                 program_counter += 4;
                 break;
             }
@@ -449,7 +457,9 @@ void logic_run(uint8_t logic_num) {
                 // position.v
                 sprites[program_counter[1]].view_info.x_pos = logic_vars[program_counter[2]];
                 sprites[program_counter[1]].view_info.y_pos = logic_vars[program_counter[3]];
-                sprite_update_prio(program_counter[1]);
+                if (!sprites[program_counter[1]].view_info.priority_override) {
+                    sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
+                }
                 program_counter += 4;
                 break;
             }
@@ -472,7 +482,9 @@ void logic_run(uint8_t logic_num) {
                 }
                 sprites[program_counter[1]].view_info.x_pos += x_offset;
                 sprites[program_counter[1]].view_info.y_pos += y_offset;
-                sprite_update_prio(program_counter[1]);
+                if (!sprites[program_counter[1]].view_info.priority_override) {
+                    sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
+                }
                 program_counter += 4;
                 break;
             }
@@ -653,34 +665,53 @@ void logic_run(uint8_t logic_num) {
             }
             case 0x51: {
                 // move.obj
-                sprites[program_counter[1]].x_destination = program_counter[2];
-                sprites[program_counter[1]].y_destination = program_counter[3];
+                sprites[program_counter[1]].prg_movetype = pmmMoveTo;
+                sprites[program_counter[1]].prg_x_destination = program_counter[2];
+                sprites[program_counter[1]].prg_y_destination = program_counter[3];
                 if (program_counter[4] > 0) {
-                    sprites[program_counter[1]].speed = program_counter[4];
+                    sprites[program_counter[1]].prg_speed = program_counter[4];
                 } else {
-                    sprites[program_counter[1]].speed = sprites[program_counter[1]].step_size;
+                    sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
                 }
-                sprites[program_counter[1]].move_complete = program_counter[5];
+                sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
+                sprites[program_counter[1]].prg_complete_flag = program_counter[5];
+                sprites[program_counter[1]].updatable = true;
                 program_counter += 6;
                 break;
             }
             case 0x52: {
-                // move.obj
-                sprites[program_counter[1]].x_destination = logic_vars[program_counter[2]];
-                sprites[program_counter[1]].y_destination = logic_vars[program_counter[3]];
-                sprites[program_counter[1]].speed = program_counter[4];
-                sprites[program_counter[1]].move_complete = program_counter[5];
+                // move.obj.v
+                sprites[program_counter[1]].prg_movetype = pmmMoveTo;
+                sprites[program_counter[1]].prg_x_destination = logic_vars[program_counter[2]];
+                sprites[program_counter[1]].prg_y_destination = logic_vars[program_counter[3]];
+                if (program_counter[4] > 0) {
+                    sprites[program_counter[1]].prg_speed = program_counter[4];
+                } else {
+                    sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
+                }
+                sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
+                sprites[program_counter[1]].prg_complete_flag = program_counter[5];
+                sprites[program_counter[1]].updatable = true;
                 program_counter += 6;
                 break;
             }
             case 0x53: {
                 // follow.ego
+                sprites[program_counter[1]].prg_movetype = pmmFollow;
+                if (program_counter[4] > 0) {
+                    sprites[program_counter[1]].prg_speed = program_counter[2];
+                } else {
+                    sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
+                }
+                sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
+                sprites[program_counter[1]].prg_complete_flag = program_counter[3];
+                sprites[program_counter[1]].updatable = true;
                 program_counter += 4;
                 break;
             }
             case 0x54: {
-                sprites[program_counter[1]].wander = true;
-                sprites[program_counter[1]].wander_dir = 0;
+                sprites[program_counter[1]].prg_movetype = pmmWander;
+                sprites[program_counter[1]].prg_dir = 0;
                 if (program_counter[1] == 0) {
                     player_control = false;
                 }

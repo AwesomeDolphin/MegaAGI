@@ -197,7 +197,7 @@ void handle_movement_joystick(void) {
 
     uint8_t port2joy = PEEK(0xDC00) & 0x0f;
     uint8_t new_object_dir = joystick_direction[port2joy];
-    sprite_set_direction(0, new_object_dir);
+    sprites[0].object_dir = new_object_dir;
 }
 
 /*

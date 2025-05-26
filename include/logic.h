@@ -3,6 +3,7 @@
 
 extern uint8_t __far *logic_vars;
 extern uint8_t __far *logic_flags;
+extern uint8_t object_data_offset;
 
 void logic_set_flag(uint8_t flag);
 void logic_reset_flag(uint8_t flag);

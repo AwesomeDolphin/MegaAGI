@@ -25,6 +25,7 @@ typedef struct logic_info {
 
 #pragma clang section bss="extradata"
 __far static logic_info_t logic_infos[256];
+__far static uint8_t object_locations[256];
 #pragma clang section bss=""
 
 #pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
@@ -43,6 +44,8 @@ static uint8_t __far *logic_strings;
 static char game_id[8];
 static uint8_t logic_stack_ptr;
 static uint8_t local_string[256];
+
+uint8_t object_data_offset;
 
 void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {
     *dest_string = *src_string;
@@ -337,7 +340,7 @@ void logic_run(uint8_t logic_num) {
                 chipmem_free_unlocked();
                 player_control = true;
                 sprites[0].frozen = false;
-                engine_unblock();
+                block_active = 0;
                 horizon_line = 36;
                 logic_vars[1] = logic_vars[0];
                 logic_vars[0] = program_counter[1];
@@ -542,6 +545,13 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 3;
                 break;
             }
+            case 0x38: {
+                // release.priority
+                sprites[program_counter[1]].view_info.priority_override = false;
+                sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
+                program_counter += 2;
+                break;
+            }
             case 0x3A: {
                 sprites[program_counter[1]].updatable = false;
                 program_counter += 2;
@@ -728,6 +738,58 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 2;
                 break;
             }
+            case 0x5A: {
+                // block
+                block_active = 1;
+                block_x1 = program_counter[1];
+                block_y1 = program_counter[2];
+                block_x2 = program_counter[3];
+                block_y2 = program_counter[4];
+                program_counter += 5;
+                break;
+            }
+            case 0x5B: {
+                // unblock
+                block_active = 0;
+                program_counter += 1;
+                break;
+            }
+            case 0x5C: {
+                // get
+                object_locations[program_counter[1]] = 255;
+                program_counter += 2;
+                break;
+            }
+            case 0x5D: {
+                // get.v
+                object_locations[logic_vars[program_counter[1]]] = 255;
+                program_counter += 2;
+                break;
+            }
+            case 0x5E: {
+                // drop
+                object_locations[program_counter[1]] = 0;
+                program_counter += 2;
+                break;
+            }
+            case 0x5F: {
+                // put
+                object_locations[program_counter[1]] = program_counter[2];
+                program_counter += 3;
+                break;
+            }
+            case 0x60: {
+                // put.v
+                object_locations[program_counter[1]] = logic_vars[program_counter[2]];
+                program_counter += 3;
+                break;
+            }
+            case 0x61: {
+                // get.room.v
+                logic_vars[program_counter[2]] = object_locations[logic_vars[program_counter[1]]];
+                program_counter += 3;
+                break;
+            }
             case 0x62: {
                 // load.sound
                 program_counter += 2;
@@ -808,6 +870,35 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 3;
                 break;
             }
+            case 0x6E: {
+                // shake_screen
+                uint8_t r8;
+                uint8_t r07;
+                for (uint8_t count = 0; count < program_counter[1]; count++) {
+                    for (uint8_t scroll = 0x51; scroll < 0x60; scroll+=4) {
+                        do {
+                            r8 = PEEK(0xD011);
+                            r07 = PEEK(0xD012);
+                        } while ((r8 & 0x80) || (r07 > 20));
+                        POKE(0xD04C, scroll);
+                        do {
+                            r8 = PEEK(0xD011);
+                        } while (!(r8 & 0x80));
+                    }
+                    for (uint8_t scroll = 0x5F; scroll >= 0x50; scroll-=4) {
+                        do {
+                            r8 = PEEK(0xD011);
+                            r07 = PEEK(0xD012);
+                        } while ((r8 & 0x80) || (r07 > 20));
+                        POKE(0xD04C, scroll);
+                        do {
+                            r8 = PEEK(0xD011);
+                        } while (!(r8 & 0x80));
+                    }
+                }
+                program_counter += 2;
+                break;
+            }
             case 0x6F: {
                 // configure.screen
                 program_counter += 4;
@@ -856,7 +947,7 @@ void logic_run(uint8_t logic_num) {
                 engine_allowinput(false);
                 player_control = true;
                 engine_dialog_close();
-                engine_unblock();
+                block_active = 0;
                 horizon_line = 36;
                 for (int counter = 0; counter < 256; counter++) {
                     logic_vars[counter] = 0;
@@ -869,6 +960,14 @@ void logic_run(uint8_t logic_num) {
                 sprite_clearall();
                 engine_clear_keyboard();
                 return;
+            }
+            case 0x82: {
+                // random
+                uint16_t randrange = (program_counter[1] - program_counter[2]);
+                uint16_t randval = (rand() % randrange) + program_counter[1];
+                logic_vars[program_counter[3]] = randval;
+                program_counter += 4;
+                break;
             }
             case 0x83: {
                 // program.control
@@ -1003,6 +1102,19 @@ void logic_init(void) {
         logic_strings[counter] = 0x99;
     }
 
+    for (int counter = 0; counter < (24 * 40); counter++) {
+        logic_strings[counter] = 0x99;
+    }
+
+    uint8_t __far *object_ptr = chipmem2_base + object_data_offset;
+    uint8_t number_of_objects = object_ptr[2];
+    for (int counter = 0; counter < 256; counter++) {
+        if (counter < number_of_objects) {
+            object_locations[counter] = object_ptr[((counter + 1) * 3) + 2];
+        } else {
+            object_locations[counter] = 0;
+        }
+    }
     logic_stack_ptr = 16;
     logic_load(0);
     chipmem_lock();

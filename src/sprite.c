@@ -51,7 +51,7 @@ void sprite_sort(void) {
             if (py == px) {
                 uint8_t hx = sprites[x].view_info.y_pos;
                 uint8_t hy = sprites[y].view_info.y_pos;
-                if (hy < hx) {
+                if (hy <= hx) {
                     break;
                 }
             }
@@ -120,6 +120,7 @@ void sprite_erase_animated(void) {
 #pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
 
 uint8_t priorities[169];
+uint8_t block_active, block_x1, block_y1, block_x2, block_y2;
 
 void setup_priorities(void) {
     uint8_t priority_level = 4;
@@ -284,6 +285,15 @@ uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
 
     if (((left_prio == 1) || (right_prio == 1)) && sprite->observe_blocks){
         sprite->object_dir = 0;
+    }
+
+    if (block_active) {
+        if (sprite->observe_blocks) {
+            bool sprite_entered = ((new_xpos < block_x1) && (new_xpos + sprite->view_info.width > block_x1) && (new_ypos >= block_y1) && (new_ypos <= block_y2));
+            if (sprite_entered) {
+                sprite->object_dir = 0;
+            }
+        }
     }
 
     if ((left_prio == 2) || (right_prio == 2)) {

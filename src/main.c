@@ -43,7 +43,9 @@ int main () {
   simpleprint("LOADING DIRECTORY FILES...\r");
   load_directory_files();
   simpleprint("LOADING WORDS.TOK...\r");
-  load_words_file();
+  init_load_words();
+  simpleprint("LOADING OBJECTS...\r");
+  init_load_words();
   
   VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
   run_loop();

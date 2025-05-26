@@ -262,10 +262,6 @@ void handle_movement_keys(void) {
     }
 }*/
 
-void engine_unblock(void) {
-
-}
-
 void engine_statusline(bool enable) {
     
 }
@@ -287,14 +283,6 @@ void engine_allowinput(bool allowed) {
 }
 
 void engine_handleinput(void) {
-    if (dialog_first != dialog_last)
-    {
-        if (ASCIIKEY != 0) {
-            ASCIIKEY = 0;
-            engine_dialog_close();
-        }
-        return;
-    }
     if (!input_ok) {
         return;
     }
@@ -347,22 +335,28 @@ void run_loop(void) {
 
         run_cycles++;
         if (dialog_first != dialog_last) {
-            if (dialog_time != 0xffff) {
-                dialog_time--;
-                if (dialog_time == 0) {
-                    engine_dialog_close();
+            if (ASCIIKEY != 0) {
+                ASCIIKEY = 0;
+                engine_dialog_close();
+            } else {
+                if (dialog_time != 0xffff) {
+                    dialog_time--;
+                    if (dialog_time == 0) {
+                        engine_dialog_close();
+                    }
                 }
             }
-        }
-        if (run_cycles >= logic_vars[10]) {
-            logic_reset_flag(2);
-            logic_reset_flag(4);
-            engine_handleinput();
-            sprite_erase_animated();
-            handle_movement_joystick();
-            logic_run(0);
-            sprite_draw_animated();
-            run_cycles = 0;
+        } else {
+            if (run_cycles >= logic_vars[10]) {
+                logic_reset_flag(2);
+                logic_reset_flag(4);
+                engine_handleinput();
+                sprite_erase_animated();
+                handle_movement_joystick();
+                logic_run(0);
+                sprite_draw_animated();
+                run_cycles = 0;
+            }
         }
         engine_running = false;
     }

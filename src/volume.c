@@ -160,29 +160,3 @@ void load_volume_files(void) {
   volumes = vol_number - 1;
 }
 
-void load_words_file(void) {
-  char vol_name[32];
-  strcpy(vol_name, "WORDS.TOK,S,R");
-  uint16_t words_offset = chipmem2_alloc(8000);
-  uint8_t __far *words_target = chipmem2_base + words_offset;
-  uint8_t buffer[256];
-
-  simpleopen(vol_name, strlen(vol_name));
-  size_t bytes_read;
-  uint32_t words_size = 0;
-  do {
-    bytes_read = simpleread(buffer);
-
-    if (bytes_read > 0) {
-      for (size_t idx = 0; idx < bytes_read; idx++) {
-        words_target[idx] = buffer[idx];
-      }
-      words_size += bytes_read;
-      words_target += bytes_read;
-    }
-  } while (bytes_read > 0);
-  simpleclose();
-  chipmem2_free(words_offset);
-  chipmem2_alloc(words_size);
-}
-

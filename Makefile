@@ -40,6 +40,7 @@ agi.d81: agi.prg
 	$(C1541) -attach agi.d81 -write volumes/VOL.1 vol.1,s
 	$(C1541) -attach agi.d81 -write volumes/VOL.2 vol.2,s
 	$(C1541) -attach agi.d81 -write volumes/WORDS.TOK words.tok,s
+	$(C1541) -attach agi.d81 -write volumes/OBJECT object,s
 
 clean:
 	-rm $(OBJS) $(OBJS:%.o=%.clst) $(OBJS_DEBUG) $(OBJS_DEBUG:%.o=%.clst)

@@ -53,6 +53,7 @@ extern __far agisprite_t sprites[256];
 extern __far uint8_t animated_sprites[256];
 extern uint8_t animated_sprite_count;
 extern uint8_t priorities[169];
+extern uint8_t block_active, block_x1, block_y1, block_x2, block_y2;
 
 void autoselect_loop(agisprite_t *sprite);
 uint8_t sprite_move(agisprite_t *sprite, uint8_t speed);

@@ -310,7 +310,7 @@ uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
         if (sprite->ego) {
             logic_set_flag(0);
         } 
-        if (!sprite->on_water) {
+        if (sprite->on_land) {
             sprite->object_dir = 0;
         }
     } else {

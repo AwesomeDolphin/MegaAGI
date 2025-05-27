@@ -233,6 +233,7 @@ bool logic_test(void) {
 
 void logic_run(uint8_t logic_num) {
     static bool debug=false;
+    logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
         if (logic_num == 53) {
@@ -430,6 +431,8 @@ void logic_run(uint8_t logic_num) {
                     sprites[program_counter[1]].ego = false;
                 }
                 sprites[program_counter[1]].prg_movetype = pmmNone;
+                sprites[program_counter[1]].on_water = false;
+                sprites[program_counter[1]].on_land = false;
                 animated_sprite_count++;
                 program_counter += 2;
                 break;
@@ -580,6 +583,21 @@ void logic_run(uint8_t logic_num) {
             case 0x40: {
                 // object.on.water
                 sprites[program_counter[1]].on_water = true;
+                sprites[program_counter[1]].on_land = false;
+                program_counter += 2;
+                break;
+            }
+            case 0x41: {
+                // object.on.land
+                sprites[program_counter[1]].on_water = false;
+                sprites[program_counter[1]].on_land = true;
+                program_counter += 2;
+                break;
+            }
+            case 0x42: {
+                // object.on.anything
+                sprites[program_counter[1]].on_water = false;
+                sprites[program_counter[1]].on_land = false;
                 program_counter += 2;
                 break;
             }

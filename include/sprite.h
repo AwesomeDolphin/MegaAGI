@@ -28,6 +28,7 @@ typedef struct {
     bool observe_blocks;
     uint8_t step_size;
     bool on_water;
+    bool on_land;
     bool frozen;
 
     prg_move_mode_t prg_movetype;

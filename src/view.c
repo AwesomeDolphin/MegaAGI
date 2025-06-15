@@ -15,10 +15,6 @@
 #include "view.h"
 #include "irq.h"
 
-#pragma clang section bss="extradata"
-__far static uint16_t views[256];
-#pragma clang section bss=""
-
 static uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 static uint8_t drawview_trans;
 static int16_t drawview_left;
@@ -29,8 +25,15 @@ static uint8_t objprio;
 static uint8_t highprio;
 static uint8_t lowprio;
 
-void draw_cel_uncompressed(view_info_t *info) {
+bool draw_cel(view_info_t *info, uint8_t cel) {
+    uint8_t __far *loop_data = chipmem_base + info->loop_offset;
+    uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
+    info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
+
     uint8_t __far *cel_data = chipmem_base + info->cel_offset;
+    info->width  = cel_data[0];
+    info->height = cel_data[1];
+
     info->backbuffer_offset = chipmem_alloc(info->height * info->width);
     uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
     uint16_t pixel_offset = 0;
@@ -46,6 +49,7 @@ void draw_cel_uncompressed(view_info_t *info) {
     lowprio = objprio & 0x0f;
 
     cel_data += 3;
+    bool drew_something = false;;
     for (int16_t draw_col = drawview_left; draw_col < drawview_right; draw_col++) {
         if ((draw_col == 0) || (draw_col > 158)) {
             continue;
@@ -58,14 +62,21 @@ void draw_cel_uncompressed(view_info_t *info) {
         if (highpix) {
             for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
                 if ((draw_row < 0) || (draw_row > 167)) {
+                    priority_pointer += 80;
                     continue;
                 }
-                prioval = *priority_pointer & 0xf0;
+                volatile uint8_t __far *scanprio_pointer = priority_pointer;
+                do {
+                    prioval = *scanprio_pointer & 0xf0;
+                    scanprio_pointer += 80;
+                } while (prioval < 0x40);
+                
                 priority_pointer += 80;
                 view_backbuf[pixel_offset] = *draw_pointer;
                 if (*cel_data != drawview_trans) {
                     if ((prioval) <= highprio) {
                         *draw_pointer = *cel_data;
+                        drew_something=true;
                     }
                 }
                 draw_pointer += 8;
@@ -74,12 +85,21 @@ void draw_cel_uncompressed(view_info_t *info) {
             }
         } else {
             for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
-                prioval = *priority_pointer & 0x0f;
+                if ((draw_row < 0) || (draw_row > 167)) {
+                    priority_pointer += 80;
+                    continue;
+                }
+                volatile uint8_t __far *scanprio_pointer = priority_pointer;
+                do {
+                    prioval = *scanprio_pointer & 0x0f;
+                    scanprio_pointer += 80;
+                } while (prioval < 4);
                 priority_pointer += 80;
                 view_backbuf[pixel_offset] = *draw_pointer;
                 if (*cel_data != drawview_trans) {
                     if ((prioval) <= lowprio) {
                         *draw_pointer = *cel_data;
+                        drew_something=true;
                     }
                 }
                 draw_pointer += 8;
@@ -88,18 +108,7 @@ void draw_cel_uncompressed(view_info_t *info) {
             }
         }
     }
-}
-
-void draw_cel(view_info_t *info, uint8_t cel) {
-    uint8_t __far *loop_data = chipmem_base + info->loop_offset;
-    uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
-    info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
-
-    uint8_t __far *cel_data = chipmem_base + info->cel_offset;
-    info->width  = cel_data[0];
-    info->height = cel_data[1];
-
-    draw_cel_uncompressed(info);
+    return drew_something;
 }
 
 void erase_view(view_info_t *info) {
@@ -132,6 +141,12 @@ bool select_loop(view_info_t *info, uint8_t loop_num) {
         uint8_t __far *loop_data = chipmem_base + loop_offset;
         info->loop_offset = loop_offset;
         info->number_of_cels = loop_data[0];
+        uint8_t __far *cell_ptr = loop_data + 1;
+        info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
+
+        uint8_t __far *cel_data = chipmem_base + info->cel_offset;
+        info->width  = cel_data[0];
+        info->height = cel_data[1];
         return true;
     }
     return false;
@@ -141,6 +156,7 @@ void view_set(view_info_t *info, uint8_t view_num) {
     info->view_offset = views[view_num];
     uint8_t __far *view_data = chipmem_base + info->view_offset;
     info->number_of_loops = view_data[0];
+    info->desc_offset = info->view_offset + (info->number_of_loops * 2) + 1;
 }
 
 void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
@@ -154,6 +170,25 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
     uint8_t __far *view_dest_location = chipmem_base + view_offset;
     views[view_num] = view_offset;
     view_dest_location[0] = loop_count;
+    uint8_t desc_offset_loc = 3;
+    uint16_t desc_source_offset = ((view_location[desc_offset_loc + 1]) << 8);
+    desc_source_offset |= view_location[desc_offset_loc];
+    if (desc_source_offset != 0) {
+        uint16_t desc_dest_offset = chipmem_alloc(1);
+        uint16_t desc_length = 0;
+        uint8_t __huge *desc_source_location = view_location + desc_source_offset;
+        uint8_t __far *desc_dest_location = chipmem_base + desc_dest_offset;
+        uint8_t copy_byte;
+        do {
+           copy_byte = *desc_source_location;
+           *desc_dest_location = copy_byte;
+           desc_source_location++;
+           desc_dest_location++;
+           desc_length++; 
+        } while (copy_byte != 0);
+        chipmem_free(desc_dest_offset);
+        chipmem_alloc(desc_length);
+    }
     for (uint8_t loop_index = 0; loop_index < loop_count; loop_index++) {
         uint8_t loop_offset_loc = (loop_index * 2) + 5;
         uint16_t loop_source_offset = ((view_location[loop_offset_loc + 1]) << 8);

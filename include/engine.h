@@ -3,11 +3,9 @@
 
 #include "main.h"
 
-extern uint8_t horizon_line;
-extern bool player_control;
-
 void run_loop(void);
-void engine_display_dialog(uint8_t *message_string);
+void engine_display_dialog(uint8_t __far *message_string);
+void engine_show_object(uint8_t view_num);
 void engine_interrupt_handler(void);
 void engine_clear_keyboard(void);
 void engine_allowinput(bool allowed);

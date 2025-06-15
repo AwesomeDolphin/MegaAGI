@@ -18,16 +18,6 @@
 #include "view.h"
 #include "volume.h"
 
-typedef struct logic_info {
-    uint16_t offset;
-    uint8_t __far *text_offset;
-} logic_info_t;
-
-#pragma clang section bss="extradata"
-__far static logic_info_t logic_infos[256];
-__far static uint8_t object_locations[256];
-#pragma clang section bss=""
-
 #pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
 
 uint8_t __far *logic_vars = NULL;
@@ -41,11 +31,11 @@ typedef struct logic_stack_entry {
 static logic_stack_entry_t logic_stack[16];
 static uint8_t __far *program_counter;
 static uint8_t __far *logic_strings;
-static char game_id[8];
 static uint8_t logic_stack_ptr;
-static uint8_t local_string[256];
+static char local_string[256];
 
 uint8_t object_data_offset;
+bool debug;
 
 void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {
     *dest_string = *src_string;
@@ -56,7 +46,7 @@ void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string)
     }
 }
 
-void logic_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string) {
+void logic_strcpy_far_near(char *dest_string, uint8_t __far *src_string) {
     *dest_string = *src_string;
     while (*dest_string != 0) {
         dest_string++;
@@ -231,8 +221,9 @@ bool logic_test(void) {
     }
 }
 
-void logic_run(uint8_t logic_num) {
-    static bool debug=false;
+void logic_run(void) {
+    static uint8_t logic_num; 
+    logic_num = 0;
     logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
@@ -251,7 +242,11 @@ void logic_run(uint8_t logic_num) {
             case 0x00: {
                 // return
                 if (logic_num == 0) {
+                    logic_vars[5] = 0;
+                    logic_vars[4] = 0;
                     logic_reset_flag(5);
+                    logic_reset_flag(6);
+                    logic_reset_flag(12);
                     return;
                 }
                 program_counter = logic_stack[logic_stack_ptr].return_address;
@@ -336,6 +331,7 @@ void logic_run(uint8_t logic_num) {
             }
             case 0x12: {
                 // new.screen
+                gfx_hold_flip(true);
                 sprite_stop_all();
                 sprite_unanimate_all();
                 chipmem_free_unlocked();
@@ -389,6 +385,7 @@ void logic_run(uint8_t logic_num) {
             case 0x19: {
                 // draw.pic
                 gfx_hold_flip(true);
+                VICIV.bordercol = COLOR_GREEN;
                 draw_pic();
                 program_counter += 2;
                 break;
@@ -396,6 +393,7 @@ void logic_run(uint8_t logic_num) {
             case 0x1A: {
                 // show.pic
                 gfx_hold_flip(false);
+                VICIV.bordercol = COLOR_BLACK;
                 program_counter += 1;
                 break;
             }
@@ -421,10 +419,11 @@ void logic_run(uint8_t logic_num) {
                 // animate_obj
                 animated_sprites[animated_sprite_count] = program_counter[1];
                 sprites[program_counter[1]].view_info.priority_override = false;
+                sprites[program_counter[1]].cycling = true;
                 sprites[program_counter[1]].observe_horizon = true;
                 sprites[program_counter[1]].observe_blocks = true;
                 sprites[program_counter[1]].updatable = true;
-                sprites[program_counter[1]].step_size = 1;
+                sprites[program_counter[1]].step_size = 4;
                 if (program_counter[1] == 0) {
                     sprites[program_counter[1]].ego = true;
                 } else {
@@ -691,6 +690,12 @@ void logic_run(uint8_t logic_num) {
                 program_counter += 2;
                 break;
             }
+            case 0x4F: {
+                // step.size
+                sprites[program_counter[1]].step_size = logic_vars[program_counter[2]];
+                program_counter += 3;
+                break;
+            }
             case 0x51: {
                 // move.obj
                 sprites[program_counter[1]].prg_movetype = pmmMoveTo;
@@ -827,16 +832,14 @@ void logic_run(uint8_t logic_num) {
             case 0x65: {
                 // print
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[1]);
-                logic_strcpy_far_near(local_string, src_string);
-                engine_display_dialog(local_string);
+                engine_display_dialog(src_string);
                 program_counter += 2;
                 break;
             }
             case 0x66: {
                 // print.v
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[1]]);
-                logic_strcpy_far_near(local_string, src_string);
-                engine_display_dialog(local_string);
+                engine_display_dialog(src_string);
                 program_counter += 2;
                 break;
             }
@@ -844,7 +847,7 @@ void logic_run(uint8_t logic_num) {
                 // display
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[3]);
                 logic_strcpy_far_near(local_string, src_string);
-                gfx_print_ascii(program_counter[2], program_counter[1], (char*)local_string);
+                gfx_print_ascii(program_counter[2], program_counter[1], local_string);
                 program_counter += 4;
                 break;
             }
@@ -852,7 +855,7 @@ void logic_run(uint8_t logic_num) {
                 // display.v
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[3]]);
                 logic_strcpy_far_near(local_string, src_string);
-                gfx_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], (char *)local_string);
+                gfx_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], local_string);
                 program_counter += 4;
                 break;
             }
@@ -978,6 +981,12 @@ void logic_run(uint8_t logic_num) {
                 sprite_clearall();
                 engine_clear_keyboard();
                 return;
+            }
+            case 0x81: {
+                // show.obj
+                engine_show_object(program_counter[1]);
+                program_counter += 2;
+                break;
             }
             case 0x82: {
                 // random

@@ -255,6 +255,7 @@ void pic_load(uint8_t pic_num) {
         gfx_print_ascii(0, 0, "FAULT: Failed to load pic %d.", pic_num);
         return;
     }
+    gfx_print_ascii(0, 0, "%X", (uint32_t)pic_offset);
 }
 
 void pic_discard(uint8_t pic_num) {

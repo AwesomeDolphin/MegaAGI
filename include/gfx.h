@@ -23,7 +23,7 @@ void gfx_setupmem(void);
 void gfx_blackscreen(void);
 void gfx_cleargfx(bool preserve_text);
 bool gfx_flippage(void);
-void gfx_hold_flip(bool hold);
+bool gfx_hold_flip(bool hold);
 void gfx_switchto(void);
 void gfx_switchfrom(void);
 void gfx_set_textmode(bool enable_text);

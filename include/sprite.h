@@ -50,14 +50,12 @@ typedef struct {
     bool ego;
 } agisprite_t;
 
-extern __far agisprite_t sprites[256];
-extern __far uint8_t animated_sprites[256];
-extern uint8_t animated_sprite_count;
 extern uint8_t priorities[169];
-extern uint8_t block_active, block_x1, block_y1, block_x2, block_y2;
+extern view_info_t object_view;
+extern bool show_object_view;
 
 void autoselect_loop(agisprite_t *sprite);
-uint8_t sprite_move(agisprite_t *sprite, uint8_t speed);
+uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed);
 void sprite_erase(uint8_t sprite_num);
 void sprite_draw(uint8_t sprite_num);
 uint8_t sprite_get_view(uint8_t sprite_num);

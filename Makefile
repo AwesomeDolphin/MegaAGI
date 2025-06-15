@@ -2,7 +2,7 @@ VPATH = src
 
 # Common source files
 ASM_SRCS = simplefile.s irq.s
-C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c parser.c init.c
+C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c parser.c init.c gamesave.c
 C1541 = c1541
 INC = -I./include
 

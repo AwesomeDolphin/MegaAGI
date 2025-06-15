@@ -28,10 +28,10 @@
         (address (#x14000 . #x17fff)) (type bss) (qualifier far)
         (section prioritydata))
     (memory extradata
-        (address (#x18000 . #x1d6ff)) (type bss) (qualifier far)
+        (address (#x18000 . #x1f6ff)) (type bss) (qualifier far)
         (section extradata))
     (memory chipram2
-        (address (#x1d700 . #x1f6ff)) (type bss) (qualifier far)
+        (address (#xff8e000 . #xff8ffff)) (type bss) (qualifier far)
         (section chipram2))
     (memory colorram
         (address (#xff81000 . #xff81bff)) (type bss) (qualifier far)

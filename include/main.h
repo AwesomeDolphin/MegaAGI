@@ -2,6 +2,7 @@
 #define MAIN_H
 
 #include "stdbool.h"
+#include "gamesave.h"
 
 struct __F018 {
   uint8_t dmalowtrig;

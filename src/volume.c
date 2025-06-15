@@ -14,8 +14,6 @@ typedef struct voldir_entry {
     uint32_t offset;
 } voldir_entry_t;
 
-uint8_t __huge *attic_memory = (uint8_t __huge *)0x8000000;
-
 static uint8_t __huge *volume_files[16] = {0};
 #pragma clang section bss="extradata"
 __far static voldir_entry_t logic_directory[256];
@@ -131,7 +129,7 @@ uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *ob
 void load_volume_files(void) {
   char vol_name[32];
   strcpy(vol_name, "VOL.0,S,R");
-  uint8_t __huge *volume_cache = attic_memory;
+  uint8_t __huge *volume_cache = attic_memory + atticmem_allocoffset;
   uint8_t buffer[256];
   int vol_number = 0;
   for (vol_number = 0; vol_number < 15; vol_number++) {
@@ -154,6 +152,8 @@ void load_volume_files(void) {
         volume_files[vol_number] = 0;
         simpleclose();
         break;
+    } else {
+      atticmem_alloc(volume_size);
     }
     simpleclose();
   }

@@ -7,20 +7,20 @@
 #include <mega65.h>
 #include <math.h>
 
+#include "main.h"
 #include "logic.h"
 #include "memmanage.h"
 #include "view.h"
 
 uint8_t __far * const chipmem_base = (uint8_t __far *)0x40000;
-uint8_t __far * const chipmem2_base = (uint8_t __far *)0x1d700;
-static uint16_t chipmem_allocoffset;
-static uint16_t chipmem_lockoffset;
-static uint16_t chipmem2_allocoffset;
+uint8_t __far * const chipmem2_base = (uint8_t __far *)0xff8e000;
+uint8_t __huge * const attic_memory = (uint8_t __huge *)0x8000000;
 
 void memmanage_init(void) {
     chipmem_allocoffset = 1;
     chipmem_lockoffset = 1;
     chipmem2_allocoffset = 1;
+    atticmem_allocoffset = 1;
 }
 
 uint16_t chipmem_alloc(uint16_t size) {
@@ -53,5 +53,15 @@ uint16_t chipmem2_alloc(uint16_t size) {
 
 void chipmem2_free(uint16_t offset) {
     chipmem2_allocoffset = offset;
+}
+
+uint32_t atticmem_alloc(uint32_t size) {
+    uint32_t old_offset = atticmem_allocoffset;
+    atticmem_allocoffset = atticmem_allocoffset + size;
+    return old_offset;
+}
+
+void atticmem_free(uint32_t offset) {
+    atticmem_allocoffset = offset;
 }
 

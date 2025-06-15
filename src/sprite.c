@@ -18,12 +18,10 @@
 static void sprite_update_sprite(uint8_t sprite_num);
 static void sprite_move_at_speed(agisprite_t *sprite);
 
-#pragma clang section bss="extradata"
-__far agisprite_t sprites[256];
-__far uint8_t animated_sprites[256];
-#pragma clang section bss=""
-uint8_t animated_sprite_count;
-uint16_t free_point;
+view_info_t object_view;
+bool show_object_view;
+bool object_view_drawn;
+ 
 static uint8_t wander_pointers[9][3] = {
     {1,3,7},
     {4,5,6},
@@ -74,31 +72,51 @@ void sprite_draw_animated(void) {
 
     free_point = chipmem_alloc(1);
 
-    gfx_hold_flip(true);
+    bool old_hold = gfx_hold_flip(true);
     if (drawing_screen == 0) { 
         select_graphics0_mem();
     } else {
         select_graphics1_mem();
     }
     
+    bool ego_drawn = false;
     for (int i = 0; i < animated_sprite_count; i++) {
         agisprite_t sprite = sprites[animated_sprites[i]];
         if (sprite.drawable) {
-            draw_cel(&sprite.view_info, sprite.cel_index);
+            bool drew_something = draw_cel(&sprite.view_info, sprite.cel_index);
+            if (sprite.ego) {
+                ego_drawn = drew_something;
+            }
             sprites[animated_sprites[i]] = sprite;
         }
     }
 
+    if (show_object_view) {
+        draw_cel(&object_view, 0);
+        object_view_drawn = true;
+    }
+
     select_execution_mem();
-    gfx_hold_flip(false);
+    gfx_hold_flip(old_hold);
+
+    if (ego_drawn) {
+        logic_reset_flag(1);
+    } else {
+        logic_set_flag(1);
+    }
 }
 
 void sprite_erase_animated(void) {
-    gfx_hold_flip(true);
+    bool old_hold = gfx_hold_flip(true);
     if (drawing_screen == 0) { 
         select_graphics0_mem();
     } else {
         select_graphics1_mem();
+    }
+    
+    if (object_view_drawn) {
+        erase_view(&object_view);
+        object_view_drawn = false;
     }
     
     for (int i = animated_sprite_count; i > 0; i--) {
@@ -109,7 +127,7 @@ void sprite_erase_animated(void) {
     } 
 
     select_execution_mem();
-    gfx_hold_flip(false);
+    gfx_hold_flip(old_hold);
 
     if (free_point > 0) {
         chipmem_free(free_point);
@@ -120,7 +138,6 @@ void sprite_erase_animated(void) {
 #pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
 
 uint8_t priorities[169];
-uint8_t block_active, block_x1, block_y1, block_x2, block_y2;
 
 void setup_priorities(void) {
     uint8_t priority_level = 4;
@@ -202,10 +219,13 @@ void autoselect_loop(agisprite_t *sprite) {
     }
 }
 
-uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
+uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
     int16_t view_dx;
     int16_t view_dy;
     if (sprite->frozen) {
+        if (sprite->ego) {
+            logic_vars[6] = 0;
+        }
         return false;
     }
     switch (sprite->object_dir) {
@@ -247,33 +267,25 @@ uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
         break;
     }
 
-    uint8_t ego_border = 0;
+    uint8_t object_border = 0;
     int16_t new_xpos = sprite->view_info.x_pos + view_dx;
     int16_t new_ypos = sprite->view_info.y_pos + view_dy;
     if (new_xpos <= -1) {
-        if (sprite->ego) {
-            ego_border = 4;
-        }
+        object_border = 4;
         sprite->object_dir = 0;
     } else if (new_xpos > (160 - sprite->view_info.width)) {
-        if (sprite->ego) {
-            ego_border = 2;
-        }
+        object_border = 2;
         sprite->object_dir = 0;
     } 
     
     if ((new_ypos - sprite->view_info.height) <= -1) {
-        if (sprite->ego) {
-            ego_border = 1;
-        }
+        object_border = 1;
         sprite->object_dir = 0;
     } else if (sprite->observe_horizon && (new_ypos <= horizon_line)) {
-        ego_border = 1;
+        object_border = 1;
         sprite->object_dir = 0;
     } else if (new_ypos > 167) {
-        if (sprite->ego) {
-            ego_border = 3;
-        }
+        object_border = 3;
         sprite->object_dir = 0;
     }
 
@@ -289,10 +301,25 @@ uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
 
     if (block_active) {
         if (sprite->observe_blocks) {
-            bool sprite_entered = ((new_xpos < block_x1) && (new_xpos + sprite->view_info.width > block_x1) && (new_ypos >= block_y1) && (new_ypos <= block_y2));
+            bool sprite_entered = ((new_xpos < block_x2) && (new_xpos + sprite->view_info.width > block_x1) && (new_ypos >= block_y1) && (new_ypos <= block_y2));
             if (sprite_entered) {
                 sprite->object_dir = 0;
             }
+        }
+    }
+
+    if (sprite->observe_object_collisions) {
+        for (int i = 0; i < animated_sprite_count; i++) {
+            if (animated_sprites[i] == spr_num) continue;
+            int16_t other_x = sprites[animated_sprites[i]].view_info.x_pos;
+            if ((new_xpos > (other_x+sprites[animated_sprites[i]].view_info.width)) || (new_xpos + sprite->view_info.width < other_x)) {
+                continue;
+            }
+            int16_t other_y = sprites[animated_sprites[i]].view_info.y_pos;
+            if (new_ypos != other_y) {
+                continue;
+            }
+            sprite->object_dir = 0;
         }
     }
 
@@ -323,9 +350,14 @@ uint8_t sprite_move(agisprite_t *sprite, uint8_t speed) {
     }
 
     if (sprite->ego) {
-        logic_vars[2] = ego_border;
+        logic_vars[2] = object_border;
         logic_vars[6] = sprite->object_dir;
-    } 
+    } else {
+        if (object_border != 0) {
+            logic_vars[4] = spr_num;
+            logic_vars[5] = object_border;
+        }
+    }
     
     if (sprite->object_dir != 0) {
         sprite->view_info.x_pos = sprite->view_info.x_pos + view_dx;
@@ -351,19 +383,23 @@ void sprite_unanimate_all(void) {
 
 void sprite_mark_drawable(uint8_t sprite_num) {
     sprites[sprite_num].drawable = true;
-    sprites[sprite_num].cycling = true;
+    if (sprites[sprite_num].observe_horizon) {
+        if (sprites[sprite_num].view_info.y_pos <= horizon_line) {
+                sprites[sprite_num].view_info.y_pos = horizon_line + 1;
+        }
+    }
 }
 
 void sprite_setedge(uint8_t sprite_num, uint8_t edgenum) {
     switch(edgenum) {
         case 1:
-            sprites[sprite_num].view_info.y_pos = 167;
+            sprites[sprite_num].view_info.y_pos = 166;
             break;
         case 2:
             sprites[sprite_num].view_info.x_pos = 0;
             break;
         case 3:
-            sprites[sprite_num].view_info.y_pos = horizon_line + sprites[sprite_num].view_info.height;
+            sprites[sprite_num].view_info.y_pos = horizon_line + 1;
             break;
         case 4:
             sprites[sprite_num].view_info.x_pos = 160 - sprites[sprite_num].view_info.width;
@@ -435,7 +471,9 @@ void sprite_update_sprite(uint8_t sprite_num) {
         break;
     }
 
-    sprite_move(&sprite, speed);
+    speed = (speed > 4) ? speed / 4 : 1;
+
+    sprite_move(sprite_num, &sprite, speed);
     if (!sprite.view_info.priority_override) {
         sprite.view_info.priority = priorities[sprite.view_info.y_pos];
     }
@@ -489,5 +527,7 @@ void sprite_init(void) {
     setup_priorities();
     animated_sprite_count = 0;
     free_point = 0;
+    show_object_view = false;
+    object_view_drawn = false;
     sprite_clearall();
 }

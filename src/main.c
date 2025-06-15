@@ -19,7 +19,6 @@
 #define ASCIIKEY (*(volatile uint8_t *)0xd610)
 #define PETSCIIKEY (*(volatile uint8_t *)0xd619)
 #define VICREGS ((volatile uint8_t *)0xd000)
-#define POKE(X, Y) (*(volatile uint8_t*)(X)) = Y
 
 int main () {
   VICIV.bordercol = COLOR_BLACK;

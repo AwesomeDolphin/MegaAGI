@@ -474,8 +474,6 @@ void gfx_blackscreen(void) {
 }
 
 void gfx_cleargfx(bool preserve_text) {
-  POKE(0xD020,0);
-
   if (drawing_screen == 0) {
     DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen0cmd) >> 8);
     DMA.etrig = (uint8_t)(((uint16_t)clrscreen0cmd) & 0xff);
@@ -533,10 +531,12 @@ bool gfx_flippage(void) {
   return false;
 }
 
-void gfx_hold_flip(bool hold) {
+bool gfx_hold_flip(bool hold) {
   __disable_interrupts();
+  bool old_hold = stop_flip;
   stop_flip = hold;
-  __enable_interrupts();
+  __enable_interrupts(); 
+  return old_hold;
 }
 
 void gfx_switchto(void) {

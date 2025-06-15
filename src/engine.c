@@ -25,24 +25,10 @@ volatile bool run_engine;
 
 #pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
 
-volatile uint8_t view_x = 40;
-volatile uint8_t view_y = 40;
 volatile uint8_t run_cycles;
-static uint8_t picture = 1;
-static uint8_t keypress_up;
-static uint8_t keypress_down;
-static uint8_t keypress_left;
-static uint8_t keypress_right;
-static uint8_t last_cursorreg;
-static uint8_t last_columnzero;
-static uint8_t keypress_f5;
-volatile uint8_t frame_dirty;
 volatile bool engine_running;
 static char command_buffer[38];
 static uint8_t cmd_buf_ptr = 0;
-static bool input_ok;
-uint8_t horizon_line;
-bool player_control;
 uint8_t dialog_first;
 uint8_t dialog_last;
 uint16_t dialog_time;
@@ -51,16 +37,19 @@ uint8_t box_height = 0;
 uint8_t line_length = 0;
 uint8_t word_length = 0;
 uint8_t msg_char;
-uint8_t *msg_ptr;
-uint8_t *last_word;
+char *msg_ptr;
+char *last_word;
+char format_string_buffer[1024];
 
 static const uint8_t joystick_direction[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
     0, 6, 8, 7, 0, 5, 1, 0
 };
 
-void engine_display_dialog(uint8_t *message_string) {
-    msg_ptr = message_string;
+void engine_display_dialog(uint8_t __far *message_string) {
+    logic_strcpy_far_near(format_string_buffer, message_string);
+
+    msg_ptr = format_string_buffer;
     last_word = msg_ptr;
     word_length = 0;
     line_length = 0;
@@ -98,10 +87,10 @@ void engine_display_dialog(uint8_t *message_string) {
     } while (msg_char != 0);
 
     uint8_t x_start = 20 - (box_width / 2) - 1;
-    uint8_t y_start = 15 - (box_height / 2) - 1;
+    uint8_t y_start = 10 - (box_height / 2) - 1;
     dialog_first = y_start;
 
-    msg_ptr = message_string;
+    msg_ptr = format_string_buffer;
     line_length = 0;
 
     gfx_begin_print(x_start, y_start);
@@ -163,6 +152,19 @@ void engine_display_dialog(uint8_t *message_string) {
     }
 }
 
+void engine_show_object(uint8_t view_num) {
+    view_load(view_num);
+    view_set(&object_view, view_num);
+    select_loop(&object_view, 0);
+    object_view.x_pos = 80 - (object_view.width / 2);
+    object_view.y_pos = 155;
+    object_view.priority_override = true;
+    object_view.priority = 0x0f;
+    show_object_view = true;
+    uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
+    engine_display_dialog(desc_data);
+}
+
 void engine_dialog_close(void) {
     for (uint8_t line = dialog_first; line <= dialog_last; line++)
     {
@@ -170,6 +172,7 @@ void engine_dialog_close(void) {
     }
     dialog_first = 0;
     dialog_last = 0;
+    show_object_view = false;
 }
 /*
     0000 = inv
@@ -200,68 +203,6 @@ void handle_movement_joystick(void) {
     sprites[0].object_dir = new_object_dir;
 }
 
-/*
-void handle_movement_keys(void) {
-    __disable_interrupts();
-    POKE(0xd614, 0);
-    uint8_t cursor_reg = PEEK(0xd60f);
-    uint8_t column_zero = PEEK(0xd613);
-    if (cursor_reg != last_cursorreg) {
-        column_zero = 0xff;
-    }
-    last_cursorreg = cursor_reg;
-    if (column_zero != last_columnzero) {
-        last_columnzero = column_zero;
-        column_zero = 0xff;
-    }
-    __enable_interrupts();
-    uint8_t up_key = cursor_reg & 0x02;
-    uint8_t left_key = cursor_reg & 0x01;
-    uint8_t right_key = (!(column_zero & 0x04)) && (!left_key);
-    uint8_t down_key = (!(column_zero & 0x80)) && (!up_key);
-    keypress_f5 = (!(column_zero & 0x40));
-    if (down_key) {
-        if (!keypress_down) {
-            keypress_down = 1;
-            object_dir = 5;
-            set_dy(1);
-            autoselect_loop();
-        } 
-    } else {
-        keypress_down = 0;
-    }
-    if (right_key) {
-        if (!keypress_right) {
-            keypress_right = 1;
-            object_dir = 3;
-            set_dx(1);
-            autoselect_loop();
-        }
-    } else {
-        keypress_right = 0;
-    }
-    if (up_key) {
-        if (!keypress_up) {
-            keypress_up = 1;
-            object_dir = 1;
-            set_dy(-1);
-            autoselect_loop();
-        }
-    } else {
-        keypress_up = 0;
-    }
-    if (left_key) {
-        if (!keypress_left) {
-            keypress_left = 1;
-            object_dir = 7;
-            set_dx(-1);
-            autoselect_loop();
-        }
-    } else {
-        keypress_left = 0;
-    }
-}*/
-
 void engine_statusline(bool enable) {
     
 }
@@ -289,6 +230,12 @@ void engine_handleinput(void) {
     uint8_t ascii_key = ASCIIKEY;
     if (ascii_key != 0) {
         ASCIIKEY = 0;
+        if (ascii_key == 0xf7) {
+            gamesave_save_to_attic();
+        }
+        if (ascii_key == 0xf5) {
+            gamesave_load_from_attic();
+        }
         if (ascii_key == 0x14) {
             if (cmd_buf_ptr > 0) {
                 cmd_buf_ptr--;
@@ -299,7 +246,7 @@ void engine_handleinput(void) {
             command_buffer[cmd_buf_ptr] = 0;
             parser_decode_string(command_buffer);
             engine_clear_keyboard();
-        } else {
+        } else if (ascii_key < 127) {
             if (cmd_buf_ptr < 37) {
                 command_buffer[cmd_buf_ptr] = ascii_key;
                 gfx_set_printpos(cmd_buf_ptr + 3, 22);
@@ -328,6 +275,12 @@ void run_loop(void) {
     player_control = true;
     dialog_first = 0;
     dialog_last = 0;
+    logic_set_flag(9);
+    logic_set_flag(11);
+    logic_vars[22] = 3;
+    logic_vars[23] = 0x0f;
+    logic_vars[24] = 37;
+    logic_vars[25] = 3;
     while (1) {
         while(!run_engine);
         engine_running = true;
@@ -353,7 +306,8 @@ void run_loop(void) {
                 engine_handleinput();
                 sprite_erase_animated();
                 handle_movement_joystick();
-                logic_run(0);
+                logic_run();
+                logic_reset_flag(11);
                 sprite_draw_animated();
                 run_cycles = 0;
             }
@@ -376,10 +330,9 @@ void engine_interrupt_handler(void) {
     
     frame_counter++;
     if (frame_counter >= 3) {
-        if (gfx_flippage()) {
-            run_engine = true;
-            frame_counter = 0;
-        }
+        gfx_flippage();
+        run_engine = true;
+        frame_counter = 0;
     }
     *far_irr = *far_irr; // ack interrupt
 }

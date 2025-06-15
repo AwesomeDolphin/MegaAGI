@@ -3,6 +3,7 @@
 
 extern uint8_t __far * const chipmem_base;
 extern uint8_t __far * const chipmem2_base;
+extern uint8_t __huge * const attic_memory;
 
 void memmanage_init(void);
 uint16_t chipmem_alloc(uint16_t size);
@@ -11,5 +12,7 @@ void chipmem_lock(void);
 void chipmem_free_unlocked(void);
 uint16_t chipmem2_alloc(uint16_t size);
 void chipmem2_free(uint16_t offset);
+uint32_t atticmem_alloc(uint32_t size);
+void atticmem_free(uint32_t offset);
 
 #endif

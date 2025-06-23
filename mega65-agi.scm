@@ -1,18 +1,28 @@
 (define memories
   '((memory program
-            (address (#x2001 . #x6fff)) (type any)
+            (address (#x2001 . #x74ff)) (type any)
             (section
                 (programStart #x2001)
                 (startup #x200e)
             )
     )
-    (memory nographics
-        (address (#x7000 . #xafff))
-        (section nographicstext nographicsdata nographicsrodata)
+    
+    (memory inits
+        (address (#x7500 . #x8500))
+        (section initstext initsdata initsrodata)
     )
-    (memory nographicsbss
-        (address (#xb000 . #xbfff))
-        (section nographicsbss)
+
+    (memory midmem
+        (address (#x7500 . #xbbff))
+        (section midmemtext midmemdata midmemrodata)
+    )
+    (memory midmembss
+        (address (#xbc00 . #xbfff))
+        (section midmembss)
+    )
+    (memory himem
+        (address (#xc000 . #xcfff))
+        (section himemtext himemdata himemrodata)
     )
     (memory zeroPage (address (#x2 . #x7f)) (type ram) (qualifier zpage)
 	    (section (registers #x2)))

@@ -6,6 +6,7 @@
 #include "sound.h"
 #include "irq.h"
 #include "logic.h"
+#include "main.h"
 #include "simplefile.h"
 #include "volume.h"
 
@@ -16,17 +17,22 @@ volatile uint16_t voice_offsets[3];
 volatile uint8_t voice_stopped[3] = {0};
 volatile uint16_t durations[3] = {0};
 volatile uint8_t voice_holds[3];
-volatile uint8_t flag_end;
+volatile uint8_t sound_flag_end;
 volatile uint8_t sound_running;
+volatile bool request_stop;
+volatile bool sound_flag_needs_set;
 
 void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
+    if (sound_running) {
+        return;
+    }
     uint16_t length;
     sound_file = locate_volume_object(voSound, sound_num, &length);
     if (sound_file == NULL) {
         return;
     }
 
-    flag_end = flag_at_end;
+    sound_flag_end = flag_at_end;
 
     voice_offsets[0] = (sound_file[1] << 8) | sound_file[0];
     voice_offsets[1] = (sound_file[3] << 8) | sound_file[2];
@@ -44,6 +50,7 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     SID1.v2.pw = 0x200;
 
     sound_running = 1;
+    request_stop = false;
 
     durations[0] = 1;
     durations[1] = 1;
@@ -55,20 +62,19 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
 
 void sound_stop(void) {
     if (sound_running) {
-        sound_running = 0;
-        voice_stopped[0] = 1;
-        voice_stopped[1] = 1;
-        voice_stopped[2] = 1;
-        SID1.v1.ctrl = 0x00;
-        SID1.v2.ctrl = 0x00;
-        SID1.v3.ctrl = 0x00;
-        SID1.amp = 0x00;
-        logic_set_flag(flag_end);
+        request_stop = true;
+        while(sound_running) {
+            // Wait for sound to stop
+        }
+        if (sound_flag_needs_set) {
+            sound_flag_needs_set = false;
+            logic_set_flag(sound_flag_end);
+        }
     }
 }
 
 void wait_sound(void) {
-    while (!voice_stopped[0] || !voice_stopped[1] || !voice_stopped[2]) {
+    while (sound_running) {
     }
 }
 
@@ -121,7 +127,17 @@ void sound_interrupt_handler(void) {
             }
         }
     }
-    if (!acted) {
-        sound_stop();
+    if (request_stop) {
+        voice_stopped[0] = 1;
+        voice_stopped[1] = 1;
+        voice_stopped[2] = 1;
+    }
+    if (sound_running && !acted) {
+        FARSID1.v1.ctrl = 0x00;
+        FARSID1.v2.ctrl = 0x00;
+        FARSID1.v3.ctrl = 0x00;
+        FARSID1.amp = 0x00;
+        sound_flag_needs_set = true;
+        sound_running = 0;
     }
 }

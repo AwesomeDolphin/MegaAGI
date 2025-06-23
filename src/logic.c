@@ -7,6 +7,7 @@
 #include <mega65.h>
 
 #include "engine.h"
+#include "gamesave.h"
 #include "gfx.h"
 #include "logic.h"
 #include "main.h"
@@ -18,7 +19,7 @@
 #include "view.h"
 #include "volume.h"
 
-#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 uint8_t __far *logic_vars = NULL;
 uint8_t __far *logic_flags = NULL;
@@ -32,9 +33,9 @@ static logic_stack_entry_t logic_stack[16];
 static uint8_t __far *program_counter;
 static uint8_t __far *logic_strings;
 static uint8_t logic_stack_ptr;
-static char local_string[256];
+static uint8_t local_string[256];
 
-uint8_t object_data_offset;
+uint16_t object_data_offset;
 bool debug;
 
 void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {
@@ -46,7 +47,7 @@ void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string)
     }
 }
 
-void logic_strcpy_far_near(char *dest_string, uint8_t __far *src_string) {
+void logic_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string) {
     *dest_string = *src_string;
     while (*dest_string != 0) {
         dest_string++;
@@ -100,6 +101,11 @@ bool logic_test_commands(void) {
          case 0x05:
             // greatern test
             result = logic_vars[program_counter[1]] > program_counter[2];
+            program_counter += 3;
+            break;
+         case 0x06:
+            // greaterv test
+            result = logic_vars[program_counter[1]] > logic_vars[program_counter[2]];
             program_counter += 3;
             break;
         case 0x07:
@@ -173,7 +179,7 @@ bool logic_test_commands(void) {
             break;
         }
         default:
-            gfx_print_ascii(0, 0, "FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
+            gfx_print_ascii(0, 0, (uint8_t *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
     }
     return result;
@@ -226,18 +232,21 @@ void logic_run(void) {
     logic_num = 0;
     logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
-    while(1) {
-        if (logic_num == 53) {
-            //debug = true;
+    while(1) {/*
+        bool big_fall  = ((logic_flags[158 >> 3]) >> (158 & 0x07)) & 0x01;
+        if ((logic_num == 38) && (big_fall)) {
+            debug = true;
+        } else {
+            debug = false;
         }
         if (debug) {
-            gfx_print_ascii(0,0,"A:%x %X", logic_num, (uint32_t)program_counter);
-            gfx_print_ascii(0,1,"B:%x", *program_counter);
+            gfx_print_ascii(0,0,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
+            gfx_print_ascii(0,1,(uint8_t *)"B:%x", *program_counter);
             while(ASCIIKEY==0) {
     
             }
             ASCIIKEY=0;
-        }
+        }*/
         switch (*program_counter) {
             case 0x00: {
                 // return
@@ -386,7 +395,8 @@ void logic_run(void) {
                 // draw.pic
                 gfx_hold_flip(true);
                 VICIV.bordercol = COLOR_GREEN;
-                draw_pic();
+                views_in_pic = 0;
+                draw_pic(true);
                 program_counter += 2;
                 break;
             }
@@ -403,6 +413,15 @@ void logic_run(void) {
                 program_counter += 2;
                 break;
             }
+            case 0x1C: {
+                // overlay.pic
+                gfx_hold_flip(true);
+                VICIV.bordercol = COLOR_GREEN;
+                views_in_pic = 0;
+                draw_pic(false);
+                program_counter += 2;
+                break;
+            }
             case 0x1E: {
                 // load.view
                 view_load(program_counter[1]);
@@ -412,6 +431,12 @@ void logic_run(void) {
             case 0x1F: {
                 // load.view.v
                 view_load(logic_vars[program_counter[1]]);
+                program_counter += 2;
+                break;
+            }
+            case 0x20: {
+                // discard.view
+                view_unload(program_counter[1]);
                 program_counter += 2;
                 break;
             }
@@ -533,6 +558,30 @@ void logic_run(void) {
                 program_counter += 3;
                 break;
             }
+            case 0x32: {
+                // current.cel
+                logic_vars[program_counter[2]] = sprites[program_counter[1]].cel_index;
+                program_counter += 3;
+                break;
+            }
+            case 0x33: {
+                // current.loop
+                logic_vars[program_counter[2]] = sprites[program_counter[1]].loop_index;
+                program_counter += 3;
+                break;
+            }
+            case 0x34: {
+                // current.view
+                logic_vars[program_counter[2]] = sprites[program_counter[1]].view_number;
+                program_counter += 3;
+                break;
+            }
+            case 0x35: {
+                // number.of.loops
+                logic_vars[program_counter[2]] = sprites[program_counter[1]].view_info.number_of_loops;
+                program_counter += 3;
+                break;
+            }
             case 0x36: {
                 // set.priority
                 sprites[program_counter[1]].view_info.priority = program_counter[2];
@@ -611,10 +660,11 @@ void logic_run(void) {
                 break;
             }
             case 0x45: {
+                // distance
                 if (sprites[program_counter[1]].drawable && sprites[program_counter[2]].drawable) {
                     logic_vars[program_counter[3]]  =
-                    (sprites[program_counter[1]].view_info.x_pos - sprites[program_counter[2]].view_info.x_pos) +
-                    (sprites[program_counter[1]].view_info.y_pos - sprites[program_counter[2]].view_info.y_pos);
+                    abs(sprites[program_counter[1]].view_info.x_pos - sprites[program_counter[2]].view_info.x_pos) +
+                    abs(sprites[program_counter[1]].view_info.y_pos - sprites[program_counter[2]].view_info.y_pos);
                 } else {
                     logic_vars[program_counter[3]]  = 0xff;
                 }
@@ -708,7 +758,11 @@ void logic_run(void) {
                 }
                 sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
                 sprites[program_counter[1]].prg_complete_flag = program_counter[5];
+                sprites[program_counter[1]].frozen = false;
                 sprites[program_counter[1]].updatable = true;
+                if (program_counter[1] == 0) {
+                    player_control = false;
+                }
                 program_counter += 6;
                 break;
             }
@@ -717,14 +771,19 @@ void logic_run(void) {
                 sprites[program_counter[1]].prg_movetype = pmmMoveTo;
                 sprites[program_counter[1]].prg_x_destination = logic_vars[program_counter[2]];
                 sprites[program_counter[1]].prg_y_destination = logic_vars[program_counter[3]];
-                if (program_counter[4] > 0) {
-                    sprites[program_counter[1]].prg_speed = program_counter[4];
+                uint8_t speed_var = logic_vars[program_counter[4]];
+                if (speed_var > 0) {
+                    sprites[program_counter[1]].prg_speed = speed_var;
                 } else {
                     sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
                 }
                 sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
                 sprites[program_counter[1]].prg_complete_flag = program_counter[5];
+                sprites[program_counter[1]].frozen = false;
                 sprites[program_counter[1]].updatable = true;
+                if (program_counter[1] == 0) {
+                    player_control = false;
+                }
                 program_counter += 6;
                 break;
             }
@@ -747,6 +806,14 @@ void logic_run(void) {
                 sprites[program_counter[1]].prg_dir = 0;
                 if (program_counter[1] == 0) {
                     player_control = false;
+                }
+                program_counter += 2;
+                break;
+            }
+            case 0x55: {
+                sprites[program_counter[1]].prg_movetype = pmmNone;
+                if (program_counter[1] == 0) {
+                    player_control = true;
                 }
                 program_counter += 2;
                 break;
@@ -960,6 +1027,29 @@ void logic_run(void) {
                 program_counter += 4;
                 break;
             }
+            case 0x7A: {
+                // add.to.pic
+                view_set(&object_view, program_counter[1]);
+                select_loop(&object_view, program_counter[2]);
+                object_view.cel_offset = program_counter[3];
+                object_view.x_pos = program_counter[4];
+                object_view.y_pos = program_counter[5];
+                object_view.priority_override = true;
+                object_view.priority = program_counter[6];
+                object_view.priority_set = true;
+                object_view.baseline_priority = program_counter[7];
+                add_to_pic_commands[views_in_pic].view_number = program_counter[1];
+                add_to_pic_commands[views_in_pic].loop_index = program_counter[2];
+                add_to_pic_commands[views_in_pic].cel_index = program_counter[3];
+                add_to_pic_commands[views_in_pic].x_pos = program_counter[4];
+                add_to_pic_commands[views_in_pic].y_pos = program_counter[5];
+                add_to_pic_commands[views_in_pic].priority = program_counter[6];
+                add_to_pic_commands[views_in_pic].baseline_priority = program_counter[7];
+                views_in_pic++;
+                sprite_draw_to_pic();
+                program_counter += 8;
+                break;
+            }
             case 0x80: {
                 // restart.game
                 sprite_stop_all();
@@ -1025,6 +1115,26 @@ void logic_run(void) {
                 program_counter += 2;
                 break;
             }
+            case 0x93: {
+                // reposition.to
+                sprites[program_counter[1]].view_info.x_pos = program_counter[2];
+                sprites[program_counter[1]].view_info.y_pos = program_counter[3];
+                if (!sprites[program_counter[1]].view_info.priority_override) {
+                    sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
+                }
+                program_counter += 4;
+                break;
+            }
+            case 0x94: { 
+                // reposition.to.v
+                sprites[program_counter[1]].view_info.x_pos = logic_vars[program_counter[2]];
+                sprites[program_counter[1]].view_info.y_pos = logic_vars[program_counter[3]];
+                if (!sprites[program_counter[1]].view_info.priority_override) {
+                    sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
+                }
+                program_counter += 4;
+                break;
+            }
             case 0x9C:
                 // Set Menu
                 program_counter += 2;
@@ -1065,7 +1175,7 @@ void logic_run(void) {
                 break;
             }
             default:
-            gfx_print_ascii(0, 0, "FAULT: UNKINSTR=%x:%X", *program_counter,(uint32_t)program_counter);
+            gfx_print_ascii(0, 0, (uint8_t *)"FAULT: UNKINSTR=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }
@@ -1080,7 +1190,7 @@ void logic_load(uint8_t logic_num) {
 
     logic_infos[logic_num].offset = load_volume_object(voLogic, logic_num, &length);
     if (logic_infos[logic_num].offset == 0) {
-        gfx_print_ascii(0, 0, "FAULT: Failed to load logic %d.", logic_num);
+        gfx_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
         return;
     }
 

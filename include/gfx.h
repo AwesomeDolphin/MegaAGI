@@ -16,7 +16,7 @@ void gfx_print_asciichar(uint8_t character, bool reverse);
 void gfx_print_scncode(uint8_t scncode);
 void gfx_begin_print(uint8_t x, uint8_t y);
 void gfx_end_print(void);
-void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...);
+void gfx_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...);
 void gfx_set_printpos(uint8_t x, uint8_t y);
 void gfx_clear_line(uint8_t y);
 void gfx_setupmem(void);
@@ -25,7 +25,6 @@ void gfx_cleargfx(bool preserve_text);
 bool gfx_flippage(void);
 bool gfx_hold_flip(bool hold);
 void gfx_switchto(void);
-void gfx_switchfrom(void);
 void gfx_set_textmode(bool enable_text);
 
 #endif

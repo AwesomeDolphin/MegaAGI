@@ -4,6 +4,16 @@
 #include "logic.h"
 #include "sprite.h"
 
+typedef struct add_to_pic_command {
+    uint8_t view_number;
+    uint8_t loop_index;
+    uint8_t cel_index;
+    uint8_t x_pos;
+    uint8_t y_pos;
+    uint8_t priority;
+    uint8_t baseline_priority;
+} add_to_pic_command_t;
+
 extern uint16_t chipmem_allocoffset;
 extern uint16_t chipmem_lockoffset;
 extern uint16_t chipmem2_allocoffset;
@@ -25,9 +35,13 @@ extern __far uint8_t animated_sprites[256];
 extern __far uint16_t views[256];
 extern __far logic_info_t logic_infos[256];
 extern __far uint8_t object_locations[256];
+extern __far uint8_t views_in_pic;
+extern __far add_to_pic_command_t add_to_pic_commands[16];
 #pragma clang section bss=""
 
-void gamesave_save_to_attic(void);
+uint32_t gamesave_save_to_attic(void);
+void gamesave_save_to_disk(void);
 void gamesave_load_from_attic(void);
+void gamesave_load_from_disk(void);
 
 #endif

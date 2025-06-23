@@ -13,7 +13,7 @@
 #define ALPHABET_SIZE 26
 #define XOR_VALUE 0x7f
 
-#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 // Structure to represent our dictionary reference
 typedef struct dictionary {
@@ -24,6 +24,7 @@ typedef struct dictionary {
 dictionary_t dict;
 uint8_t parser_word_index;
 uint16_t parser_word_numbers[20];
+bool parser_debug;
 
 // Function to find a word in the dictionary and collect matching word numbers
 bool parser_find_word(const char* target) {
@@ -34,8 +35,11 @@ bool parser_find_word(const char* target) {
     
     // If offset is 0, no words starting with this letter
     if (offset == 0) {
-        gfx_print_ascii(20,1,"NO WORD");
         return false;
+    }
+
+    if (parser_debug) {
+        gfx_print_ascii(0,0,(uint8_t *)target);
     }
     
     // Set current position in dictionary
@@ -91,9 +95,22 @@ bool parser_find_word(const char* target) {
         uint16_t word_number = *current_pos << 8;
         word_number = *(current_pos + 1);
         current_pos += 2;
-        
+
+        if (parser_debug) {
+            gfx_print_ascii(0,1,(uint8_t *)current_word);
+            gfx_print_ascii(0, 2, (uint8_t *)"%d", i);
+            gfx_print_ascii(0,3,(uint8_t *)"%d", word_number);
+        }
+
         // OPTIMIZATION 3: Early length check
         if (current_word_len != target_len) {
+            if (parser_debug) {
+                gfx_print_ascii(0,4,(uint8_t *)"O3");
+                while(ASCIIKEY == 0) {
+                    // Wait for key release
+                }
+                ASCIIKEY = 0; // Clear key
+            }
             continue;
         }
         
@@ -103,6 +120,13 @@ bool parser_find_word(const char* target) {
             // Match found, store word number if not 0
             if (word_number > 0) {
                 parser_word_numbers[parser_word_index] = word_number;
+                if (parser_debug) {
+                    gfx_print_ascii(0,4,(uint8_t *)"M: %d %d", word_number, parser_word_index);
+                    while(ASCIIKEY == 0) {
+                        // Wait for key release
+                    }
+                    ASCIIKEY = 0; // Clear key
+                }
                 parser_word_index++;
             }
             return true;
@@ -142,10 +166,11 @@ bool parser_decode_string(char *target) {
     uint8_t index = 0;
     parser_word_index = 0;
     char *token = strtok(target, " ");
+    logic_vars[9] = 0;
     while (token != NULL) {
         if (!parser_find_word(token)){
-            logic_vars[9] = index;
-            return false;
+            logic_vars[9] = index + 1;
+            break;
         }
         index++;
         token = strtok(NULL, " ");
@@ -157,6 +182,7 @@ bool parser_decode_string(char *target) {
 
 // Initialize dictionary reference to pre-loaded memory
 void parser_init(void) {
+    parser_debug = false;
    // Point to the 26 letter offsets at the start of the dictionary
     dict.letter_offsets = (uint16_t __far *) (chipmem2_base+1);
     

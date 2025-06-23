@@ -1,7 +1,7 @@
 #ifndef PIC_H
 #define PIC_H
 
-uint8_t draw_pic(void);
+void draw_pic(bool clear_screen);
 void pic_load(uint8_t pic_num);
 void pic_discard(uint8_t pic_num);
 

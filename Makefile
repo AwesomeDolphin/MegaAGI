@@ -31,7 +31,9 @@ agi.elf: $(OBJS_DEBUG)
 agi.d81: agi.prg
 	$(C1541) -format "agi,a1" d81 agi.d81
 	$(C1541) -attach agi.d81 -write agi.prg agi.c65
-	$(C1541) -attach agi.d81 -write nographics.raw nographics,s
+	$(C1541) -attach agi.d81 -write inits.raw inits,s
+	$(C1541) -attach agi.d81 -write midmem.raw midmem,s
+	$(C1541) -attach agi.d81 -write himem.raw himem,s
 	$(C1541) -attach agi.d81 -write volumes/LOGDIR logdir,s
 	$(C1541) -attach agi.d81 -write volumes/PICDIR picdir,s
 	$(C1541) -attach agi.d81 -write volumes/SNDDIR snddir,s

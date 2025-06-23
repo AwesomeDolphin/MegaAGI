@@ -24,7 +24,7 @@ typedef struct fill_info {
 __far static fill_info_t fills[128];
 #pragma clang section bss=""
 
-#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+#pragma clang section bss="midmembss" data="himemdata" rodata="himemrodata" text="himemtext"
 static    uint8_t pic_color;
 static    uint8_t priority_color;
 static    uint8_t pic_on;
@@ -83,18 +83,14 @@ uint8_t can_fill(uint8_t x, uint8_t y) {
     return (gfx_get(x, y) == 15);
 }
 
-uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
+void draw_fill(uint8_t in_x, uint8_t in_y) {
     if (!can_fill(in_x, in_y)) {
-        return 0;
+        return;
     }
     fill_pointer = 2;
     fills[1] = (fill_info_t){.x1 = in_x, .x2 = in_x, .y = in_y, .dy = 1};
     fills[2] = (fill_info_t){.x1 = in_x, .x2 = in_x, .y = in_y - 1, .dy = -1};
-    uint8_t max_depth = 0;
     while (fill_pointer > 0) {
-        if (fill_pointer > max_depth) {
-            max_depth = fill_pointer;
-        }
         fill_info_t cur_fill = fills[fill_pointer];
         fill_pointer--;
 
@@ -136,13 +132,13 @@ uint8_t draw_fill(uint8_t in_x, uint8_t in_y) {
             loc_x = cur_fill.x1;
         }
     }
-    return max_depth;
 }
 
-uint8_t draw_pic(void) {
-    gfx_cleargfx(true);
+void draw_pic(bool clear_screen) {
+    if (clear_screen) {
+        gfx_cleargfx(true);
+    }
     engine_dialog_close();
-    uint8_t max_depth = 1;
     uint8_t __far *pic_file;
     pic_file = chipmem_base + pic_offset;
 
@@ -222,10 +218,7 @@ uint8_t draw_pic(void) {
                 break;
             case 0xF8:
                 while ((pic_file[index] & 0xf0) != 0xf0) {
-                    uint8_t depth = draw_fill(pic_file[index], pic_file[index+1]);
-                    if (depth > max_depth) {
-                        max_depth = depth;
-                    }
+                    draw_fill(pic_file[index], pic_file[index+1]);
                     index += 2;
                 }
                 break;
@@ -234,11 +227,7 @@ uint8_t draw_pic(void) {
                 index = 0xffff;
                 break;
             default:
-                gfx_switchfrom();
-                while (ASCIIKEY==0);
-                ASCIIKEY = 0;
-                gfx_switchto();
-                return 0;
+                return;
         }
     } while (index < pic_length);
     pic_color = 0;
@@ -246,16 +235,14 @@ uint8_t draw_pic(void) {
     priority_color = 4;
     priority_on = 1;
     draw_line(0, 167, 159, 167);
-    return max_depth;
 }
 
 void pic_load(uint8_t pic_num) {
     pic_offset = load_volume_object(voPic, pic_num, &pic_length);
     if (pic_offset == 0) {
-        gfx_print_ascii(0, 0, "FAULT: Failed to load pic %d.", pic_num);
+        gfx_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
         return;
     }
-    gfx_print_ascii(0, 0, "%X", (uint32_t)pic_offset);
 }
 
 void pic_discard(uint8_t pic_num) {

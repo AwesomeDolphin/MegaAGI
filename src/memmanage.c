@@ -16,6 +16,22 @@ uint8_t __far * const chipmem_base = (uint8_t __far *)0x40000;
 uint8_t __far * const chipmem2_base = (uint8_t __far *)0xff8e000;
 uint8_t __huge * const attic_memory = (uint8_t __huge *)0x8000000;
 
+void memmanage_memcpy_far_huge(uint8_t __huge *dest_mem, uint8_t __far *src_mem, uint32_t length) {
+    for (uint32_t pos = 0; pos < length; pos++) {
+        *dest_mem = *src_mem;
+        dest_mem++;
+        src_mem++;
+    }
+}
+
+void memmanage_memcpy_huge_far(uint8_t __far *dest_mem, uint8_t __huge *src_mem, uint32_t length) {
+    for (uint32_t pos = 0; pos < length; pos++) {
+        *dest_mem = *src_mem;
+        dest_mem++;
+        src_mem++;
+    }
+}
+
 void memmanage_init(void) {
     chipmem_allocoffset = 1;
     chipmem_lockoffset = 1;

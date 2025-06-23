@@ -4,7 +4,7 @@ To build the D81, you will need to do the following:
 ```
 	c1541 -format "agi,a1" d81 agi.d81
 	c1541 -attach agi.d81 -write agi.prg agi.c65
-	c1541 -attach agi.d81 -write nographics.raw nographics,s
+	c1541 -attach agi.d81 -write midmem.raw midmem,s
 	c1541 -attach agi.d81 -write volumes/LOGDIR logdir,s
 	c1541 -attach agi.d81 -write volumes/PICDIR picdir,s
 	c1541 -attach agi.d81 -write volumes/SNDDIR snddir,s

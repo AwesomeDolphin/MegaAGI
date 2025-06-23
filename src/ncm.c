@@ -10,7 +10,6 @@
 #include "irq.h"
 #include "main.h"
 
-uint8_t vic4cache[14];
 volatile uint8_t __far *drawing_xpointer[2][160];
 uint8_t *fastdrawing_xpointer[160];
 static uint16_t printpos = 0;
@@ -109,55 +108,6 @@ uint8_t copys1d0cmd[] =    {0x00,               // End of token list
                             0x00, 0x00,         // modulo
                            };
 
-uint8_t palettedata[] =  {0x00, 0x00, 0x00,
-                          0x00, 0x00, 0x8A,
-                          0x00, 0x8A, 0x00,
-                          0x00, 0x8A, 0x8A,
-                          0x8A, 0x00, 0x00,
-                          0x8A, 0x00, 0x8A,
-                          0x8A, 0x45, 0x00,
-                          0x8A, 0x8A, 0x8A,
-                          0x45, 0x45, 0x45,
-                          0x45, 0x45, 0xCF,
-                          0x45, 0xCF, 0x45,
-                          0x45, 0xCF, 0xCF,
-                          0xCF, 0x45, 0x45,
-                          0xCF, 0x45, 0xCF,
-                          0xCF, 0xCF, 0x45,
-                          0xCF, 0xCF, 0xCF};
-
-void savevic(void) {
-  vic4cache[0] = VICIV.ctrl2;
-  vic4cache[1] = VICIV.ctrla;
-  vic4cache[2] = VICIV.ctrlb;
-  vic4cache[3] = VICIV.ctrlc;
-  vic4cache[4] = VICIV.linestep >> 8;
-  vic4cache[5] = VICIV.linestep & 0xff;
-  vic4cache[6] = VICIV.chrcount;
-  vic4cache[7] = VICIV.palsel;
-  vic4cache[8] = VICIV.scrnptr_mb;
-  vic4cache[9] = VICIV.scrnptr_bnk;
-  vic4cache[10] = VICIV.scrnptr_msb;
-  vic4cache[11] = VICIV.scrnptr_lsb;
-  vic4cache[12] = VICIV.colptr >> 8;
-  vic4cache[13] = VICIV.colptr & 0xff;
-}
-
-void loadvic(void) {
-  VICIV.ctrl2 = vic4cache[0];
-  VICIV.ctrla = vic4cache[1];
-  VICIV.ctrlb = vic4cache[2];
-  VICIV.ctrlc = vic4cache[3];
-  VICIV.linestep = (vic4cache[4] << 8) | vic4cache[5];
-  VICIV.chrcount = vic4cache[6];
-  VICIV.palsel = vic4cache[7];
-  VICIV.scrnptr_mb = vic4cache[8];
-  VICIV.scrnptr_bnk = vic4cache[9];
-  VICIV.scrnptr_msb = vic4cache[10];
-  VICIV.scrnptr_lsb = vic4cache[11];
-  VICIV.colptr = (vic4cache[12] << 8) | vic4cache[13];
-}
-
 void gfx_print_asciichar(uint8_t character, bool reverse) {
   if (character < 32) {
     character = character + 0x80;
@@ -247,7 +197,7 @@ void gfx_end_print(void) {
   }
 }
 
-void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
+void gfx_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...) {
   gfx_begin_print(x,y);
   va_list ap;
   va_start(ap, formatstring);
@@ -257,6 +207,18 @@ void gfx_print_ascii(uint8_t x, uint8_t y, char *formatstring, ...) {
     if (petsciichar == '%') {
       ascii_string++;
       switch (*ascii_string) {
+        case 'f': {
+          char buffer[9];
+          uint32_t param = va_arg(ap, int);
+          uint8_t len = my_ultoa_invert(param, buffer, 2);
+          for (uint8_t ctr = 0; ctr < len; ctr++) {
+            gfx_print_asciichar(buffer[ctr], false);
+          }
+          for (uint8_t ctr = len; ctr < 8; ctr++) {
+            gfx_print_asciichar('0', false);
+          }
+          break;
+        }
         case 'd':
         case 'x': {
           char buffer[17];
@@ -298,7 +260,7 @@ void gfx_clear_line(uint8_t y) {
 void gfx_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
     for (uint8_t i = 0; i < 25; i++) {
-      gfx_print_ascii(0, i, "                                       ");
+      gfx_print_ascii(0, i, (uint8_t *)"                                       ");
     }
     game_text = true;
   } else {
@@ -420,54 +382,6 @@ void gfx_drawslowline(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t co
    }
 }
 
-void gfx_setupmem(void) {
-  for (int y = 0; y < 25; y++) {
-    for (int x = 0; x < 20; x++) {
-      if (y < 21) {
-        screen_memory_0[(y * 61) + x] = 0x1400 + (0x200 * 0) + (x * 25) + y;        
-        screen_memory_1[(y * 61) + x] = 0x1400 + (0x200 * 1) + (x * 25) + y;
-        color_memory[(y * 61) + x] = 0x1f08;       
-      } else {
-        screen_memory_0[(y * 61) + x] = 0x1400 + 21;        
-        screen_memory_1[(y * 61) + x] = 0x1400 + 21;
-        color_memory[(y * 61) + x] = 0x1f08;       
-      }
-    }
-    int x=20;
-    screen_memory_0[(y * 61) + x] = 0x0140;        
-    screen_memory_1[(y * 61) + x] = 0x0140;
-    color_memory[(y * 61) + x] = 0x0010;       
-    for (int x = 21; x < 61; x++) {
-      screen_memory_0[(y * 61) + x] = 0x0041;        
-      screen_memory_1[(y * 61) + x] = 0x0041;
-      color_memory[(y * 61) + x] = 0x0100;       
-    }
-  }
-
-  uint32_t column0_address = 0x50000;
-  uint32_t column1_address = 0x58000;
-  uint32_t fastcolumn_address = 0x8000;
-  for (uint8_t x = 0; x < 160; x++) {
-    drawing_xpointer[0][x] = (uint8_t __far *)column0_address + (x >> 3) * 1600 + (x & 0x07);
-    drawing_xpointer[1][x] = (uint8_t __far *)column1_address + (x >> 3) * 1600 + (x & 0x07);
-    fastdrawing_xpointer[x] = (uint8_t *)fastcolumn_address + (x >> 3) * 1600 + (x & 0x07);
-  }
-
-  uint8_t palette_index = 16;
-  for (int i = 0; i < 48; i += 3) {
-    PALETTE.red[palette_index] = palettedata[i];
-    PALETTE.green[palette_index] = palettedata[i+1];
-    PALETTE.blue[palette_index] = palettedata[i+2];
-    palette_index++;
-  }
-
-  DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen0cmd) >> 8);
-  DMA.etrig = (uint8_t)(((uint16_t)clrscreen0cmd) & 0xff);
-  DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen1cmd) >> 8);
-  DMA.etrig = (uint8_t)(((uint16_t)clrscreen1cmd) & 0xff);
-
-}
-
 void gfx_blackscreen(void) {
   DMA.dmahigh = (uint8_t)(((uint16_t)blackscreencmd) >> 8);
   DMA.etrig = (uint8_t)(((uint16_t)blackscreencmd) & 0xff);
@@ -539,9 +453,76 @@ bool gfx_hold_flip(bool hold) {
   return old_hold;
 }
 
+#pragma clang section bss="midmembss" data="initsdata" rodata="initsrodata" text="initstext"
+
+uint8_t palettedata[] =  {0x00, 0x00, 0x00,
+                          0x00, 0x00, 0x8A,
+                          0x00, 0x8A, 0x00,
+                          0x00, 0x8A, 0x8A,
+                          0x8A, 0x00, 0x00,
+                          0x8A, 0x00, 0x8A,
+                          0x8A, 0x45, 0x00,
+                          0x8A, 0x8A, 0x8A,
+                          0x45, 0x45, 0x45,
+                          0x45, 0x45, 0xCF,
+                          0x45, 0xCF, 0x45,
+                          0x45, 0xCF, 0xCF,
+                          0xCF, 0x45, 0x45,
+                          0xCF, 0x45, 0xCF,
+                          0xCF, 0xCF, 0x45,
+                          0xCF, 0xCF, 0xCF};
+
+
+void gfx_setupmem(void) {
+  for (int y = 0; y < 25; y++) {
+    for (int x = 0; x < 20; x++) {
+      if (y < 21) {
+        screen_memory_0[(y * 61) + x] = 0x1400 + (0x200 * 0) + (x * 25) + y;        
+        screen_memory_1[(y * 61) + x] = 0x1400 + (0x200 * 1) + (x * 25) + y;
+        color_memory[(y * 61) + x] = 0x1f08;       
+      } else {
+        screen_memory_0[(y * 61) + x] = 0x1400 + 21;        
+        screen_memory_1[(y * 61) + x] = 0x1400 + 21;
+        color_memory[(y * 61) + x] = 0x1f08;       
+      }
+    }
+    int x=20;
+    screen_memory_0[(y * 61) + x] = 0x0140;        
+    screen_memory_1[(y * 61) + x] = 0x0140;
+    color_memory[(y * 61) + x] = 0x0010;       
+    for (int x = 21; x < 61; x++) {
+      screen_memory_0[(y * 61) + x] = 0x0041;        
+      screen_memory_1[(y * 61) + x] = 0x0041;
+      color_memory[(y * 61) + x] = 0x0100;       
+    }
+  }
+
+  uint32_t column0_address = 0x50000;
+  uint32_t column1_address = 0x58000;
+  uint32_t fastcolumn_address = 0x8000;
+  for (uint8_t x = 0; x < 160; x++) {
+    drawing_xpointer[0][x] = (uint8_t __far *)column0_address + (x >> 3) * 1600 + (x & 0x07);
+    drawing_xpointer[1][x] = (uint8_t __far *)column1_address + (x >> 3) * 1600 + (x & 0x07);
+    fastdrawing_xpointer[x] = (uint8_t *)fastcolumn_address + (x >> 3) * 1600 + (x & 0x07);
+  }
+
+  uint8_t palette_index = 16;
+  for (int i = 0; i < 48; i += 3) {
+    PALETTE.red[palette_index] = palettedata[i];
+    PALETTE.green[palette_index] = palettedata[i+1];
+    PALETTE.blue[palette_index] = palettedata[i+2];
+    palette_index++;
+  }
+
+  DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen0cmd) >> 8);
+  DMA.etrig = (uint8_t)(((uint16_t)clrscreen0cmd) & 0xff);
+  DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen1cmd) >> 8);
+  DMA.etrig = (uint8_t)(((uint16_t)clrscreen1cmd) & 0xff);
+
+}
+
 void gfx_switchto(void) {
     stop_flip = false;
-    savevic();
     
     gfx_setupmem();
 
@@ -557,8 +538,4 @@ void gfx_switchto(void) {
     VICIV.colptr = 0x1000;
     VICIV.chrcount = 61;
     VICIV.linestep = 122;
-}
-
-void gfx_switchfrom(void) {
-    loadvic();
 }

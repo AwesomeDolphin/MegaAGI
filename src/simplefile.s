@@ -1,6 +1,7 @@
         .extern _Zp
 
 CHKIN:  .equlab 0xffc6
+CHKOUT: .equlab 0xffc9
 OPEN:   .equlab 0xffc0
 CLRCHN: .equlab 0xffcc
 SETLFS: .equlab 0xffba
@@ -17,7 +18,7 @@ simpleopen:
         ldy zp:_Zp+1
         jsr SETNAM
         lda #0x02
-        ldx #0x08
+        ldx zp:_Zp+2
         ldy #0x02
         jsr SETLFS
         jsr OPEN
@@ -54,8 +55,19 @@ readfail:
 
         .public simplewrite
 simplewrite:
-        jmp CHROUT
-
+        sta zp:_Zp+2
+        ldx #0x02
+        jsr CHKOUT
+        ldy #0x00
+write$:
+        lda (zp:_Zp+0),y
+        jsr CHROUT
+        iny
+        cpy zp:_Zp+2
+        bne write$
+        lda #0x00
+        jmp CLRCHN
+        
         .public simpleprint
 simpleprint:
         ldy #0x00
@@ -73,3 +85,33 @@ doneprint$:
 simpleclose:
         lda #0x02
         jmp CLOSE
+
+        .public simplecmdchan
+simplecmdchan:
+        tax
+        lda #0x0f
+        tay
+        jsr SETLFS
+        lda #0x00
+        jsr SETNAM
+        jsr OPEN
+        jsr CLRCHN
+
+        ldx #0x0f
+        jsr CHKIN
+        ldy #0x00
+cmdnext:
+        jsr CHRIN
+        sta (zp:_Zp+0),y
+        iny
+        cpy #0xff
+        beq cmddone
+        cmp #0x0d
+        bne cmdnext
+cmddone:
+        lda #0x00
+        sta (zp:_Zp+0),y
+
+        lda #0x0f
+        jmp CLOSE
+

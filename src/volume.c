@@ -22,39 +22,13 @@ __far static voldir_entry_t sound_directory[256];
 __far static voldir_entry_t view_directory[256];
 #pragma clang section bss=""
 
-#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
-
-
 static uint8_t volumes;
 static uint8_t logic_files;
 static uint8_t pic_files;
 static uint8_t sound_files;
 static uint8_t view_files;
 
-uint8_t load_directory_file(char *dir_file_name, voldir_entry_t __far *entries) {
-    uint8_t entry_num = 0;
-    uint8_t entrybuf[768];
-    simpleopen(dir_file_name, strlen(dir_file_name));
-    uint16_t entries_read = simpleread(&entrybuf[0]);
-    entries_read += simpleread(&entrybuf[255]);
-    entries_read += simpleread(&entrybuf[510]);
-    entries_read += simpleread(&entrybuf[765]);
-    uint16_t entry_index = 0;
-    for (entry_num = 0; entry_num < entries_read / 3; entry_num++) {
-        entries[entry_num].volume_number = entrybuf[entry_index + 0] >> 4;
-        entries[entry_num].offset = ((uint32_t)(entrybuf[entry_index + 0] & 0x0f) << 16) | (((entrybuf[entry_index + 1]) << 8) & 0xffff) | entrybuf[entry_index + 2];
-        entry_index += 3;
-    }
-    simpleclose();
-    return entry_num;
-}
-
-void load_directory_files(void) {
-    logic_files = load_directory_file("LOGDIR,S,R", logic_directory);
-    pic_files = load_directory_file("PICDIR,S,R", pic_directory);
-    sound_files = load_directory_file("SNDDIR,S,R", sound_directory);
-    view_files = load_directory_file("VIEWDIR,S,R", view_directory);
-}
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 uint8_t __huge *locate_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length) {
   voldir_entry_t __far *volobj_entry = NULL;
@@ -126,6 +100,32 @@ uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *ob
     return target_offset;
 }
 
+#pragma clang section bss="midmembss" data="initsdata" rodata="initsrodata" text="initstext"
+uint8_t load_directory_file(char *dir_file_name, voldir_entry_t __far *entries) {
+    uint8_t entry_num = 0;
+    uint8_t entrybuf[768];
+    simpleopen(dir_file_name, strlen(dir_file_name), 8);
+    uint16_t entries_read = simpleread(&entrybuf[0]);
+    entries_read += simpleread(&entrybuf[255]);
+    entries_read += simpleread(&entrybuf[510]);
+    entries_read += simpleread(&entrybuf[765]);
+    uint16_t entry_index = 0;
+    for (entry_num = 0; entry_num < entries_read / 3; entry_num++) {
+        entries[entry_num].volume_number = entrybuf[entry_index + 0] >> 4;
+        entries[entry_num].offset = ((uint32_t)(entrybuf[entry_index + 0] & 0x0f) << 16) | (((entrybuf[entry_index + 1]) << 8) & 0xffff) | entrybuf[entry_index + 2];
+        entry_index += 3;
+    }
+    simpleclose();
+    return entry_num;
+}
+
+void load_directory_files(void) {
+    logic_files = load_directory_file("LOGDIR,S,R", logic_directory);
+    pic_files = load_directory_file("PICDIR,S,R", pic_directory);
+    sound_files = load_directory_file("SNDDIR,S,R", sound_directory);
+    view_files = load_directory_file("VIEWDIR,S,R", view_directory);
+}
+
 void load_volume_files(void) {
   char vol_name[32];
   strcpy(vol_name, "VOL.0,S,R");
@@ -133,7 +133,7 @@ void load_volume_files(void) {
   uint8_t buffer[256];
   int vol_number = 0;
   for (vol_number = 0; vol_number < 15; vol_number++) {
-    simpleopen(vol_name, strlen(vol_name));
+    simpleopen(vol_name, strlen(vol_name), 8);
     vol_name[4]++; 
     volume_files[vol_number] = volume_cache;
     size_t bytes_read;

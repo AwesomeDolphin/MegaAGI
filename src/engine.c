@@ -23,7 +23,10 @@
 volatile uint8_t frame_counter;
 volatile bool run_engine;
 
-#pragma clang section bss="nographicsbss" data="nographicsdata" rodata="nographicsrodata" text="nographicstext"
+#pragma clang section bss="extradata"
+__far uint8_t format_string_buffer[1024];
+
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 volatile uint8_t run_cycles;
 volatile bool engine_running;
@@ -37,9 +40,8 @@ uint8_t box_height = 0;
 uint8_t line_length = 0;
 uint8_t word_length = 0;
 uint8_t msg_char;
-char *msg_ptr;
-char *last_word;
-char format_string_buffer[1024];
+__far uint8_t *msg_ptr;
+__far uint8_t *last_word;
 
 static const uint8_t joystick_direction[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
@@ -47,7 +49,7 @@ static const uint8_t joystick_direction[16] = {
 };
 
 void engine_display_dialog(uint8_t __far *message_string) {
-    logic_strcpy_far_near(format_string_buffer, message_string);
+    logic_strcpy_far_far(format_string_buffer, message_string);
 
     msg_ptr = format_string_buffer;
     last_word = msg_ptr;
@@ -211,7 +213,7 @@ void engine_clear_keyboard(void) {
     command_buffer[0] = 0;
     cmd_buf_ptr=0;
     ASCIIKEY = 0;
-    gfx_print_ascii(0, 22, ">                                       ");
+    gfx_print_ascii(0, 22, (uint8_t *)">                                       ");
 }
 
 void engine_allowinput(bool allowed) {
@@ -219,7 +221,13 @@ void engine_allowinput(bool allowed) {
     if (input_ok) {
         engine_clear_keyboard();
     } else {
-        gfx_print_ascii(0, 22, "                                        ");
+        gfx_print_ascii(0, 22, (uint8_t *)"                                        ");
+    }
+}
+
+void engine_dumpstate(void) {
+    for (int i = 0; i < 8; i++) {
+        gfx_print_ascii(0, i, (uint8_t *)"%d: %f%f%f%f", i*32, logic_flags[i * 4], logic_flags[i * 4 + 1], logic_flags[i * 4 + 2], logic_flags[i * 4 + 3]);
     }
 }
 
@@ -230,11 +238,17 @@ void engine_handleinput(void) {
     uint8_t ascii_key = ASCIIKEY;
     if (ascii_key != 0) {
         ASCIIKEY = 0;
+        if (ascii_key == 0xf1) {
+            engine_dumpstate();
+        }
         if (ascii_key == 0xf7) {
-            gamesave_save_to_attic();
+            gamesave_save_to_disk();
         }
         if (ascii_key == 0xf5) {
-            gamesave_load_from_attic();
+            gamesave_load_from_disk();
+        }
+        if (ascii_key == 0xf6) {
+            parser_debug = true;
         }
         if (ascii_key == 0x14) {
             if (cmd_buf_ptr > 0) {
@@ -262,14 +276,13 @@ void engine_handleinput(void) {
 void run_loop(void) {
     view_init();
     sprite_init();
-    gfx_switchto();
-    gfx_blackscreen();
     logic_init();
     parser_init();
     frame_counter = 0;
     run_cycles = 0;
     run_engine = false;
     engine_running = false;
+    sound_flag_needs_set = false;
     hook_irq();
     input_ok = false;
     player_control = true;
@@ -301,6 +314,10 @@ void run_loop(void) {
             }
         } else {
             if (run_cycles >= logic_vars[10]) {
+                if (sound_flag_needs_set) {
+                    sound_flag_needs_set = false;
+                    logic_set_flag(sound_flag_end);
+                }
                 logic_reset_flag(2);
                 logic_reset_flag(4);
                 engine_handleinput();

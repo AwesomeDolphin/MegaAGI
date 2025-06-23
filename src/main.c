@@ -26,25 +26,13 @@ int main () {
   VICIV.key = 0x47;
   VICIV.key = 0x53;
   VICIV.chrxscl = 120;
-  simplewrite(0x93);
-  simplewrite(0x0b);
-  simplewrite(0x0e);
+  simpleprint("\x93\x0b\x0e");
   simpleprint("AGI DEMO!\r");
   POKE(1,133);
 
-  simpleprint("LOADING HIMEM...\r");
-  init_load_raw();
-
   memmanage_init();
-  
-  simpleprint("LOADING VOLUME FILES...\r");
-  load_volume_files();
-  simpleprint("LOADING DIRECTORY FILES...\r");
-  load_directory_files();
-  simpleprint("LOADING WORDS.TOK...\r");
-  init_load_words();
-  simpleprint("LOADING OBJECTS...\r");
-  init_load_words();
+
+  init_system();
   
   VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
   run_loop();

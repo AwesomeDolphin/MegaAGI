@@ -16,6 +16,8 @@ typedef struct view_info {
     int16_t y_pos;
     bool priority_override;
     uint8_t priority;
+    bool priority_set;
+    uint8_t baseline_priority;
     uint16_t desc_offset;
 } view_info_t;
 

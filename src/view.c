@@ -24,6 +24,9 @@ static uint8_t drawview_bottom;
 static uint8_t objprio;
 static uint8_t highprio;
 static uint8_t lowprio;
+static uint8_t baseprio;
+static uint8_t highbaseprio;
+static uint8_t lowbaseprio; 
 
 bool draw_cel(view_info_t *info, uint8_t cel) {
     uint8_t __far *loop_data = chipmem_base + info->loop_offset;
@@ -45,8 +48,11 @@ bool draw_cel(view_info_t *info, uint8_t cel) {
     drawview_bottom = info->y_pos;
 
     objprio = colorval[info->priority];
+    baseprio = colorval[info->baseline_priority];
     highprio = objprio & 0xf0;
     lowprio = objprio & 0x0f;
+    highbaseprio = baseprio & 0xf0;
+    lowbaseprio = baseprio & 0x0f;
 
     cel_data += 3;
     bool drew_something = false;;
@@ -77,6 +83,13 @@ bool draw_cel(view_info_t *info, uint8_t cel) {
                     if ((prioval) <= highprio) {
                         *draw_pointer = *cel_data;
                         drew_something=true;
+                        if (info->priority_set) {
+                            if ((draw_row == drawview_bottom) && (highbaseprio < 0x40)) {
+                                *scanprio_pointer = (*scanprio_pointer & 0x0f) | highbaseprio;
+                            } else {
+                                *scanprio_pointer = (*scanprio_pointer & 0x0f) | highprio;
+                            }
+                        }
                     }
                 }
                 draw_pointer += 8;
@@ -100,6 +113,13 @@ bool draw_cel(view_info_t *info, uint8_t cel) {
                     if ((prioval) <= lowprio) {
                         *draw_pointer = *cel_data;
                         drew_something=true;
+                        if (info->priority_set) {
+                            if ((draw_row == drawview_bottom) && (lowbaseprio < 0x04)) {
+                                *scanprio_pointer = (*scanprio_pointer & 0xf0) | lowbaseprio;
+                            } else {
+                                *scanprio_pointer = (*scanprio_pointer & 0xf0) | lowprio;
+                            }
+                        }
                     }
                 }
                 draw_pointer += 8;
@@ -157,6 +177,7 @@ void view_set(view_info_t *info, uint8_t view_num) {
     uint8_t __far *view_data = chipmem_base + info->view_offset;
     info->number_of_loops = view_data[0];
     info->desc_offset = info->view_offset + (info->number_of_loops * 2) + 1;
+    info->priority_set = false;
 }
 
 void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
@@ -275,7 +296,6 @@ bool view_load(uint8_t view_num) {
 void view_unload(uint8_t view_num) {
     if (views[view_num] != 0) {
         chipmem_free(views[view_num]);
-        views[view_num] = 0;
     }
 }
 

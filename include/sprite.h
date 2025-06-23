@@ -66,6 +66,7 @@ void sprite_mark_drawable(uint8_t sprite_num);
 void sprite_setedge(uint8_t sprite_num, uint8_t edgenum);
 void sprite_draw_animated(void);
 void sprite_erase_animated(void);
+void sprite_draw_to_pic(void);
 void sprite_clearall(void);
 void sprite_init(void);
 

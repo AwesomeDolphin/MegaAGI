@@ -84,3 +84,12 @@ select_execution_mem:
 		map
 		eom
 		rts
+            .public select_kernel_mem
+select_kernel_mem:  
+		lda #0x00
+		ldx #0x00
+		ldy #0x00
+		ldz #0x83
+		map
+		eom
+		rts

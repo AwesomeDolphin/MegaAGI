@@ -42,6 +42,8 @@ __far add_to_pic_command_t add_to_pic_commands[16];
 
 uint8_t __huge *gamesave_cache;
 
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+
 uint32_t gamesave_save_to_attic(void) {
     gamesave_cache = attic_memory + atticmem_allocoffset;
     VICIV.bordercol = COLOR_RED;
@@ -93,34 +95,36 @@ uint32_t gamesave_save_to_attic(void) {
     return offset;
 }
 
-void gamesave_save_to_disk(void) {
+void gamesave_save_to_disk(char *filename) {
+    uint8_t buffer[256];
+
     uint32_t save_size = gamesave_save_to_attic();
     select_kernel_mem();
     POKE(0xD030, 0x64);
     VICIV.bordercol = COLOR_SOYLENTGREEN;
+
+    simplecmdchan((uint8_t *)"I0:\r", 9);
+    simpleerrchan(buffer, 9);
     uint8_t __huge *gamesave_file = gamesave_cache;
-    simpleopen("GAMESAVE.AGI,S,W", 16, 9);
+    strcat(filename, ".AGI,S,W");
+    simpleopen(filename, strlen(filename), 9);
     size_t bytes_written = 0;
-    uint8_t buffer[256];
     uint8_t __far *buffer_far = (uint8_t __far *)buffer;
     for (uint32_t i = 0; i < save_size; i += 250) {
         uint32_t chunk_size = (save_size - i > 250) ? 250 : (save_size - i);
-        gfx_print_ascii(0,0, (uint8_t *)"SAVE: %X %X %d", i, save_size, chunk_size);
         memmanage_memcpy_huge_far(buffer_far, &gamesave_file[i], chunk_size);
         simplewrite(buffer, chunk_size);
     }
     simpleclose();
 
-    simplecmdchan(buffer, 9);
-    gfx_print_ascii(0,0,buffer);
-    if (buffer[0] < 0x32) {
-        gfx_print_ascii(0,0, (uint8_t *)"Saved from: %X", gamesave_cache);
-    }
+    simpleerrchan(buffer, 9);
+    gfx_print_ascii(0,0, false, buffer);
 
     VICIV.bordercol = COLOR_BLACK;
     POKE(0xD030, 0x44);
     select_execution_mem();
 }
+
 
 void gamesave_load_from_attic(void) {
     VICIV.bordercol = COLOR_RED;
@@ -185,29 +189,40 @@ void gamesave_load_from_attic(void) {
     draw_pic(true);
     pic_discard(logic_vars[0]);
     for (int i = 0; i < views_in_pic; i++) {
-        view_set(&object_view, add_to_pic_commands[i].view_number);
-        select_loop(&object_view, add_to_pic_commands[i].loop_index);
-        object_view.cel_offset = add_to_pic_commands[i].cel_index;
-        object_view.x_pos = add_to_pic_commands[i].x_pos;
-        object_view.y_pos = add_to_pic_commands[i].y_pos;
-        object_view.priority_override = true;
-        object_view.priority = add_to_pic_commands[i].priority;
-        object_view.priority_set = true;
-        object_view.baseline_priority = add_to_pic_commands[i].baseline_priority;
-        sprite_draw_to_pic();
+        if ((add_to_pic_commands[i].x_pos == 0xff) && (add_to_pic_commands[i].y_pos == 0xff)) {
+            pic_offset = (add_to_pic_commands[i].loop_index << 8);
+            pic_offset |= add_to_pic_commands[i].cel_index;
+            draw_pic(false);
+        } else {
+            view_load(add_to_pic_commands[i].view_number);
+            view_set(&object_view, add_to_pic_commands[i].view_number);
+            select_loop(&object_view, add_to_pic_commands[i].loop_index);
+            object_view.cel_offset = add_to_pic_commands[i].cel_index;
+            object_view.x_pos = add_to_pic_commands[i].x_pos;
+            object_view.y_pos = add_to_pic_commands[i].y_pos;
+            object_view.priority_override = true;
+            object_view.priority = add_to_pic_commands[i].priority;
+            object_view.priority_set = true;
+            object_view.baseline_priority = add_to_pic_commands[i].baseline_priority;
+            sprite_draw_to_pic();
+            view_unload(add_to_pic_commands[i].view_number);
+        }
     }
     gfx_hold_flip(false);
     VICIV.bordercol = COLOR_BLACK;
 }
 
-void gamesave_load_from_disk(void) {
+void gamesave_load_from_disk(char *filename) {
     gamesave_cache = attic_memory + atticmem_allocoffset;
     select_kernel_mem();
     POKE(0xD030, 0x64);
     VICIV.bordercol = COLOR_SOYLENTGREEN;
     uint8_t buffer[256];
 
-    simpleopen("GAMESAVE.AGI,S,R", 16, 9);
+    simplecmdchan((uint8_t *)"I0:\r", 9);
+    simpleerrchan(buffer, 9);
+    strcat(filename, ".AGI,S,R");
+    simpleopen(filename, strlen(filename), 9);
     size_t bytes_read;
     do {
         bytes_read = simpleread(buffer);
@@ -220,8 +235,8 @@ void gamesave_load_from_disk(void) {
     } while (bytes_read > 0);
     simpleclose();
 
-    simplecmdchan(buffer, 9);
-    gfx_print_ascii(0,0,buffer);
+    simpleerrchan(buffer, 9);
+    gfx_print_ascii(0,0, false, buffer);
 
     VICIV.bordercol = COLOR_BLACK;
     POKE(0xD030, 0x44);
@@ -229,7 +244,6 @@ void gamesave_load_from_disk(void) {
 
     if (buffer[0] < 0x32) {
         gamesave_cache = attic_memory + atticmem_allocoffset;
-        gfx_print_ascii(0,0, (uint8_t *)"Reading from: %X", gamesave_cache);
         gamesave_load_from_attic();
     }
 }

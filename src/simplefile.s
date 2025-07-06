@@ -98,20 +98,47 @@ simplecmdchan:
         jsr CLRCHN
 
         ldx #0x0f
-        jsr CHKIN
+        jsr CHKOUT
         ldy #0x00
 cmdnext:
-        jsr CHRIN
-        sta (zp:_Zp+0),y
+        lda (zp:_Zp+0),y
+        jsr CHROUT
         iny
         cpy #0xff
         beq cmddone
         cmp #0x0d
         bne cmdnext
 cmddone:
+        lda #0x0f
+        jmp CLOSE
+
+        .public simpleerrchan
+simpleerrchan:
+        tax
+        lda #0x0f
+        tay
+        jsr SETLFS
+        lda #0x00
+        jsr SETNAM
+        jsr OPEN
+        jsr CLRCHN
+
+        ldx #0x0f
+        jsr CHKIN
+        ldy #0x00
+errnext:
+        jsr CHRIN
+        sta (zp:_Zp+0),y
+        iny
+        cpy #0xff
+        beq errdone
+        cmp #0x0d
+        bne errnext
+errdone:
         lda #0x00
         sta (zp:_Zp+0),y
 
         lda #0x0f
         jmp CLOSE
+
 

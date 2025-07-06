@@ -16,7 +16,7 @@
 #include "gfx.h"
 
 static void sprite_update_sprite(uint8_t sprite_num);
-static void sprite_move_at_speed(agisprite_t *sprite);
+static bool sprite_move_at_speed(agisprite_t *sprite);
 
 view_info_t object_view;
 bool show_object_view;
@@ -149,7 +149,7 @@ void sprite_erase_animated(void) {
 }
 
 
-#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+#pragma clang section bss="midmembss" data="ultmemdata" rodata="ultmemrodata" text="ultmemtext"
 
 uint8_t priorities[169];
 
@@ -175,13 +175,14 @@ void setup_priorities(void) {
     }
 }
 
-void sprite_move_at_speed(agisprite_t *sprite) {
+bool sprite_move_at_speed(agisprite_t *sprite) {
 
     int16_t x1 = sprite->view_info.x_pos;
     int16_t y1 = sprite->view_info.y_pos;
     int16_t x2 = sprite->prg_x_destination;
     int16_t y2 = sprite->prg_y_destination;
-    int16_t z = sprite->prg_speed_squared;
+    int16_t speed = sprite->prg_speed;
+    int16_t dist = sprite->prg_distance;
 
     int16_t dx = x2 - x1;
     int16_t dy = y2 - y1;
@@ -191,10 +192,8 @@ void sprite_move_at_speed(agisprite_t *sprite) {
     int16_t distance_squared = sqr_dx + sqr_dy;
     
     // Check if z exceeds the distance
-    if (z >= distance_squared) {
-        // We would reach or pass the target, so just go to target
-        sprite->view_info.x_pos = x2;
-        sprite->view_info.y_pos = y2;
+    if (dist >= distance_squared) {
+        // We are within the target distance, so finish the move
         logic_set_flag(sprite->prg_complete_flag);
         if (sprite->ego) {
             player_control = true;
@@ -202,12 +201,12 @@ void sprite_move_at_speed(agisprite_t *sprite) {
         sprite->prg_speed = 0;
         sprite->object_dir = 0;
         sprite->prg_movetype = pmmNone;
-        return;
+        return true;
     }
 
-    if (sqr_dy < z) {
+    if (abs(dy) < speed) {
         sprite->object_dir = (dx > 0) ? 3 : 7; // Right or Left
-    } else if (sqr_dx < z) {
+    } else if (abs(dx) < speed) {
         sprite->object_dir = (dy > 0) ? 5 : 1; // Down or Up
     } else {
         if (dx > 0 && dy > 0) sprite->object_dir = 4; // Down-Right
@@ -215,6 +214,7 @@ void sprite_move_at_speed(agisprite_t *sprite) {
         if (dx < 0 && dy > 0) sprite->object_dir = 6; // Down-Left
         if (dx < 0 && dy < 0) sprite->object_dir = 8; // Up-Left
     }
+    return false;
 }
 
 void autoselect_loop(agisprite_t *sprite) {
@@ -290,6 +290,7 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
     uint8_t object_border = 0;
     int16_t new_xpos = sprite->view_info.x_pos + view_dx;
     int16_t new_ypos = sprite->view_info.y_pos + view_dy;
+
     if (new_xpos <= -1) {
         object_border = 4;
         sprite->object_dir = 0;
@@ -339,6 +340,8 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
                 }
             }
         }
+    } else {
+        sprite_onland = true;
     }
 
     if (sprite->observe_object_collisions) {
@@ -411,6 +414,20 @@ void sprite_stop_all(void) {
 void sprite_unanimate_all(void) {
     for (uint16_t sprite_num = 0; sprite_num < 256; sprite_num++) {
         sprites[sprite_num].drawable = false;
+        sprites[sprite_num].view_info.priority_override = false;
+        sprites[sprite_num].cycling = true;
+        sprites[sprite_num].observe_horizon = true;
+        sprites[sprite_num].observe_blocks = true;
+        sprites[sprite_num].updatable = true;
+        sprites[sprite_num].step_size = 1;
+        if (sprite_num == 0) {
+            sprites[sprite_num].ego = true;
+        } else {
+            sprites[sprite_num].ego = false;
+        }
+        sprites[sprite_num].prg_movetype = pmmNone;
+        sprites[sprite_num].on_water = false;
+        sprites[sprite_num].on_land = false;
         animated_sprites[sprite_num] = 0;
     }
     animated_sprite_count = 0;
@@ -456,9 +473,13 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
     sprite.loop_index = 0;
     sprite.cycle_time = 1;
     sprite.cycle_count = 1;
+    sprite.end_of_loop = 0;
     sprite.reverse = false;
     view_set(&sprite.view_info, view_number);
     select_loop(&sprite.view_info, 0);
+    if (sprite.view_info.x_pos > 160 - sprite.view_info.width) {
+        sprite.view_info.x_pos = 160 - sprite.view_info.width;
+    }
     sprites[sprite_num] = sprite;
 }
 
@@ -486,7 +507,7 @@ void sprite_update_sprite(uint8_t sprite_num) {
             speed = sprite.step_size;
             if (sprite.object_dir == 0)
             {
-                uint8_t rand_dir = (rand() % 3);
+                uint8_t rand_dir = (abs(rand()) % 3);
                 uint8_t new_dir = wander_pointers[sprite.prg_dir][rand_dir];
                 sprite.object_dir = new_dir;
                 sprite.prg_dir = new_dir;
@@ -507,11 +528,16 @@ void sprite_update_sprite(uint8_t sprite_num) {
                 sprite_move_at_speed(&sprite);
             }
         break;
+        case pmmFollowInit:
+            speed = sprite.prg_speed;
+            sprite.prg_x_destination = sprites[0].view_info.x_pos;
+            sprite.prg_y_destination = sprites[0].view_info.y_pos;
+            sprite_move_at_speed(&sprite);
+            sprite.prg_movetype = pmmFollow;
+        break;
         default:
         break;
     }
-
-    speed = (speed > 4) ? speed / 4 : 1;
 
     sprite_move(sprite_num, &sprite, speed);
     if (!sprite.view_info.priority_override) {
@@ -570,4 +596,5 @@ void sprite_init(void) {
     show_object_view = false;
     object_view_drawn = false;
     sprite_clearall();
+    sprite_unanimate_all();
 }

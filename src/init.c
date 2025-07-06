@@ -16,6 +16,8 @@ static uint32_t init_midmem_offset;
 static uint16_t init_midmem_size;
 static uint32_t init_himem_offset;
 static uint16_t init_himem_size;
+static uint32_t init_ultmem_offset;
+static uint16_t init_ultmem_size;
 
 static void init_internal(void);
 static void init_load_words(void);
@@ -43,6 +45,7 @@ void init_system(void) {
 
     memmanage_memcpy_huge_far((uint8_t __far *)0x7500, attic_memory + init_midmem_offset, init_midmem_size);
     memmanage_memcpy_huge_far((uint8_t __far *)0xC000, attic_memory + init_himem_offset, init_himem_size);
+    memmanage_memcpy_huge_far((uint8_t __far *)0xE000, attic_memory + init_ultmem_offset, init_ultmem_size);
 
     object_data_offset = init_obj_data_offset;
 }
@@ -112,19 +115,12 @@ void init_load_objects(void) {
 }
 
 void init_internal(void) {
-    uint8_t cmdchan[256];
-    simpleprint("CMDCHAN 8: ");
-    simplecmdchan(cmdchan, 8);
-    simpleprint((char*)cmdchan);
-
-    simpleprint("CMDCHAN 9: ");
-    simplecmdchan(cmdchan, 9);  
-    simpleprint((char*)cmdchan);
-
     simpleprint("LOADING MIDMEM...\r");
     init_midmem_offset = load_seq_attic("MIDMEM,S,R", &init_midmem_size);
     simpleprint("LOADING HIMEM...\r");
     init_himem_offset = load_seq_attic("HIMEM,S,R", &init_himem_size);
+    simpleprint("LOADING ULTMEM...\r");
+    init_ultmem_offset = load_seq_attic("ULTMEM,S,R", &init_ultmem_size);
     simpleprint("LOADING VOLUME FILES...\r");
     load_volume_files();
     simpleprint("LOADING DIRECTORY FILES...\r");

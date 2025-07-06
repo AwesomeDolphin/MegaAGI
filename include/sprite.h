@@ -9,6 +9,7 @@ typedef enum {
     pmmMoveTo,
     pmmFollow,
     pmmFollowWander,
+    pmmFollowInit,
 } prg_move_mode_t;
 
 typedef struct {
@@ -35,7 +36,7 @@ typedef struct {
     int16_t prg_x_destination;
     int16_t prg_y_destination;
     int16_t prg_speed;
-    int16_t prg_speed_squared;
+    int16_t prg_distance;
     uint8_t prg_complete_flag;
     uint8_t prg_dir;
     uint8_t prg_timer;

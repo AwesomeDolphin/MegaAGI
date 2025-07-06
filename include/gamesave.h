@@ -40,8 +40,8 @@ extern __far add_to_pic_command_t add_to_pic_commands[16];
 #pragma clang section bss=""
 
 uint32_t gamesave_save_to_attic(void);
-void gamesave_save_to_disk(void);
+void gamesave_save_to_disk(char *filename);
 void gamesave_load_from_attic(void);
-void gamesave_load_from_disk(void);
+void gamesave_load_from_disk(char *filename);
 
 #endif

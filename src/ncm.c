@@ -18,7 +18,7 @@ volatile uint8_t drawing_screen = 1;
 volatile uint8_t viewing_screen = 0;
 static volatile bool stop_flip;
 static uint8_t highcolor[16] = {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0};
-static bool game_text;
+bool game_text;
 
 #pragma clang section bss="screenmem0"
 __far static uint16_t screen_memory_0[1525];
@@ -171,6 +171,25 @@ uint8_t my_ultoa_invert(unsigned long val, char *str, int base)
   return len;
 }
 
+uint8_t my_atoi(uint8_t *str, uint8_t **endptr)
+{
+  uint8_t val = 0;
+  uint8_t digit;
+  while (*str != 0) {
+    if (*str >= '0' && *str <= '9') {
+      digit = *str - '0';
+    } else {
+      break;
+    }
+    val = (val * 10) + digit;
+    str++;
+  }
+  if (endptr) {
+    *endptr = str;
+  }
+  return val;
+}
+
 void gfx_begin_print(uint8_t x, uint8_t y) {
   if (game_text) {
     printpos = (y * 61) + 21 + x;
@@ -197,7 +216,9 @@ void gfx_end_print(void) {
   }
 }
 
-void gfx_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...) {
+void gfx_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...) {
+  char buffer[17];
+  uint8_t padlen = 0;
   gfx_begin_print(x,y);
   va_list ap;
   va_start(ap, formatstring);
@@ -207,43 +228,55 @@ void gfx_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...) {
     if (petsciichar == '%') {
       ascii_string++;
       switch (*ascii_string) {
+        case 'p': {
+          uint8_t padcol = my_atoi(ascii_string + 1, &ascii_string);
+          while (padlen < padcol) {
+            gfx_print_asciichar(' ', reverse);
+            padlen++;
+          }
+          break;
+        }
         case 'f': {
-          char buffer[9];
           uint32_t param = va_arg(ap, int);
           uint8_t len = my_ultoa_invert(param, buffer, 2);
           for (uint8_t ctr = 0; ctr < len; ctr++) {
-            gfx_print_asciichar(buffer[ctr], false);
+            gfx_print_asciichar(buffer[ctr], reverse);
+            padlen++;
           }
           for (uint8_t ctr = len; ctr < 8; ctr++) {
-            gfx_print_asciichar('0', false);
+            gfx_print_asciichar('0', reverse);
+            padlen++;
           }
+          ascii_string++;
           break;
         }
         case 'd':
         case 'x': {
-          char buffer[17];
           uint32_t param = va_arg(ap, unsigned int);
           uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'x') ? 16 : 10);
           for (; len > 0; len--) {
-            gfx_print_asciichar(buffer[len-1], false);
+            gfx_print_asciichar(buffer[len-1], reverse);
+            padlen++;
           }
+          ascii_string++;
           break;
         }
         case 'D':
         case 'X': {
-          char buffer[17];
           uint32_t param = va_arg(ap, unsigned long);
           uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'X') ? 16 : 10);
           for (; len > 0; len--) {
-            gfx_print_asciichar(buffer[len-1], false);
+            gfx_print_asciichar(buffer[len-1], reverse);
+            padlen++;
           }
+          ascii_string++;
           break;
         }
       }
-      ascii_string++;
       continue;
     }
-    gfx_print_asciichar(petsciichar, false);
+    gfx_print_asciichar(petsciichar, reverse);
+    padlen++;
     ascii_string++;
   }
   va_end(ap);
@@ -260,7 +293,7 @@ void gfx_clear_line(uint8_t y) {
 void gfx_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
     for (uint8_t i = 0; i < 25; i++) {
-      gfx_print_ascii(0, i, (uint8_t *)"                                       ");
+      gfx_print_ascii(0, i, false, (uint8_t *)"                                       ");
     }
     game_text = true;
   } else {
@@ -476,21 +509,39 @@ uint8_t palettedata[] =  {0x00, 0x00, 0x00,
 void gfx_setupmem(void) {
   for (int y = 0; y < 25; y++) {
     for (int x = 0; x < 20; x++) {
-      if (y < 21) {
-        screen_memory_0[(y * 61) + x] = 0x1400 + (0x200 * 0) + (x * 25) + y;        
-        screen_memory_1[(y * 61) + x] = 0x1400 + (0x200 * 1) + (x * 25) + y;
+      if ((y > 0) && (y < 22)) {
+        // Initializing the NCM graphics memory, twenty rows of 20 characters, 16 pixels per character
+        // Initializing in column order, so that maybe someday DMA can be used to copy the data
+        // to the screen.
+        // Character 0x1400 points to 0x50000, which is the first bitmap screen
+        // Character 0x1600 points to 0x58000, which is the second bitmap screen
+        // We set up memory for a 320x200 screen, but only use 20 of the rows
+        // But since memory is arranged that way, each vertical strip starts 25 characters apart
+        screen_memory_0[(y * 61) + x] = 0x1400 + (0x200 * 0) + (x * 25) + (y - 1);        
+        screen_memory_1[(y * 61) + x] = 0x1400 + (0x200 * 1) + (x * 25) + (y - 1);
+        // Color memory is set as 0x1f = Select palette 1, where the PC palette is loaded, and color 0x0f is the foreground color
+        // The foreground color is important, because this is the color that will be used when the NCM screen has 0xf as a color
+        // The 0x08 selects NCM mode, with no other flags
         color_memory[(y * 61) + x] = 0x1f08;       
       } else {
+        // Point all characters on lines that do not have game graphics to the same character, which is a blank character
         screen_memory_0[(y * 61) + x] = 0x1400 + 21;        
         screen_memory_1[(y * 61) + x] = 0x1400 + 21;
+        // Color memory is set as 0x1f = Select palette 1, where the PC palette is loaded, and color 0x0f is the foreground color
+        // The foreground color is important, because this is the color that will be used when the NCM screen has 0xf as a color
+        // The 0x08 selects NCM mode, with no other flags
         color_memory[(y * 61) + x] = 0x1f08;       
       }
     }
     int x=20;
+    // This is the GOTOX flag character, at character 20, so after the graphics pointers
+    // We reposition the buffer writing to pixel 320, which is pointless, except that it keeps the text OFF the screen
     screen_memory_0[(y * 61) + x] = 0x0140;        
     screen_memory_1[(y * 61) + x] = 0x0140;
     color_memory[(y * 61) + x] = 0x0010;       
     for (int x = 21; x < 61; x++) {
+      // Set the characters to < 255, because want to use the ROM character set for these
+      // Color memory simply sets the foreground color to palette 0 (Commodore colors), color 1, (white).
       screen_memory_0[(y * 61) + x] = 0x0041;        
       screen_memory_1[(y * 61) + x] = 0x0041;
       color_memory[(y * 61) + x] = 0x0100;       

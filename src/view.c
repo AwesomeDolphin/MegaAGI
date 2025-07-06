@@ -180,6 +180,8 @@ void view_set(view_info_t *info, uint8_t view_num) {
     info->priority_set = false;
 }
 
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+
 void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
     bool debug = false;
     uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
@@ -296,6 +298,7 @@ bool view_load(uint8_t view_num) {
 void view_unload(uint8_t view_num) {
     if (views[view_num] != 0) {
         chipmem_free(views[view_num]);
+        views[view_num] = 0;
     }
 }
 

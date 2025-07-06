@@ -24,6 +24,10 @@
         (address (#xc000 . #xcfff))
         (section himemtext himemdata himemrodata)
     )
+    (memory ultmem
+        (address (#xe000 . #xfff0))
+        (section ultmemtext ultmemdata ultmemrodata)
+    )
     (memory zeroPage (address (#x2 . #x7f)) (type ram) (qualifier zpage)
 	    (section (registers #x2)))
     (memory stackPage (address (#x100 . #x1ff)) (type ram))

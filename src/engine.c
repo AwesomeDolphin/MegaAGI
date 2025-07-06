@@ -40,6 +40,8 @@ uint8_t box_height = 0;
 uint8_t line_length = 0;
 uint8_t word_length = 0;
 uint8_t msg_char;
+bool status_line_enabled;
+uint8_t status_line_score;
 __far uint8_t *msg_ptr;
 __far uint8_t *last_word;
 
@@ -47,6 +49,17 @@ static const uint8_t joystick_direction[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
     0, 6, 8, 7, 0, 5, 1, 0
 };
+
+void engine_update_status_line(void) {
+    if (!game_text) {
+        if (status_line_enabled) {
+            if (logic_vars[3] != status_line_score) {
+                status_line_score = logic_vars[3];
+                gfx_print_ascii(0, 0, true, (uint8_t *)"Score: %d of %d%p40", logic_vars[3], logic_vars[7]);
+            }
+        }
+    }
+}
 
 void engine_display_dialog(uint8_t __far *message_string) {
     logic_strcpy_far_far(format_string_buffer, message_string);
@@ -206,14 +219,17 @@ void handle_movement_joystick(void) {
 }
 
 void engine_statusline(bool enable) {
-    
+    status_line_enabled = enable;
+    if (!enable) {
+        gfx_print_ascii(0, 0, false, (uint8_t *)"%p40");
+    }
 }
 
 void engine_clear_keyboard(void) {
     command_buffer[0] = 0;
     cmd_buf_ptr=0;
     ASCIIKEY = 0;
-    gfx_print_ascii(0, 22, (uint8_t *)">                                       ");
+    gfx_print_ascii(0, 22, false, (uint8_t *)">%p40");
 }
 
 void engine_allowinput(bool allowed) {
@@ -221,13 +237,13 @@ void engine_allowinput(bool allowed) {
     if (input_ok) {
         engine_clear_keyboard();
     } else {
-        gfx_print_ascii(0, 22, (uint8_t *)"                                        ");
+        gfx_print_ascii(0, 22, false, (uint8_t *)"%p40");
     }
 }
 
 void engine_dumpstate(void) {
     for (int i = 0; i < 8; i++) {
-        gfx_print_ascii(0, i, (uint8_t *)"%d: %f%f%f%f", i*32, logic_flags[i * 4], logic_flags[i * 4 + 1], logic_flags[i * 4 + 2], logic_flags[i * 4 + 3]);
+        gfx_print_ascii(0, i, false, (uint8_t *)"%d: %f%f%f%f", i*32, logic_flags[i * 4], logic_flags[i * 4 + 1], logic_flags[i * 4 + 2], logic_flags[i * 4 + 3]);
     }
 }
 
@@ -242,10 +258,20 @@ void engine_handleinput(void) {
             engine_dumpstate();
         }
         if (ascii_key == 0xf7) {
-            gamesave_save_to_disk();
+            if (cmd_buf_ptr > 16) {
+                cmd_buf_ptr = 16;
+            }
+            command_buffer[cmd_buf_ptr] = 0;
+            gamesave_save_to_disk(command_buffer);
+            engine_clear_keyboard();
         }
         if (ascii_key == 0xf5) {
-            gamesave_load_from_disk();
+            if (cmd_buf_ptr > 16) {
+                cmd_buf_ptr = 16;
+            }
+            command_buffer[cmd_buf_ptr] = 0;
+            gamesave_load_from_disk(command_buffer);
+            engine_clear_keyboard();
         }
         if (ascii_key == 0xf6) {
             parser_debug = true;
@@ -274,16 +300,18 @@ void engine_handleinput(void) {
 }
 
 void run_loop(void) {
-    view_init();
-    sprite_init();
-    logic_init();
-    parser_init();
     frame_counter = 0;
     run_cycles = 0;
     run_engine = false;
     engine_running = false;
     sound_flag_needs_set = false;
+    status_line_enabled = false;
+    status_line_score = 255;
     hook_irq();
+    view_init();
+    sprite_init();
+    logic_init();
+    parser_init();
     input_ok = false;
     player_control = true;
     dialog_first = 0;
@@ -320,6 +348,7 @@ void run_loop(void) {
                 }
                 logic_reset_flag(2);
                 logic_reset_flag(4);
+                engine_update_status_line();
                 engine_handleinput();
                 sprite_erase_animated();
                 handle_movement_joystick();

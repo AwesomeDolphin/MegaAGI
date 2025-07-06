@@ -34,6 +34,7 @@ agi.d81: agi.prg
 	$(C1541) -attach agi.d81 -write inits.raw inits,s
 	$(C1541) -attach agi.d81 -write midmem.raw midmem,s
 	$(C1541) -attach agi.d81 -write himem.raw himem,s
+	$(C1541) -attach agi.d81 -write ultmem.raw ultmem,s
 	$(C1541) -attach agi.d81 -write volumes/LOGDIR logdir,s
 	$(C1541) -attach agi.d81 -write volumes/PICDIR picdir,s
 	$(C1541) -attach agi.d81 -write volumes/SNDDIR snddir,s

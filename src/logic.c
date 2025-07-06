@@ -19,7 +19,7 @@
 #include "view.h"
 #include "volume.h"
 
-#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+#pragma clang section bss="midmembss" data="ultmemdata" rodata="ultmemrodata" text="ultmemtext"
 
 uint8_t __far *logic_vars = NULL;
 uint8_t __far *logic_flags = NULL;
@@ -179,7 +179,7 @@ bool logic_test_commands(void) {
             break;
         }
         default:
-            gfx_print_ascii(0, 0, (uint8_t *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
+            gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
     }
     return result;
@@ -227,26 +227,22 @@ bool logic_test(void) {
     }
 }
 
+#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+
 void logic_run(void) {
     static uint8_t logic_num; 
     logic_num = 0;
     logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
-    while(1) {/*
-        bool big_fall  = ((logic_flags[158 >> 3]) >> (158 & 0x07)) & 0x01;
-        if ((logic_num == 38) && (big_fall)) {
-            debug = true;
-        } else {
-            debug = false;
-        }
+    while(1) {
         if (debug) {
-            gfx_print_ascii(0,0,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
-            gfx_print_ascii(0,1,(uint8_t *)"B:%x", *program_counter);
+            gfx_print_ascii(0,0,false,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
+            gfx_print_ascii(0,1,false,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
             while(ASCIIKEY==0) {
     
             }
             ASCIIKEY=0;
-        }*/
+        }
         switch (*program_counter) {
             case 0x00: {
                 // return
@@ -417,7 +413,14 @@ void logic_run(void) {
                 // overlay.pic
                 gfx_hold_flip(true);
                 VICIV.bordercol = COLOR_GREEN;
-                views_in_pic = 0;
+                add_to_pic_commands[views_in_pic].view_number = program_counter[1];
+                add_to_pic_commands[views_in_pic].loop_index = (pic_offset >> 8) & 0xff;
+                add_to_pic_commands[views_in_pic].cel_index = pic_offset & 0xff;
+                add_to_pic_commands[views_in_pic].x_pos = 0xff;
+                add_to_pic_commands[views_in_pic].y_pos = 0xff;
+                add_to_pic_commands[views_in_pic].priority = 0xff;
+                add_to_pic_commands[views_in_pic].baseline_priority = 0xff;
+                views_in_pic++;
                 draw_pic(false);
                 program_counter += 2;
                 break;
@@ -443,20 +446,6 @@ void logic_run(void) {
             case 0x21: {
                 // animate_obj
                 animated_sprites[animated_sprite_count] = program_counter[1];
-                sprites[program_counter[1]].view_info.priority_override = false;
-                sprites[program_counter[1]].cycling = true;
-                sprites[program_counter[1]].observe_horizon = true;
-                sprites[program_counter[1]].observe_blocks = true;
-                sprites[program_counter[1]].updatable = true;
-                sprites[program_counter[1]].step_size = 4;
-                if (program_counter[1] == 0) {
-                    sprites[program_counter[1]].ego = true;
-                } else {
-                    sprites[program_counter[1]].ego = false;
-                }
-                sprites[program_counter[1]].prg_movetype = pmmNone;
-                sprites[program_counter[1]].on_water = false;
-                sprites[program_counter[1]].on_land = false;
                 animated_sprite_count++;
                 program_counter += 2;
                 break;
@@ -662,8 +651,10 @@ void logic_run(void) {
             case 0x45: {
                 // distance
                 if (sprites[program_counter[1]].drawable && sprites[program_counter[2]].drawable) {
+                    int16_t x1_center = sprites[program_counter[1]].view_info.x_pos + (sprites[program_counter[1]].view_info.width / 2);
+                    int16_t x2_center = sprites[program_counter[2]].view_info.x_pos + (sprites[program_counter[2]].view_info.width / 2);
                     logic_vars[program_counter[3]]  =
-                    abs(sprites[program_counter[1]].view_info.x_pos - sprites[program_counter[2]].view_info.x_pos) +
+                    abs(x1_center - x2_center) +
                     abs(sprites[program_counter[1]].view_info.y_pos - sprites[program_counter[2]].view_info.y_pos);
                 } else {
                     logic_vars[program_counter[3]]  = 0xff;
@@ -756,7 +747,7 @@ void logic_run(void) {
                 } else {
                     sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
                 }
-                sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
+                sprites[program_counter[1]].prg_distance = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
                 sprites[program_counter[1]].prg_complete_flag = program_counter[5];
                 sprites[program_counter[1]].frozen = false;
                 sprites[program_counter[1]].updatable = true;
@@ -777,7 +768,7 @@ void logic_run(void) {
                 } else {
                     sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
                 }
-                sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
+                sprites[program_counter[1]].prg_distance = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
                 sprites[program_counter[1]].prg_complete_flag = program_counter[5];
                 sprites[program_counter[1]].frozen = false;
                 sprites[program_counter[1]].updatable = true;
@@ -788,15 +779,17 @@ void logic_run(void) {
                 break;
             }
             case 0x53: {
-                // follow.ego
+                // follow.ego 
                 sprites[program_counter[1]].prg_movetype = pmmFollow;
-                if (program_counter[4] > 0) {
-                    sprites[program_counter[1]].prg_speed = program_counter[2];
+                sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
+                if (program_counter[2] > 0) {
+                    sprites[program_counter[1]].prg_distance = program_counter[2];
                 } else {
-                    sprites[program_counter[1]].prg_speed = sprites[program_counter[1]].step_size;
+                    sprites[program_counter[1]].prg_distance = sprites[program_counter[1]].step_size;
                 }
-                sprites[program_counter[1]].prg_speed_squared = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
+                sprites[program_counter[1]].prg_distance *= sprites[program_counter[1]].prg_distance;
                 sprites[program_counter[1]].prg_complete_flag = program_counter[3];
+                sprites[program_counter[1]].frozen = false;
                 sprites[program_counter[1]].updatable = true;
                 program_counter += 4;
                 break;
@@ -807,15 +800,30 @@ void logic_run(void) {
                 if (program_counter[1] == 0) {
                     player_control = false;
                 }
+                sprites[program_counter[1]].frozen = false;
+                sprites[program_counter[1]].updatable = true;
                 program_counter += 2;
                 break;
             }
             case 0x55: {
+                // normal.motion
                 sprites[program_counter[1]].prg_movetype = pmmNone;
                 if (program_counter[1] == 0) {
                     player_control = true;
                 }
                 program_counter += 2;
+                break;
+            }
+            case 0x56: {
+                // set.dir
+                sprites[program_counter[1]].object_dir = logic_vars[program_counter[2]];
+                program_counter += 3;
+                break;
+            }
+            case 0x57: {
+                // get.dir
+                logic_vars[program_counter[2]] = sprites[program_counter[1]].object_dir;
+                program_counter += 3;
                 break;
             }
             case 0x58: {
@@ -914,7 +922,7 @@ void logic_run(void) {
                 // display
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[3]);
                 logic_strcpy_far_near(local_string, src_string);
-                gfx_print_ascii(program_counter[2], program_counter[1], local_string);
+                gfx_print_ascii(program_counter[2], program_counter[1], false, local_string);
                 program_counter += 4;
                 break;
             }
@@ -922,7 +930,7 @@ void logic_run(void) {
                 // display.v
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[3]]);
                 logic_strcpy_far_near(local_string, src_string);
-                gfx_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], local_string);
+                gfx_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], false, local_string);
                 program_counter += 4;
                 break;
             }
@@ -994,11 +1002,13 @@ void logic_run(void) {
             }
             case 0x70: {
                 // status.line.on
+                engine_statusline(true);
                 program_counter += 1;
                 break;
             }
             case 0x71: {
                 // status.line.off
+                engine_statusline(false);
                 program_counter += 1;
                 break;
             }
@@ -1175,7 +1185,7 @@ void logic_run(void) {
                 break;
             }
             default:
-            gfx_print_ascii(0, 0, (uint8_t *)"FAULT: UNKINSTR=%x:%X", *program_counter,(uint32_t)program_counter);
+            gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKINSTR=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }
@@ -1190,7 +1200,7 @@ void logic_load(uint8_t logic_num) {
 
     logic_infos[logic_num].offset = load_volume_object(voLogic, logic_num, &length);
     if (logic_infos[logic_num].offset == 0) {
-        gfx_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
+        gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
         return;
     }
 

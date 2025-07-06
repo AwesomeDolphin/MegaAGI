@@ -33,7 +33,7 @@ static uint8_t last_relative_x;
 static uint8_t last_relative_y;
 static uint16_t fill_pointer;
 static uint16_t pic_length;
-static uint16_t pic_offset;
+uint16_t pic_offset;
 
 void pset(uint8_t x, uint8_t y) {
     if (pic_on) {
@@ -240,7 +240,7 @@ void draw_pic(bool clear_screen) {
 void pic_load(uint8_t pic_num) {
     pic_offset = load_volume_object(voPic, pic_num, &pic_length);
     if (pic_offset == 0) {
-        gfx_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
+        gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
         return;
     }
 }

@@ -13,7 +13,7 @@
 #define ALPHABET_SIZE 26
 #define XOR_VALUE 0x7f
 
-#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+#pragma clang section bss="midmembss" data="ultmemdata" rodata="ultmemrodata" text="ultmemtext"
 
 // Structure to represent our dictionary reference
 typedef struct dictionary {
@@ -39,7 +39,7 @@ bool parser_find_word(const char* target) {
     }
 
     if (parser_debug) {
-        gfx_print_ascii(0,0,(uint8_t *)target);
+        gfx_print_ascii(0,0,false,(uint8_t *)target);
     }
     
     // Set current position in dictionary
@@ -97,15 +97,15 @@ bool parser_find_word(const char* target) {
         current_pos += 2;
 
         if (parser_debug) {
-            gfx_print_ascii(0,1,(uint8_t *)current_word);
-            gfx_print_ascii(0, 2, (uint8_t *)"%d", i);
-            gfx_print_ascii(0,3,(uint8_t *)"%d", word_number);
+            gfx_print_ascii(0,1,false,(uint8_t *)current_word);
+            gfx_print_ascii(0, 2, false,(uint8_t *)"%d", i);
+            gfx_print_ascii(0,3,false,(uint8_t *)"%d", word_number);
         }
 
         // OPTIMIZATION 3: Early length check
         if (current_word_len != target_len) {
             if (parser_debug) {
-                gfx_print_ascii(0,4,(uint8_t *)"O3");
+                gfx_print_ascii(0,4,false, (uint8_t *)"O3");
                 while(ASCIIKEY == 0) {
                     // Wait for key release
                 }
@@ -121,7 +121,7 @@ bool parser_find_word(const char* target) {
             if (word_number > 0) {
                 parser_word_numbers[parser_word_index] = word_number;
                 if (parser_debug) {
-                    gfx_print_ascii(0,4,(uint8_t *)"M: %d %d", word_number, parser_word_index);
+                    gfx_print_ascii(0,4,false,(uint8_t *)"M: %d %d", word_number, parser_word_index);
                     while(ASCIIKEY == 0) {
                         // Wait for key release
                     }

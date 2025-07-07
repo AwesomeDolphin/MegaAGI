@@ -6,6 +6,7 @@
 #include <calypsi/intrinsics6502.h>
 #include <mega65.h>
 
+#include "dialog.h"
 #include "engine.h"
 #include "gamesave.h"
 #include "gfx.h"
@@ -33,28 +34,9 @@ static logic_stack_entry_t logic_stack[16];
 static uint8_t __far *program_counter;
 static uint8_t __far *logic_strings;
 static uint8_t logic_stack_ptr;
-static uint8_t local_string[256];
 
 uint16_t object_data_offset;
 bool debug;
-
-void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {
-    *dest_string = *src_string;
-    while (*dest_string != 0) {
-        dest_string++;
-        src_string++;
-        *dest_string = *src_string;
-    }
-}
-
-void logic_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string) {
-    *dest_string = *src_string;
-    while (*dest_string != 0) {
-        dest_string++;
-        src_string++;
-        *dest_string = *src_string;
-    }
-}
 
 void logic_set_flag(uint8_t flag) {
     uint8_t flag_reg = (flag >> 3);
@@ -179,7 +161,7 @@ bool logic_test_commands(void) {
             break;
         }
         default:
-            gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
+            dialog_print_ascii(0, 0, false, (uint8_t __far *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
     }
     return result;
@@ -236,8 +218,8 @@ void logic_run(void) {
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
         if (debug) {
-            gfx_print_ascii(0,0,false,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
-            gfx_print_ascii(0,1,false,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
+            dialog_print_ascii(0,0,false,(uint8_t __far *)"A:%x %X", logic_num, (uint32_t)program_counter);
+            dialog_print_ascii(0,1,false,(uint8_t __far *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
             while(ASCIIKEY==0) {
     
             }
@@ -393,6 +375,7 @@ void logic_run(void) {
                 VICIV.bordercol = COLOR_GREEN;
                 views_in_pic = 0;
                 draw_pic(true);
+                status_line_score = 255;
                 program_counter += 2;
                 break;
             }
@@ -422,6 +405,7 @@ void logic_run(void) {
                 add_to_pic_commands[views_in_pic].baseline_priority = 0xff;
                 views_in_pic++;
                 draw_pic(false);
+                status_line_score = 255;
                 program_counter += 2;
                 break;
             }
@@ -907,30 +891,28 @@ void logic_run(void) {
             case 0x65: {
                 // print
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[1]);
-                engine_display_dialog(src_string);
+                dialog_show(src_string, false);
                 program_counter += 2;
                 break;
             }
             case 0x66: {
                 // print.v
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[1]]);
-                engine_display_dialog(src_string);
+                dialog_show(src_string, false);
                 program_counter += 2;
                 break;
             }
             case 0x67: {
                 // display
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[3]);
-                logic_strcpy_far_near(local_string, src_string);
-                gfx_print_ascii(program_counter[2], program_counter[1], false, local_string);
+                dialog_print_ascii(program_counter[2], program_counter[1], false, src_string);
                 program_counter += 4;
                 break;
             }
             case 0x68: {
                 // display.v
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[3]]);
-                logic_strcpy_far_near(local_string, src_string);
-                gfx_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], false, local_string);
+                dialog_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], false, src_string);
                 program_counter += 4;
                 break;
             }
@@ -1016,7 +998,7 @@ void logic_run(void) {
                 // set.string
                 uint8_t __far *dest_string = logic_strings + (40 * program_counter[1]);
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[2]);
-                logic_strcpy_far_far(dest_string, src_string);
+                memmanage_strcpy_far_far(dest_string, src_string);
                 program_counter += 3;
                 break;
             }
@@ -1060,6 +1042,18 @@ void logic_run(void) {
                 program_counter += 8;
                 break;
             }
+            case 0x7D: {
+                // save.game
+                gamesave_begin(true);
+                program_counter += 1;
+                break;
+            }
+            case 0x7E: {
+                // restore.game
+                gamesave_begin(false);
+                program_counter += 1;
+                break;
+            }
             case 0x80: {
                 // restart.game
                 sprite_stop_all();
@@ -1067,9 +1061,10 @@ void logic_run(void) {
                 chipmem_free_unlocked();
                 engine_allowinput(false);
                 player_control = true;
-                engine_dialog_close();
+                dialog_close();
                 block_active = 0;
                 horizon_line = 36;
+                status_line_score = 255;
                 for (int counter = 0; counter < 256; counter++) {
                     logic_vars[counter] = 0;
                 }
@@ -1185,7 +1180,7 @@ void logic_run(void) {
                 break;
             }
             default:
-            gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKINSTR=%x:%X", *program_counter,(uint32_t)program_counter);
+            dialog_print_ascii(0, 0, false, (uint8_t __far *)"FAULT: UNKINSTR=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }
@@ -1200,7 +1195,7 @@ void logic_load(uint8_t logic_num) {
 
     logic_infos[logic_num].offset = load_volume_object(voLogic, logic_num, &length);
     if (logic_infos[logic_num].offset == 0) {
-        gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
+        dialog_print_ascii(0, 0, false, (uint8_t __far *)"FAULT: Failed to load logic %d.", logic_num);
         return;
     }
 

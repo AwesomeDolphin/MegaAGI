@@ -4,7 +4,8 @@
         "stdint.h": "c",
         "string.h": "c",
         "gfx.h": "c",
-        "view.h": "c"
+        "view.h": "c",
+        "memmanage.h": "c"
     },
     "C_Cpp.default.compilerPath": ""
 }

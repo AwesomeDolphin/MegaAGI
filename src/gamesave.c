@@ -6,6 +6,8 @@
 #include <calypsi/intrinsics6502.h>
 #include <mega65.h>
 
+#include "dialog.h"
+#include "engine.h"
 #include "gamesave.h"
 #include "gfx.h"
 #include "irq.h"
@@ -29,6 +31,8 @@ uint8_t block_active, block_x1, block_y1, block_x2, block_y2;
 
 uint8_t animated_sprite_count;
 uint16_t free_point;
+
+bool saving;
 
 #pragma clang section bss="extradata"
 __far agisprite_t sprites[256];
@@ -107,8 +111,8 @@ void gamesave_save_to_disk(char *filename) {
     simpleerrchan(buffer, 9);
     uint8_t __huge *gamesave_file = gamesave_cache;
     strcat(filename, ".AGI,S,W");
+    dialog_print_ascii(0,1, false, (uint8_t __far *)filename);
     simpleopen(filename, strlen(filename), 9);
-    size_t bytes_written = 0;
     uint8_t __far *buffer_far = (uint8_t __far *)buffer;
     for (uint32_t i = 0; i < save_size; i += 250) {
         uint32_t chunk_size = (save_size - i > 250) ? 250 : (save_size - i);
@@ -118,7 +122,7 @@ void gamesave_save_to_disk(char *filename) {
     simpleclose();
 
     simpleerrchan(buffer, 9);
-    gfx_print_ascii(0,0, false, buffer);
+    dialog_print_ascii(0,2, false, (uint8_t __far *)buffer);
 
     VICIV.bordercol = COLOR_BLACK;
     POKE(0xD030, 0x44);
@@ -214,6 +218,8 @@ void gamesave_load_from_attic(void) {
 
 void gamesave_load_from_disk(char *filename) {
     gamesave_cache = attic_memory + atticmem_allocoffset;
+    strcat(filename, ".AGI,S,R");
+    dialog_print_ascii(0,1, false, (uint8_t __far *)filename);
     select_kernel_mem();
     POKE(0xD030, 0x64);
     VICIV.bordercol = COLOR_SOYLENTGREEN;
@@ -221,7 +227,6 @@ void gamesave_load_from_disk(char *filename) {
 
     simplecmdchan((uint8_t *)"I0:\r", 9);
     simpleerrchan(buffer, 9);
-    strcat(filename, ".AGI,S,R");
     simpleopen(filename, strlen(filename), 9);
     size_t bytes_read;
     do {
@@ -236,14 +241,37 @@ void gamesave_load_from_disk(char *filename) {
     simpleclose();
 
     simpleerrchan(buffer, 9);
-    gfx_print_ascii(0,0, false, buffer);
 
     VICIV.bordercol = COLOR_BLACK;
     POKE(0xD030, 0x44);
     select_execution_mem();
 
+    dialog_print_ascii(0,2, false, (uint8_t __far *)buffer);
+
     if (buffer[0] < 0x32) {
         gamesave_cache = attic_memory + atticmem_allocoffset;
         gamesave_load_from_attic();
     }
+}
+
+void gamesave_dialog_handler(char *filename) {
+    uint8_t len = strlen(filename);
+
+    for (uint8_t i = 0; i < len; i++) {
+        if ((filename[i] >= 97) && (filename[i] <= 122)) {
+            filename[i] = filename[i] - 32;
+        }
+    }
+
+    if (saving) {
+        gamesave_save_to_disk(filename);
+    } else {
+        gamesave_load_from_disk(filename);
+    }
+    status_line_score = 255;
+}
+
+void gamesave_begin(bool save) {
+    saving = save;
+    dialog_show((uint8_t __far *)"Enter the name\nof the save file.\n(Uses device 9.)\n\n", true);
 }

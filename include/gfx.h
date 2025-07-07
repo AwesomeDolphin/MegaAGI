@@ -17,7 +17,7 @@ void gfx_print_asciichar(uint8_t character, bool reverse);
 void gfx_print_scncode(uint8_t scncode);
 void gfx_begin_print(uint8_t x, uint8_t y);
 void gfx_end_print(void);
-void gfx_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...);
+void gfx_print_asciistr(uint8_t x, uint8_t y, bool reverse, uint8_t __far *output);
 void gfx_set_printpos(uint8_t x, uint8_t y);
 void gfx_clear_line(uint8_t y);
 void gfx_setupmem(void);

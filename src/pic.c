@@ -6,6 +6,7 @@
 #include <mega65.h>
 #include <math.h>
 
+#include "dialog.h"
 #include "engine.h"
 #include "gfx.h"
 #include "volume.h"
@@ -138,7 +139,7 @@ void draw_pic(bool clear_screen) {
     if (clear_screen) {
         gfx_cleargfx(true);
     }
-    engine_dialog_close();
+    dialog_close();
     uint8_t __far *pic_file;
     pic_file = chipmem_base + pic_offset;
 
@@ -240,7 +241,7 @@ void draw_pic(bool clear_screen) {
 void pic_load(uint8_t pic_num) {
     pic_offset = load_volume_object(voPic, pic_num, &pic_length);
     if (pic_offset == 0) {
-        gfx_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
+        dialog_print_ascii(0, 0, false, (uint8_t __far *)"FAULT: Failed to load pic %d.", pic_num);
         return;
     }
 }

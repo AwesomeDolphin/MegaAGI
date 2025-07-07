@@ -134,6 +134,7 @@ errnext:
         beq errdone
         cmp #0x0d
         bne errnext
+        dey
 errdone:
         lda #0x00
         sta (zp:_Zp+0),y

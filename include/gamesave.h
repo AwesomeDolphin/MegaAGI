@@ -43,5 +43,7 @@ uint32_t gamesave_save_to_attic(void);
 void gamesave_save_to_disk(char *filename);
 void gamesave_load_from_attic(void);
 void gamesave_load_from_disk(char *filename);
+void gamesave_dialog_handler(char *filename);
+void gamesave_begin(bool save);
 
 #endif

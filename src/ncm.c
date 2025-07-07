@@ -9,6 +9,7 @@
 #include "gfx.h"
 #include "irq.h"
 #include "main.h"
+#include "dialog.h"
 
 volatile uint8_t __far *drawing_xpointer[2][160];
 uint8_t *fastdrawing_xpointer[160];
@@ -144,52 +145,6 @@ void gfx_set_printpos(uint8_t x, uint8_t y) {
   printpos = (y * 61) + 20 + x; 
 }
 
-uint8_t my_ultoa_invert(unsigned long val, char *str, int base)
-{
-  uint8_t len = 0;
-  do
-    {
-      int v;
-
-      v   = val % base;
-      val = val / base;
-
-      if (v <= 9)
-        {
-          v += '0';
-        }
-      else
-        {
-          v += 'A' - 10;
-        }
-
-      *str++ = v;
-      len++;
-    }
-  while (val);
-
-  return len;
-}
-
-uint8_t my_atoi(uint8_t *str, uint8_t **endptr)
-{
-  uint8_t val = 0;
-  uint8_t digit;
-  while (*str != 0) {
-    if (*str >= '0' && *str <= '9') {
-      digit = *str - '0';
-    } else {
-      break;
-    }
-    val = (val * 10) + digit;
-    str++;
-  }
-  if (endptr) {
-    *endptr = str;
-  }
-  return val;
-}
-
 void gfx_begin_print(uint8_t x, uint8_t y) {
   if (game_text) {
     printpos = (y * 61) + 21 + x;
@@ -216,70 +171,15 @@ void gfx_end_print(void) {
   }
 }
 
-void gfx_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...) {
-  char buffer[17];
-  uint8_t padlen = 0;
+void gfx_print_asciistr(uint8_t x, uint8_t y, bool reverse, uint8_t __far *output) {
   gfx_begin_print(x,y);
-  va_list ap;
-  va_start(ap, formatstring);
-  uint8_t *ascii_string = (uint8_t *)formatstring;
+
+  uint8_t __far *ascii_string = output;
   while (*ascii_string != 0) {
-    uint8_t petsciichar = *ascii_string;
-    if (petsciichar == '%') {
-      ascii_string++;
-      switch (*ascii_string) {
-        case 'p': {
-          uint8_t padcol = my_atoi(ascii_string + 1, &ascii_string);
-          while (padlen < padcol) {
-            gfx_print_asciichar(' ', reverse);
-            padlen++;
-          }
-          break;
-        }
-        case 'f': {
-          uint32_t param = va_arg(ap, int);
-          uint8_t len = my_ultoa_invert(param, buffer, 2);
-          for (uint8_t ctr = 0; ctr < len; ctr++) {
-            gfx_print_asciichar(buffer[ctr], reverse);
-            padlen++;
-          }
-          for (uint8_t ctr = len; ctr < 8; ctr++) {
-            gfx_print_asciichar('0', reverse);
-            padlen++;
-          }
-          ascii_string++;
-          break;
-        }
-        case 'd':
-        case 'x': {
-          uint32_t param = va_arg(ap, unsigned int);
-          uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'x') ? 16 : 10);
-          for (; len > 0; len--) {
-            gfx_print_asciichar(buffer[len-1], reverse);
-            padlen++;
-          }
-          ascii_string++;
-          break;
-        }
-        case 'D':
-        case 'X': {
-          uint32_t param = va_arg(ap, unsigned long);
-          uint8_t len = my_ultoa_invert(param, buffer, (*ascii_string == 'X') ? 16 : 10);
-          for (; len > 0; len--) {
-            gfx_print_asciichar(buffer[len-1], reverse);
-            padlen++;
-          }
-          ascii_string++;
-          break;
-        }
-      }
-      continue;
-    }
-    gfx_print_asciichar(petsciichar, reverse);
-    padlen++;
+    uint8_t asciichar = *ascii_string;
+    gfx_print_asciichar(asciichar, reverse);
     ascii_string++;
   }
-  va_end(ap);
   gfx_end_print();
 }
 
@@ -293,7 +193,7 @@ void gfx_clear_line(uint8_t y) {
 void gfx_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
     for (uint8_t i = 0; i < 25; i++) {
-      gfx_print_ascii(0, i, false, (uint8_t *)"                                       ");
+      dialog_print_ascii(0, i, false, (uint8_t __far *)"%p40");
     }
     game_text = true;
   } else {

@@ -5,6 +5,8 @@ extern uint8_t __far * const chipmem_base;
 extern uint8_t __far * const chipmem2_base;
 extern uint8_t __huge * const attic_memory;
 
+void memmanage_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string);
+void memmanage_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string);
 void memmanage_memcpy_far_huge(uint8_t __huge *dest_mem, uint8_t __far *src_mem, uint32_t length);
 void memmanage_memcpy_huge_far(uint8_t __far *dest_mem, uint8_t __huge *src_mem, uint32_t length);
 

@@ -7,6 +7,7 @@
 #include <mega65.h>
 
 #include "gfx.h"
+#include "dialog.h"
 #include "irq.h"
 #include "pic.h"
 #include "sound.h"
@@ -23,27 +24,12 @@
 volatile uint8_t frame_counter;
 volatile bool run_engine;
 
-#pragma clang section bss="extradata"
-__far uint8_t format_string_buffer[1024];
-
 #pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 volatile uint8_t run_cycles;
 volatile bool engine_running;
-static char command_buffer[38];
-static uint8_t cmd_buf_ptr = 0;
-uint8_t dialog_first;
-uint8_t dialog_last;
-uint16_t dialog_time;
-uint8_t box_width = 0;
-uint8_t box_height = 0;
-uint8_t line_length = 0;
-uint8_t word_length = 0;
-uint8_t msg_char;
 bool status_line_enabled;
 uint8_t status_line_score;
-__far uint8_t *msg_ptr;
-__far uint8_t *last_word;
 
 static const uint8_t joystick_direction[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
@@ -55,115 +41,9 @@ void engine_update_status_line(void) {
         if (status_line_enabled) {
             if (logic_vars[3] != status_line_score) {
                 status_line_score = logic_vars[3];
-                gfx_print_ascii(0, 0, true, (uint8_t *)"Score: %d of %d%p40", logic_vars[3], logic_vars[7]);
+                dialog_print_ascii(0, 0, true, (uint8_t __far *)"Score: %d of %d%p40", logic_vars[3], logic_vars[7]);
             }
         }
-    }
-}
-
-void engine_display_dialog(uint8_t __far *message_string) {
-    logic_strcpy_far_far(format_string_buffer, message_string);
-
-    msg_ptr = format_string_buffer;
-    last_word = msg_ptr;
-    word_length = 0;
-    line_length = 0;
-    box_width = 0;
-    box_height = 1;
-    
-    do {
-        msg_char = *msg_ptr;
-        if (msg_char > 32) {
-            word_length++;
-        } else {
-            bool wordfits = (line_length + word_length + 1) < 35;
-            if (wordfits) {
-                if (msg_char == 32) {
-                    line_length += word_length + 1;
-                    word_length = 0;
-                    last_word = msg_ptr;
-                } else {
-                    line_length += word_length;
-                    if (line_length > box_width) {
-                        box_width = line_length;
-                    }
-                }
-            } else {
-                if (line_length > box_width) {
-                    box_width = line_length - 1;
-                }
-                box_height++;
-                line_length = word_length + 1;
-                word_length = 0;
-                *last_word = '\n';
-            }
-        }
-        msg_ptr++;
-    } while (msg_char != 0);
-
-    uint8_t x_start = 20 - (box_width / 2) - 1;
-    uint8_t y_start = 10 - (box_height / 2) - 1;
-    dialog_first = y_start;
-
-    msg_ptr = format_string_buffer;
-    line_length = 0;
-
-    gfx_begin_print(x_start, y_start);
-    gfx_print_scncode(0xEC);
-    while (line_length < box_width) {
-        gfx_print_scncode(0XE2);
-        line_length++;
-    }
-    gfx_print_scncode(0xFB);
-    gfx_end_print();
-
-    line_length = 0;
-    y_start++;
-    gfx_begin_print(x_start, y_start);
-    gfx_print_scncode(0x61);
-    do {
-        msg_char = *msg_ptr;
-        if (msg_char >= 32) {
-            gfx_print_asciichar(msg_char, true);
-            line_length++;
-        } else {
-            while (line_length < box_width) {
-                gfx_print_asciichar(' ', true);
-                line_length++;
-            }
-            gfx_print_scncode(0xE1);
-            gfx_end_print();
-            y_start++;
-            gfx_begin_print(x_start, y_start);
-            gfx_print_scncode(0x61);
-            line_length = 0;
-        }
-        msg_ptr++;
-    } while (*msg_ptr != 0);
-    while (line_length < box_width) {
-        gfx_print_asciichar(' ', true);
-        line_length++;
-    }
-    gfx_print_scncode(0xE1);
-    gfx_end_print();
-
-    y_start++;
-    dialog_last = y_start;
-    line_length = 0;
-    gfx_begin_print(x_start, y_start);
-    gfx_print_scncode(0xFC);
-    while (line_length < box_width) {
-        gfx_print_scncode(0X62);
-        line_length++;
-    }
-    gfx_print_scncode(0xFE);
-    gfx_end_print();
-
-    dialog_time = logic_vars[21];
-    if (dialog_time > 0) {
-        dialog_time = (dialog_time * 15) / 10;
-    } else {
-        dialog_time = 0xffff;
     }
 }
 
@@ -177,18 +57,9 @@ void engine_show_object(uint8_t view_num) {
     object_view.priority = 0x0f;
     show_object_view = true;
     uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
-    engine_display_dialog(desc_data);
+    dialog_show(desc_data, false);
 }
 
-void engine_dialog_close(void) {
-    for (uint8_t line = dialog_first; line <= dialog_last; line++)
-    {
-        gfx_clear_line(line);
-    }
-    dialog_first = 0;
-    dialog_last = 0;
-    show_object_view = false;
-}
 /*
     0000 = inv
     0001 = inv
@@ -221,15 +92,12 @@ void handle_movement_joystick(void) {
 void engine_statusline(bool enable) {
     status_line_enabled = enable;
     if (!enable) {
-        gfx_print_ascii(0, 0, false, (uint8_t *)"%p40");
+        dialog_print_ascii(0, 0, false, (uint8_t __far *)"%p40");
     }
 }
 
 void engine_clear_keyboard(void) {
-    command_buffer[0] = 0;
-    cmd_buf_ptr=0;
-    ASCIIKEY = 0;
-    gfx_print_ascii(0, 22, false, (uint8_t *)">%p40");
+    dialog_clear_keyboard();
 }
 
 void engine_allowinput(bool allowed) {
@@ -237,66 +105,8 @@ void engine_allowinput(bool allowed) {
     if (input_ok) {
         engine_clear_keyboard();
     } else {
-        gfx_print_ascii(0, 22, false, (uint8_t *)"%p40");
+        dialog_print_ascii(0, 22, false, (uint8_t __far *)"%p40");
     }
-}
-
-void engine_dumpstate(void) {
-    for (int i = 0; i < 8; i++) {
-        gfx_print_ascii(0, i, false, (uint8_t *)"%d: %f%f%f%f", i*32, logic_flags[i * 4], logic_flags[i * 4 + 1], logic_flags[i * 4 + 2], logic_flags[i * 4 + 3]);
-    }
-}
-
-void engine_handleinput(void) {
-    if (!input_ok) {
-        return;
-    }
-    uint8_t ascii_key = ASCIIKEY;
-    if (ascii_key != 0) {
-        ASCIIKEY = 0;
-        if (ascii_key == 0xf1) {
-            engine_dumpstate();
-        }
-        if (ascii_key == 0xf7) {
-            if (cmd_buf_ptr > 16) {
-                cmd_buf_ptr = 16;
-            }
-            command_buffer[cmd_buf_ptr] = 0;
-            gamesave_save_to_disk(command_buffer);
-            engine_clear_keyboard();
-        }
-        if (ascii_key == 0xf5) {
-            if (cmd_buf_ptr > 16) {
-                cmd_buf_ptr = 16;
-            }
-            command_buffer[cmd_buf_ptr] = 0;
-            gamesave_load_from_disk(command_buffer);
-            engine_clear_keyboard();
-        }
-        if (ascii_key == 0xf6) {
-            parser_debug = true;
-        }
-        if (ascii_key == 0x14) {
-            if (cmd_buf_ptr > 0) {
-                cmd_buf_ptr--;
-                gfx_set_printpos(cmd_buf_ptr + 3, 22);
-                gfx_print_asciichar(' ', false);
-            }
-        } else if (ascii_key == 0x0d) {
-            command_buffer[cmd_buf_ptr] = 0;
-            parser_decode_string(command_buffer);
-            engine_clear_keyboard();
-        } else if (ascii_key < 127) {
-            if (cmd_buf_ptr < 37) {
-                command_buffer[cmd_buf_ptr] = ascii_key;
-                gfx_set_printpos(cmd_buf_ptr + 3, 22);
-                gfx_print_asciichar(ascii_key, false);
-                cmd_buf_ptr++;
-            }
-        }
-    }
-
-
 }
 
 void run_loop(void) {
@@ -312,10 +122,9 @@ void run_loop(void) {
     sprite_init();
     logic_init();
     parser_init();
+    dialog_init();
     input_ok = false;
     player_control = true;
-    dialog_first = 0;
-    dialog_last = 0;
     logic_set_flag(9);
     logic_set_flag(11);
     logic_vars[22] = 3;
@@ -328,34 +137,21 @@ void run_loop(void) {
         run_engine = false;
 
         run_cycles++;
-        if (dialog_first != dialog_last) {
-            if (ASCIIKEY != 0) {
-                ASCIIKEY = 0;
-                engine_dialog_close();
-            } else {
-                if (dialog_time != 0xffff) {
-                    dialog_time--;
-                    if (dialog_time == 0) {
-                        engine_dialog_close();
-                    }
-                }
-            }
-        } else {
+        if (!dialog_proc()) {
             if (run_cycles >= logic_vars[10]) {
                 if (sound_flag_needs_set) {
                     sound_flag_needs_set = false;
                     logic_set_flag(sound_flag_end);
                 }
-                logic_reset_flag(2);
-                logic_reset_flag(4);
                 engine_update_status_line();
-                engine_handleinput();
                 sprite_erase_animated();
                 handle_movement_joystick();
                 logic_run();
                 logic_reset_flag(11);
                 sprite_draw_animated();
                 run_cycles = 0;
+                logic_reset_flag(2);
+                logic_reset_flag(4);
             }
         }
         engine_running = false;

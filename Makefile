@@ -2,7 +2,7 @@ VPATH = src
 
 # Common source files
 ASM_SRCS = simplefile.s irq.s
-C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c parser.c init.c gamesave.c
+C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c parser.c init.c gamesave.c dialog.c
 C1541 = c1541
 INC = -I./include
 
@@ -14,7 +14,7 @@ obj/%.o: %.s
 	as6502 --target=mega65 --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%.o: %.c
-	cc6502 --target=mega65 -O2 $(INC) --list-file=$(@:%.o=%.clst) -o $@ $<
+	cc6502 --target=mega65 -Wall -Werror -O2 $(INC) --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%-debug.o: %.s
 	as6502 --target=mega65 --debug --list-file=$(@:%.o=%.clst) -o $@ $<

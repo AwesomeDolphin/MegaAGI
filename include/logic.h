@@ -11,8 +11,6 @@ typedef struct logic_info {
     uint8_t __far *text_offset;
 } logic_info_t;
 
-void logic_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string);
-void logic_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string);
 void logic_set_flag(uint8_t flag);
 void logic_reset_flag(uint8_t flag);
 void logic_load(uint8_t logic_num);

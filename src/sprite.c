@@ -286,7 +286,6 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
         break;
     }
 
-    uint8_t original_object_dir = sprite->object_dir;
     uint8_t object_border = 0;
     int16_t new_xpos = sprite->view_info.x_pos + view_dx;
     int16_t new_ypos = sprite->view_info.y_pos + view_dy;
@@ -312,7 +311,6 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
 
     bool sprite_alarm = false;
     bool sprite_onland = false;
-    uint8_t i = 0;
     if (sprite->view_info.priority != 0x0f) {
         for (int16_t control_xpos = new_xpos; control_xpos < (new_xpos + sprite->view_info.width); control_xpos++) {
             uint8_t control_prio = gfx_getprio(control_xpos, new_ypos);

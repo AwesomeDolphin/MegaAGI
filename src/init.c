@@ -98,7 +98,7 @@ uint16_t loadseq_chipmem2(char *name, uint16_t *data_size) {
 
 void init_load_words(void) {
   uint16_t words_size = 0;
-  uint16_t words_offset = loadseq_chipmem2("WORDS.TOK,S,R", &words_size);
+  loadseq_chipmem2("WORDS.TOK,S,R", &words_size);
 }
 
 void init_load_objects(void) {

@@ -1,3 +1,21 @@
+/***************************************************************************
+    MEGA65-AGI -- Sierra AGI interpreter for the MEGA65
+    Copyright (C) 2025  Keith Henrickson
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+***************************************************************************/
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -28,8 +46,10 @@ uint8_t __far *logic_flags = NULL;
 typedef struct logic_stack_entry {
     uint8_t __far *return_address;
     uint8_t return_logic_num;
+    uint16_t free_offset;
 } logic_stack_entry_t;
 
+static uint8_t logic_controllers[32];
 static logic_stack_entry_t logic_stack[16];
 static uint8_t __far *program_counter;
 static uint8_t __far *logic_strings;
@@ -48,6 +68,22 @@ void logic_reset_flag(uint8_t flag) {
     uint8_t flag_reg = (flag >> 3);
     uint8_t flag_reg_val = ~(1 << (flag & 0x07));
     logic_flags[flag_reg] &= flag_reg_val;
+}
+
+bool logic_flag_isset(uint8_t flag) {
+    return (((logic_flags[flag >> 3]) >> (flag & 0x07)) & 0x01);
+}
+
+void logic_set_controller(uint8_t flag) {
+    uint8_t flag_reg = (flag >> 3);
+    uint8_t flag_reg_val = (1 << (flag & 0x07));
+    logic_controllers[flag_reg] |= flag_reg_val;
+}
+
+void logic_reset_all_controllers(void) {
+    for (uint8_t i = 0; i < 32; i++) {
+        logic_controllers[i] = 0;
+    } 
 }
 
 uint16_t logic_locate_message(uint8_t logic_num, uint8_t message_num) {
@@ -108,8 +144,7 @@ bool logic_test_commands(void) {
         }
         case 0x0C:
             // controller test
-            // TODO: implement controller test
-            result = false;
+            result = ((logic_controllers[program_counter[1] >> 3]) >> (program_counter[1] & 0x07)) & 0x01;
             program_counter += 2;
             break;
         case 0x0D:
@@ -238,6 +273,9 @@ void logic_run(void) {
                 }
                 program_counter = logic_stack[logic_stack_ptr].return_address;
                 logic_num = logic_stack[logic_stack_ptr].return_logic_num;
+                if (logic_stack[logic_stack_ptr].free_offset > 0) {
+                    chipmem_free(logic_stack[logic_stack_ptr].free_offset);
+                }
                 logic_stack_ptr++;
                 break;
             }
@@ -351,6 +389,12 @@ void logic_run(void) {
                 logic_stack[logic_stack_ptr].return_address = program_counter + 2;
                 logic_stack[logic_stack_ptr].return_logic_num = logic_num;
                 logic_num = program_counter[1];
+                if (logic_infos[logic_num].offset == 0) {
+                    logic_load(logic_num);
+                    logic_stack[logic_stack_ptr].free_offset = logic_infos[logic_num].offset;
+                } else {
+                    logic_stack[logic_stack_ptr].free_offset = 0;
+                }
                 program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
                 break;
             }
@@ -680,7 +724,7 @@ void logic_run(void) {
                 break;
             }
             case 0x4B: { 
-                // end.of.loop
+                // reverse.loop
                 sprites[program_counter[1]].cycling = false;
                 sprites[program_counter[1]].end_of_loop = program_counter[2];
                 sprites[program_counter[1]].reverse = true;
@@ -1042,6 +1086,31 @@ void logic_run(void) {
                 program_counter += 8;
                 break;
             }
+            case 0x7C: {
+                // status
+                engine_allowinput(false);
+                gfx_set_textmode(true);
+                dialog_print_ascii(0,0,false,(uint8_t __far *)"You are carrying...");
+                uint8_t __far *object_ptr = chipmem2_base + object_data_offset;
+                uint8_t number_of_carried = 0;
+                for (int counter = 0; counter < 256; counter++) {
+                    if (object_locations[counter] == 255) {
+                        uint16_t object_sdesc_offset = object_ptr[((counter + 1) * 3) + 0] + 3;
+                        object_sdesc_offset |= (object_ptr[((counter + 1) * 3) + 1] << 8);
+                        uint8_t __far *object_sdesc_ptr = object_ptr + object_sdesc_offset;
+                        uint8_t column = (number_of_carried % 2) ? 20 : 0;
+                        uint8_t row = (number_of_carried / 2) + 1;
+                        dialog_print_ascii(column, row, false, object_sdesc_ptr);
+                        number_of_carried++;
+                    }
+                }
+                while(ASCIIKEY == 0);
+                ASCIIKEY = 0;
+                gfx_set_textmode(false);
+                engine_allowinput(true);
+                program_counter += 1;
+                break;
+            }
             case 0x7D: {
                 // save.game
                 gamesave_begin(true);
@@ -1100,6 +1169,12 @@ void logic_run(void) {
             case 0x84: {
                 // player.control
                 player_control = true;
+                program_counter += 1;
+                break;
+            }
+            case 0x88: {
+                // pause
+                dialog_show((uint8_t __far *)"Game paused. Press Return to continue.", false);
                 program_counter += 1;
                 break;
             }

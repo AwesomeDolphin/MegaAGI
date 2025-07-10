@@ -1,3 +1,21 @@
+/***************************************************************************
+    MEGA65-AGI -- Sierra AGI interpreter for the MEGA65
+    Copyright (C) 2025  Keith Henrickson
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+***************************************************************************/
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -37,7 +55,7 @@ void loadseq_near(char *name, uint16_t load_address) {
 }
 
 void init_system(void) {
-    simpleprint("INIT SYSTEM...\r");
+    simpleprint("lOADING BOOTSTRAP ROUTINE...\r\r");
     loadseq_near("INITS,S,R", 0x7500);
     init_internal();
 
@@ -111,24 +129,49 @@ void init_load_objects(void) {
   for (uint16_t index = 0; index < objects_size; index++) {
     *object_ptr = *object_ptr ^ avis_durgan[avis];
     avis = (avis + 1) % 11;
+    object_ptr += 1;
   }
 }
 
 void init_internal(void) {
-    simpleprint("LOADING MIDMEM...\r");
+    simpleprint("mega65-agi cOPYRIGHT (c) 2025 kEITH hENRICKSON\r"
+    "tHIS PROGRAM COMES WITH absolutely no warranty\r"
+    "tHIS IS FREE SOFTWARE, AND YOU ARE WELCOME TO REDISTRIBUTE IT\r"
+    "UNDER CERTAIN CONDITIONS. sEE gpl vERSION 3.29 IN copying\r\r");
+    simpleprint("lOADING INTERPRETER MODULES...\r");
     init_midmem_offset = load_seq_attic("MIDMEM,S,R", &init_midmem_size);
-    simpleprint("LOADING HIMEM...\r");
     init_himem_offset = load_seq_attic("HIMEM,S,R", &init_himem_size);
-    simpleprint("LOADING ULTMEM...\r");
     init_ultmem_offset = load_seq_attic("ULTMEM,S,R", &init_ultmem_size);
-    simpleprint("LOADING VOLUME FILES...\r");
+
+    uint8_t buffer[64];
+    simplecmdchan((uint8_t *)"R0:VOL.0=VOL.0\r", 8);
+    simpleerrchan(buffer, 8);
+    uint8_t errnum = (buffer[0] * 10);
+    errnum |= buffer[1];
+    if (errnum == 62) {
+      simpleprint("uNABLE TO LOCATE vol.0 AS A seq FILE!\r");
+      simpleprint("yOU MUST PROVIDE YOUR OWN agi DATA FILES\r");
+      simpleprint("agi GAMES ARE LEGALLY SOLD AT GOG.COM\r");
+      while(1);
+    }
+    simpleprint("lOADING GAME FILES...\r\r");
+    simpleprint("wHILE WE GET THINGS STARTED:\r");
+    simpleprint("cHANGE SPEED WITH 'SLOW', 'NORMAL', and 'FAST' COMMANDS!\r");
+    simpleprint("iN GAME HELP AVAILABLE ON THE 'f1' or 'help' KEYS.\r");
+    simpleprint("pLAYER MOVEMENT IS VIA A JOYSTICK ON CONTROLLER PORT 2.\r");
+    simpleprint("tHERE IS NO NEED TO CALIBRATE YOUR JOYSTICK, ctrl-j DOES NOTHING.\r");
+    simpleprint("iNSERT A SAVE GAME DISK INTO UNIT 9.\r");
+    simpleprint("green border means game is thinking! pATIENCE IS A VIRTUE.\r\r");
+    simpleprint("i DON'T HAVE A PATREON, MY WORK IS A GIFT TO THE RETRO COMMUNITY.\r");
+    simpleprint("'tHIS IS FOR EVERYONE.' -- tIM bERNERS-lEE\r\r");
     load_volume_files();
-    simpleprint("LOADING DIRECTORY FILES...\r");
     load_directory_files();
-    simpleprint("LOADING WORDS.TOK...\r");
     init_load_words();
-    simpleprint("LOADING OBJECTS...\r");
     init_load_objects();
+
+    simpleprint("pRESS ANY KEY TO PLAY GAME!\r");
+    while(ASCIIKEY==0);
+    ASCIIKEY = 0;
 
     gfx_switchto();
     gfx_blackscreen();

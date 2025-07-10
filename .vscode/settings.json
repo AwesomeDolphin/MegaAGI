@@ -5,7 +5,8 @@
         "string.h": "c",
         "gfx.h": "c",
         "view.h": "c",
-        "memmanage.h": "c"
+        "memmanage.h": "c",
+        "stdbool.h": "c"
     },
     "C_Cpp.default.compilerPath": ""
 }

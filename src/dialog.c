@@ -1,3 +1,21 @@
+/***************************************************************************
+    MEGA65-AGI -- Sierra AGI interpreter for the MEGA65
+    Copyright (C) 2025  Keith Henrickson
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+***************************************************************************/
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -109,6 +127,18 @@ void dialog_format_string_valist(uint8_t __far *formatstring, va_list ap) {
           }
           break;
         }
+        case 'w': {
+          uint8_t wordnum = my_atoi(ascii_string + 1, &ascii_string);
+          const char *wordptr = parser_word_pointers[wordnum - 1];
+          uint8_t wordchr = (uint8_t)*wordptr;
+          while (wordchr != 0) {
+            format_string_buffer[padlen] = wordchr;
+            padlen++;
+            wordptr++;
+            wordchr = (uint8_t)*wordptr;
+          };
+          break;
+        }
         case 'd':
         case 'x': {
           uint32_t param = va_arg(ap, unsigned int);
@@ -195,25 +225,58 @@ static bool dialog_handleinput(void) {
     uint8_t ascii_key = ASCIIKEY;
     if (ascii_key != 0) {
         ASCIIKEY = 0;
-        if (ascii_key == 0xf1) {
-        }
-        if (ascii_key == 0x14) {
-            if (cmd_buf_ptr > 0) {
-                gfx_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-                gfx_print_asciichar(' ', false);
-                cmd_buf_ptr--;
-                gfx_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-                gfx_print_asciichar(' ', false);
-            }
-        } else if (ascii_key == 0x0d) {
-            return true;
-        } else if ((ascii_key >= 32) && (ascii_key < 127)) {
-            if (cmd_buf_ptr < input_max_length) {
-                command_buffer[cmd_buf_ptr] = ascii_key;
-                gfx_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-                gfx_print_asciichar(ascii_key, false);
-                cmd_buf_ptr++;
-            }
+        switch(ascii_key) {
+            case 0x09:
+                logic_set_controller(4);
+                break;
+            case 0x14:
+                if (cmd_buf_ptr > 0) {
+                    gfx_set_printpos(cmd_buf_ptr + input_start_column, input_line);
+                    gfx_print_asciichar(' ', false);
+                    cmd_buf_ptr--;
+                    gfx_set_printpos(cmd_buf_ptr + input_start_column, input_line);
+                    gfx_print_asciichar(' ', false);
+                }
+                break;
+            case 0x0d:
+                return true;
+            case 0xf5:
+                logic_set_controller(1);
+                break;
+            case 0xf7:
+                logic_set_controller(2);
+                break;
+            case 0xf9:
+                logic_set_controller(3);
+                break;
+            case 0x1b:
+                logic_set_controller(14);
+                break;
+            case 0x1f:
+                logic_set_controller(18);
+                break;
+            case 0xf1:
+                logic_set_controller(18);
+                break;
+            case 0x3d:
+                logic_set_controller(5);
+                break;
+            case 0x30:
+                logic_set_controller(7);
+                break;
+            case 0x2d:
+                logic_set_controller(8);
+                break;
+            default:
+                if ((ascii_key >= 32) && (ascii_key < 127)) {
+                    if (cmd_buf_ptr < input_max_length) {
+                        command_buffer[cmd_buf_ptr] = ascii_key;
+                        gfx_set_printpos(cmd_buf_ptr + input_start_column, input_line);
+                        gfx_print_asciichar(ascii_key, false);
+                        cmd_buf_ptr++;
+                    }
+                }
+                break;
         }
     }
     return false;
@@ -374,7 +437,6 @@ bool dialog_proc(void) {
             if (dialog_handleinput()) {
                 command_buffer[cmd_buf_ptr] = 0;
                 parser_decode_string(command_buffer);
-                dialog_clear_keyboard();
             }
         break;
         case imPressKey:

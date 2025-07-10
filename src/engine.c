@@ -1,3 +1,21 @@
+/***************************************************************************
+    MEGA65-AGI -- Sierra AGI interpreter for the MEGA65
+    Copyright (C) 2025  Keith Henrickson
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+***************************************************************************/
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -127,6 +145,7 @@ void run_loop(void) {
     player_control = true;
     logic_set_flag(9);
     logic_set_flag(11);
+    logic_vars[20] = 5;
     logic_vars[22] = 3;
     logic_vars[23] = 0x0f;
     logic_vars[24] = 37;
@@ -150,8 +169,13 @@ void run_loop(void) {
                 logic_reset_flag(11);
                 sprite_draw_animated();
                 run_cycles = 0;
+                if (logic_flag_isset(2) || logic_flag_isset(4) || (logic_vars[9] > 0)) {
+                    // Parser did something
+                    dialog_clear_keyboard();
+                }
                 logic_reset_flag(2);
                 logic_reset_flag(4);
+                logic_reset_all_controllers();
             }
         }
         engine_running = false;

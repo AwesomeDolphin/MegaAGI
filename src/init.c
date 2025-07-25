@@ -43,6 +43,7 @@ static void init_load_objects(void);
 
 void loadseq_near(char *name, uint16_t load_address) {
     uint8_t *prg_mem = (uint8_t *)load_address;
+
     simpleopen(name, strlen(name), 8);
     size_t bytes_read;
     do {

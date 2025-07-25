@@ -18,6 +18,7 @@
 
         .extern _Zp
 
+SETBNK: .equlab 0xff6b
 CHKIN:  .equlab 0xffc6
 CHKOUT: .equlab 0xffc9
 OPEN:   .equlab 0xffc0
@@ -39,6 +40,9 @@ simpleopen:
         ldx zp:_Zp+2
         ldy #0x02
         jsr SETLFS
+        lda #0x00
+        tax
+        jsr SETBNK
         jsr OPEN
         jmp CLRCHN
 

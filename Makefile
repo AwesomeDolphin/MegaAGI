@@ -28,9 +28,15 @@ agi.prg:  mega65-agi.scm $(OBJS)
 agi.elf: $(OBJS_DEBUG)
 	ln6502 --target=mega65 --debug -o $@ $^ --list-file=agi-debug.cmap --semi-hosted
 
-agi.d81: agi.prg
+agi.exo: agi.prg
+	exomizer sfx basic -n -t 65 -o agi.exo agi.prg
+
+logosrc\agi.lgo: agi.exo
+	build-logo.cmd
+
+agi.d81: logosrc\agi.lgo
 	$(C1541) -format "agi,a1" d81 agi.d81
-	$(C1541) -attach agi.d81 -write agi.prg agi.c65
+	$(C1541) -attach agi.d81 -write logosrc\agi.lgo agi.c65
 	$(C1541) -attach agi.d81 -write COPYING copying,s
 	$(C1541) -attach agi.d81 -write inits.raw inits,s
 	$(C1541) -attach agi.d81 -write midmem.raw midmem,s

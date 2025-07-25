@@ -27,5 +27,17 @@
             "environment": [],
             "console": "internalConsole"
         },
+        {
+            "name": "(MEGA65) Upload",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "senddisk",
+            "program": "C:\\CommandLineApps\\etherload.exe",
+            "args": ["-m", "agi.d81", "-5", "--ntsc"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "console": "internalConsole"
+        },
    ]
 }

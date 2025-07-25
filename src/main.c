@@ -38,12 +38,43 @@
 #define PETSCIIKEY (*(volatile uint8_t *)0xd619)
 #define VICREGS ((volatile uint8_t *)0xd000)
 
+uint8_t mainpalettedata[] =  {0x00, 0x00, 0x00,
+                          0x0F, 0x0F, 0x0F,
+                          0x0F, 0x00, 0x00,
+                          0x00, 0x0F, 0x0F,
+                          0x0F, 0x00, 0x0F,
+                          0x00, 0x0F, 0x00,
+                          0x00, 0x00, 0x0F,
+                          0x0F, 0x0F, 0x00,
+                          0x0F, 0x06, 0x00,
+                          0x0A, 0x04, 0x00,
+                          0x0F, 0x07, 0x07,
+                          0x05, 0x05, 0x05,
+                          0x08, 0x08, 0x08,
+                          0x09, 0x0F, 0x09,
+                          0x09, 0x09, 0x0F,
+                          0x0B, 0x0B, 0x0B,
+};
+
 int main () {
+  uint8_t palette_index = 0;
+  for (int i = 0; i < 48; i += 3) {
+    PALETTE.red[palette_index] = mainpalettedata[i];
+    PALETTE.green[palette_index] = mainpalettedata[i+1];
+    PALETTE.blue[palette_index] = mainpalettedata[i+2];
+    palette_index++;
+  }
+
   VICIV.bordercol = COLOR_BLACK;
   VICIV.screencol = COLOR_BLACK;
   VICIV.key = 0x47;
   VICIV.key = 0x53;
   VICIV.chrxscl = 120;
+  VICIV.ctrlb = VICIV.ctrlb | VIC3_H640_MASK;
+  VICIV.ctrlc = VICIV.ctrlc & (~VIC4_CHR16_MASK);
+  VICIV.chrcount = 80;
+  VICIV.linestep = 80;
+
   simpleprint("\x93\x0b\x0e");
   simpleprint("mega65 agi -- sIERRA agi PARSER FOR THE mega65!\r");
   simpleprint("tHIS WILL ONLY WORK WITH kq1... eVERYTHING ELSE... ymmv!\r");

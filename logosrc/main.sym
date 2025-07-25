@@ -1,0 +1,35 @@
+.label frequencies_sid_reg_lo=$235d
+.label next_program_end=$2332
+.label fill_attribute_map=$2397
+.label zp_backup=$2337
+.label frequencies_hi=$2345
+.label frequencies_lo=$2339
+.label SAMPLE_END=$711a
+.label next_program=$230d {
+  .label move_next_prog_dma=$2327 {
+  }
+}
+.label main=$202a {
+  .label delay_loop=$217e
+  .label delay_loop2=$2241
+  .label sample_wait=$22b8
+  .label drawin_loop=$21c1
+}
+.label frequencies_sid_reg_hi=$2369
+.label NEXT_PROG_END=$95a9
+.label stub_to_screen_dma=$238c {
+}
+.label frequencies_sid_reg_ctl=$2375
+.label SAMPLE=$2d40 {
+}
+.label load_color_palette_dma=$2381 {
+}
+.label supersaw=$22f7 {
+}
+.label drawin_index=$2335
+.label drawin_delay=$2336
+.label CHARSET=$2700
+.label matrix_raster=$2332
+.label CLUT=$23d3
+.label clear_tile_map=$23b7
+.label frequencies_delta_lo=$2351

@@ -164,4 +164,21 @@ errdone:
         lda #0x0f
         jmp CLOSE
 
-
+        .public simpleerrcode
+simpleerrcode:
+        ldy #0x00
+        lda (zp:_Zp+0),y
+        sec
+        sbc #0x30
+        asl a
+        sta zp:_Zp+2
+        asl a
+        asl a
+        clc
+        adc zp:_Zp+2
+        iny
+        clc
+        adc (zp:_Zp+0),y
+        sec
+        sbc #0x30
+        rts

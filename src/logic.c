@@ -935,14 +935,14 @@ void logic_run(void) {
             case 0x65: {
                 // print
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[1]);
-                dialog_show(src_string, false);
+                dialog_show(false, src_string);
                 program_counter += 2;
                 break;
             }
             case 0x66: {
                 // print.v
                 uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[1]]);
-                dialog_show(src_string, false);
+                dialog_show(false, src_string);
                 program_counter += 2;
                 break;
             }
@@ -1174,7 +1174,7 @@ void logic_run(void) {
             }
             case 0x88: {
                 // pause
-                dialog_show((uint8_t __far *)"Game paused. Press Return to continue.", false);
+                dialog_show(false, (uint8_t __far *)"Game paused. Press Return to continue.");
                 program_counter += 1;
                 break;
             }

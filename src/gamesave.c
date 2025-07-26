@@ -67,8 +67,8 @@ uint8_t __huge *gamesave_cache;
 #pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 uint32_t gamesave_save_to_attic(void) {
+    VICIV.bordercol = COLOR_GREEN;
     gamesave_cache = attic_memory + atticmem_allocoffset;
-    VICIV.bordercol = COLOR_RED;
     for (int i = 0; i < 8; i++) {
         gamesave_cache[i] = game_id[i];
     }
@@ -112,8 +112,8 @@ uint32_t gamesave_save_to_attic(void) {
 
     memmanage_memcpy_far_huge(&gamesave_cache[offset], chipmem_base, 0x10000);
     offset += 0x10000;
-    VICIV.bordercol = COLOR_BLACK;
 
+    VICIV.bordercol = COLOR_BLACK;
     return offset;
 }
 
@@ -123,13 +123,11 @@ void gamesave_save_to_disk(char *filename) {
     uint32_t save_size = gamesave_save_to_attic();
     select_kernel_mem();
     POKE(0xD030, 0x64);
-    VICIV.bordercol = COLOR_SOYLENTGREEN;
 
     simplecmdchan((uint8_t *)"I0:\r", 9);
     simpleerrchan(buffer, 9);
     uint8_t __huge *gamesave_file = gamesave_cache;
     strcat(filename, ".AGI,S,W");
-    dialog_print_ascii(0,1, false, (uint8_t __far *)filename);
     simpleopen(filename, strlen(filename), 9);
     uint8_t __far *buffer_far = (uint8_t __far *)buffer;
     for (uint32_t i = 0; i < save_size; i += 250) {
@@ -140,22 +138,25 @@ void gamesave_save_to_disk(char *filename) {
     simpleclose();
 
     simpleerrchan(buffer, 9);
-    dialog_print_ascii(0,2, false, (uint8_t __far *)buffer);
+    uint8_t errcode = simpleerrcode(buffer);
+    if (errcode != 0) {
+        dialog_show(false, (uint8_t __far *)"Error saving file: %d", errcode);
+    }
 
-    VICIV.bordercol = COLOR_BLACK;
     POKE(0xD030, 0x44);
     select_execution_mem();
 }
 
 
 void gamesave_load_from_attic(void) {
-    VICIV.bordercol = COLOR_RED;
     for (int i = 0; i < 8; i++) {
         if (gamesave_cache[i] != game_id[i]) {
+            dialog_show(false, (uint8_t __far *)"Save game is not for this game!");
             return;
         }
     }
 
+    VICIV.bordercol = COLOR_GREEN;
     chipmem_allocoffset = gamesave_cache[8];
     chipmem_allocoffset |= (gamesave_cache[9] << 8);
 
@@ -206,7 +207,6 @@ void gamesave_load_from_attic(void) {
     logic_set_flag(12);
 
     gfx_hold_flip(true);
-    VICIV.bordercol = COLOR_GREEN;
     pic_load(logic_vars[0]);
     draw_pic(true);
     pic_discard(logic_vars[0]);
@@ -237,10 +237,8 @@ void gamesave_load_from_attic(void) {
 void gamesave_load_from_disk(char *filename) {
     gamesave_cache = attic_memory + atticmem_allocoffset;
     strcat(filename, ".AGI,S,R");
-    dialog_print_ascii(0,1, false, (uint8_t __far *)filename);
     select_kernel_mem();
     POKE(0xD030, 0x64);
-    VICIV.bordercol = COLOR_SOYLENTGREEN;
     uint8_t buffer[256];
 
     simplecmdchan((uint8_t *)"I0:\r", 9);
@@ -259,14 +257,13 @@ void gamesave_load_from_disk(char *filename) {
     simpleclose();
 
     simpleerrchan(buffer, 9);
-
-    VICIV.bordercol = COLOR_BLACK;
     POKE(0xD030, 0x44);
     select_execution_mem();
 
-    dialog_print_ascii(0,2, false, (uint8_t __far *)buffer);
-
-    if (buffer[0] < 0x32) {
+    uint8_t errcode = simpleerrcode(buffer);
+    if (errcode != 0) {
+        dialog_show(false, (uint8_t __far *)"Error reading file: %d", errcode);
+    } else {
         gamesave_cache = attic_memory + atticmem_allocoffset;
         gamesave_load_from_attic();
     }
@@ -291,5 +288,5 @@ void gamesave_dialog_handler(char *filename) {
 
 void gamesave_begin(bool save) {
     saving = save;
-    dialog_show((uint8_t __far *)"Enter the name\nof the save file.\n(Uses device 9.)\n\n", true);
+    dialog_show(true, (uint8_t __far *)"Enter the name\nof the save file.\n(Uses device 9.)\n\n");
 }

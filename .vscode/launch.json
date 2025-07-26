@@ -21,7 +21,7 @@
             "request": "launch",
             "preLaunchTask": "senddisk",
             "program": "C:\\CommandLineApps\\etherload.exe",
-            "args": ["-r", "-m", "agi.d81", "-5", "--ntsc", "agi.prg"],
+            "args": ["-r", "-m", "agi.d81", "-5", "--ntsc", "logosrc\\agi.lgo"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],

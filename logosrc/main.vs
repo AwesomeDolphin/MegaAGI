@@ -1,7 +1,7 @@
 al C:2241 .delay_loop2
 al C:22b8 .sample_wait
 al C:202a .main
-al C:95a9 .NEXT_PROG_END
+al C:95de .NEXT_PROG_END
 al C:22f7 .supersaw
 al C:21c1 .drawin_loop
 al C:2332 .next_program_end

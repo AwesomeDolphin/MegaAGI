@@ -195,14 +195,16 @@ void dialog_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t __far *forma
 }
 
 void dialog_clear_keyboard(void) {
-    command_buffer[0] = 0;
-    cmd_buf_ptr=0;
-    ASCIIKEY = 0;
-    input_line = 22;
-    input_start_column = 3;
-    input_max_length = 37;
+    if (input_ok && (dialog_input_mode != imDialogField)) {
+        command_buffer[0] = 0;
+        cmd_buf_ptr=0;
+        ASCIIKEY = 0;
+        input_line = 22;
+        input_start_column = 3;
+        input_max_length = 37;
 
-    dialog_print_ascii(0, 22, false, (uint8_t __far *)">%p40");
+        dialog_print_ascii(0, 22, false, (uint8_t __far *)">%p40");
+    }
 }
 
 static bool dialog_handleinput(void) {
@@ -282,11 +284,15 @@ static bool dialog_handleinput(void) {
     return false;
 }
 
-void dialog_show(uint8_t __far *message_string, bool accept_input) {
+void dialog_show(bool accept_input, uint8_t __far *message_string, ...) {
     if (accept_input) {
         dialog_print_ascii(0, 22, false, (uint8_t __far *)"%p40");
     }
-    dialog_format_string(message_string);
+
+    va_list ap;
+    va_start(ap, message_string);
+    dialog_format_string_valist(message_string, ap);
+    va_end(ap);
 
     msg_ptr = format_string_buffer;
     last_word = msg_ptr;
@@ -392,6 +398,9 @@ void dialog_show(uint8_t __far *message_string, bool accept_input) {
             gfx_print_asciichar(' ', false);
             line_length++;
         }
+        command_buffer[0] = 0;
+        cmd_buf_ptr=0;
+        ASCIIKEY = 0;
         input_line = y_start - 1;
         input_start_column = 3;
         input_max_length = 12;

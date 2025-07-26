@@ -75,7 +75,7 @@ void engine_show_object(uint8_t view_num) {
     object_view.priority = 0x0f;
     show_object_view = true;
     uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
-    dialog_show(desc_data, false);
+    dialog_show(false, desc_data);
 }
 
 /*
@@ -171,7 +171,9 @@ void run_loop(void) {
                 run_cycles = 0;
                 if (logic_flag_isset(2) || logic_flag_isset(4) || (logic_vars[9] > 0)) {
                     // Parser did something
-                    dialog_clear_keyboard();
+                    if (input_ok) {
+                        dialog_clear_keyboard();
+                    }
                 }
                 logic_reset_flag(2);
                 logic_reset_flag(4);

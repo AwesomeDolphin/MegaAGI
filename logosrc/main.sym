@@ -16,7 +16,7 @@
   .label drawin_loop=$21c1
 }
 .label frequencies_sid_reg_hi=$2369
-.label NEXT_PROG_END=$95a9
+.label NEXT_PROG_END=$95de
 .label stub_to_screen_dma=$238c {
 }
 .label frequencies_sid_reg_ctl=$2375

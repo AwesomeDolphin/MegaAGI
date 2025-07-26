@@ -23,3 +23,4 @@ void simpleprint(char *string);
 void simpleclose(void);
 void simplecmdchan(uint8_t *drive_command, uint8_t device_number);
 void simpleerrchan(uint8_t *statusmessage, uint8_t device_number);
+uint8_t simpleerrcode(uint8_t *statusmessage);

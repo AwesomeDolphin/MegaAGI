@@ -53,6 +53,15 @@ void loadseq_near(char *name, uint16_t load_address) {
         }
     } while (bytes_read > 0);
     simpleclose();
+
+    uint8_t buffer[64];
+    simpleerrchan(buffer, 8);
+    uint8_t errnum = simpleerrcode(buffer);
+    if (errnum != 0) {
+        simpleprint("eRROR LOADING FILE: ");
+        simpleprint((char *)&buffer[0]);
+        while(1); // Halt on error
+    }
 }
 
 void init_system(void) {
@@ -147,8 +156,7 @@ void init_internal(void) {
     uint8_t buffer[64];
     simplecmdchan((uint8_t *)"R0:VOL.0=VOL.0\r", 8);
     simpleerrchan(buffer, 8);
-    uint8_t errnum = (buffer[0] * 10);
-    errnum |= buffer[1];
+    uint8_t errnum = simpleerrcode(buffer);
     if (errnum == 62) {
       simpleprint("uNABLE TO LOCATE vol.0 AS A seq FILE!\r");
       simpleprint("yOU MUST PROVIDE YOUR OWN agi DATA FILES\r");

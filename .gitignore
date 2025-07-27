@@ -6,7 +6,7 @@ obj/*.lst
 obj/
 *.d81
 *.cmap
-volumes/
+kq1/
 *.exo
 *.lgo
 

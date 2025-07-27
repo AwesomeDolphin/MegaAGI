@@ -6,7 +6,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "make -k agi.d81",
+            "command": "make -k agisystem",
             "options": {
                 "cwd": "${workspaceRoot}"
             },

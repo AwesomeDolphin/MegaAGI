@@ -57,14 +57,14 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     voice_offsets[2] = (sound_file[5] << 8) | sound_file[4];
 
     SID1.amp = 0x0f;
-    SID1.v1.ad = 0x11;
-    SID1.v1.sr = 0xf0;
+    SID1.v1.ad = 0x1b;
+    SID1.v1.sr = 0x40;
     SID1.v2.pw = 0x400;
-    SID1.v2.ad = 0x11;
-    SID1.v2.sr = 0xc0;
+    SID1.v2.ad = 0x1a;
+    SID1.v2.sr = 0x20;
     SID1.v2.pw = 0x200;
-    SID1.v3.ad = 0x11;
-    SID1.v3.sr = 0xc0;
+    SID1.v3.ad = 0x1a;
+    SID1.v3.sr = 0x20;
     SID1.v2.pw = 0x200;
 
     sound_running = 1;
@@ -132,9 +132,12 @@ void sound_interrupt_handler(void) {
                 if ((vol & 0x0f) == 0x0f) {
                     sid->ctrl = 0x00;
                 } else {
-                    uint16_t sidctrl = 1876426 / (fnum - 1);
+                    // First note value is 165, which VisualAGI says is an E-6. However, the frequency I get in the formula for Tandy chips is 677Hz, which is close to (but higher than) E-5.
+                    // I'll assume that E-5 is right, and revise the conversion. The SID note value is 10814, and we can thus convert by multplying the two.
+                    // 10814 * 165 = 1786455
+                    uint16_t sidctrl = 1786455 / fnum;
                     sid->freq = sidctrl;
-                    sid->ctrl = 0x41;
+                    sid->ctrl = 0x11;
                 }
                 durations[voice] = duration;
                 if (duration < 6) {

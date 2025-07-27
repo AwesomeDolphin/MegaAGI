@@ -9,4 +9,7 @@ obj/
 kq1/
 *.exo
 *.lgo
+*.sym
+*.bytes
+*.vs
 

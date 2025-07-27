@@ -171,6 +171,7 @@ void run_loop(void) {
                 run_cycles = 0;
                 if (logic_flag_isset(2) || logic_flag_isset(4) || (logic_vars[9] > 0)) {
                     // Parser did something
+                    logic_vars[9] = 0;
                     if (input_ok) {
                         dialog_clear_keyboard();
                     }

@@ -1,4 +1,5 @@
 VPATH = src
+ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # Common source files
 ASM_SRCS = simplefile.s irq.s
@@ -10,11 +11,22 @@ INC = -I./include
 OBJS = $(ASM_SRCS:%.s=obj/%.o) $(C_SRCS:%.c=obj/%.o)
 OBJS_DEBUG = $(ASM_SRCS:%.s=obj/%-debug.o) $(C_SRCS:%.c=obj/%-debug.o)
 
+# GIT repository information
+ifneq "$(wildcard $(ROOT_DIR)/.git )" "" #check if local repo exist
+#Create variable GIT_MSG with:
+#1) git sha and additionally dirty flag
+GIT_MSG := sha:$(shell git --git-dir=$(ROOT_DIR)/.git --work-tree=$(ROOT_DIR) --no-pager describe --tags --always --dirty)
+else
+GIT_MSG := Can't find git repo
+endif
+#add user define macro (-D) to gcc
+CFLAGS += -DGIT_MSG=\"$(strip "$(GIT_MSG)")\"
+
 obj/%.o: %.s
 	as6502 --target=mega65 --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%.o: %.c
-	cc6502 --target=mega65 -Wall -Werror -O2 $(INC) --list-file=$(@:%.o=%.clst) -o $@ $<
+	cc6502 --target=mega65 -Wall -Werror -O2 $(INC) --list-file=$(@:%.o=%.clst) $(CFLAGS) -o $@ $<
 
 obj/%-debug.o: %.s
 	as6502 --target=mega65 --debug --list-file=$(@:%.o=%.clst) -o $@ $<

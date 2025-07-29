@@ -76,8 +76,7 @@ int main () {
   VICIV.linestep = 80;
 
   simpleprint("\x93\x0b\x0e");
-  simpleprint("mega65 agi -- sIERRA agi PARSER FOR THE mega65!\r");
-  simpleprint("tHIS WILL ONLY WORK WITH kq1... eVERYTHING ELSE... ymmv!\r");
+  simpleprint("mega65 agi -- sIERRA agi PARSER FOR THE mega65! kq1 VERSION.\r");
   POKE(1,133);
 
   memmanage_init();

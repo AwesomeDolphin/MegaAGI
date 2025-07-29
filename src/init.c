@@ -147,7 +147,9 @@ void init_internal(void) {
     simpleprint("mega65-agi cOPYRIGHT (c) 2025 kEITH hENRICKSON\r"
     "tHIS PROGRAM COMES WITH absolutely no warranty\r"
     "tHIS IS FREE SOFTWARE, AND YOU ARE WELCOME TO REDISTRIBUTE IT\r"
-    "UNDER CERTAIN CONDITIONS. sEE gpl vERSION 3.29 IN copying\r\r");
+    "UNDER CERTAIN CONDITIONS. sEE gpl vERSION 3.29 IN copying\r");
+    simpleprint(GIT_MSG);
+    simpleprint("\r\r");
     simpleprint("lOADING INTERPRETER MODULES...\r");
     init_midmem_offset = load_seq_attic("MIDMEM,S,R", &init_midmem_size);
     init_himem_offset = load_seq_attic("HIMEM,S,R", &init_himem_size);

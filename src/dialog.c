@@ -139,6 +139,18 @@ void dialog_format_string_valist(uint8_t __far *formatstring, va_list ap) {
           };
           break;
         }
+        case 's': {
+          const char *wordptr = va_arg(ap, char*);
+          uint8_t wordchr = (uint8_t)*wordptr;
+          while (wordchr != 0) {
+            format_string_buffer[padlen] = wordchr;
+            padlen++;
+            wordptr++;
+            wordchr = (uint8_t)*wordptr;
+          };
+          ascii_string++;
+          break;
+        }
         case 'd':
         case 'x': {
           uint32_t param = va_arg(ap, unsigned int);

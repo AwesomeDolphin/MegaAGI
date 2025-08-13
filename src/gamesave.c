@@ -140,7 +140,7 @@ void gamesave_save_to_disk(char *filename) {
     simpleerrchan(buffer, 9);
     uint8_t errcode = simpleerrcode(buffer);
     if (errcode != 0) {
-        dialog_show(false, (uint8_t __far *)"Error saving file: %d", errcode);
+        dialog_show(false, (uint8_t __far *)"Error saving file:\n%s", buffer);
     }
 
     POKE(0xD030, 0x44);
@@ -262,7 +262,7 @@ void gamesave_load_from_disk(char *filename) {
 
     uint8_t errcode = simpleerrcode(buffer);
     if (errcode != 0) {
-        dialog_show(false, (uint8_t __far *)"Error reading file: %d", errcode);
+        dialog_show(false, (uint8_t __far *)"Error reading file:\n%s", buffer);
     } else {
         gamesave_cache = attic_memory + atticmem_allocoffset;
         gamesave_load_from_attic();
@@ -288,5 +288,9 @@ void gamesave_dialog_handler(char *filename) {
 
 void gamesave_begin(bool save) {
     saving = save;
-    dialog_show(true, (uint8_t __far *)"Enter the name\nof the save file.\n(Uses device 9.)\n\n");
+    if (save) {
+        dialog_show(true, (uint8_t __far *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
+    } else {
+        dialog_show(true, (uint8_t __far *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
+    }
 }

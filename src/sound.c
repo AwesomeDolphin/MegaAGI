@@ -58,13 +58,13 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
 
     SID1.amp = 0x0f;
     SID1.v1.ad = 0x1b;
-    SID1.v1.sr = 0x40;
+    SID1.v1.sr = 0x48;
     SID1.v2.pw = 0x400;
     SID1.v2.ad = 0x1a;
-    SID1.v2.sr = 0x20;
+    SID1.v2.sr = 0x28;
     SID1.v2.pw = 0x200;
     SID1.v3.ad = 0x1a;
-    SID1.v3.sr = 0x20;
+    SID1.v3.sr = 0x28;
     SID1.v2.pw = 0x200;
 
     sound_running = 1;
@@ -137,7 +137,7 @@ void sound_interrupt_handler(void) {
                     // 10814 * 165 = 1786455
                     uint16_t sidctrl = 1786455 / fnum;
                     sid->freq = sidctrl;
-                    sid->ctrl = 0x11;
+                    sid->ctrl = 0x41;
                 }
                 durations[voice] = duration;
                 if (duration < 6) {

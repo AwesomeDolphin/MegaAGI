@@ -45,16 +45,17 @@ def add_files_to_disk_image(src_path, base_disk_image_path, output_path, autoboo
                 for filename in os.listdir(src_path):
                     file_path = os.path.join(src_path, filename)
                     if os.path.isfile(file_path):
-                        with open(file_path, 'rb') as f:
-                            data = f.read()
-                        if (len(filename) > 16):
-                            print(f"Warning: Filename '{filename}' is longer than 16 characters, failed creating image.")
-                            return False
-                        cbm_filename = filename[:16].upper().encode('ascii', 'strict')
-                        with dest_d.path(cbm_filename).open('w', ftype='seq') as dest_f:
-                            if (verbose):
-                                print(f"Importing file {filename} to disk image as {cbm_filename.decode('ascii')}:SEQ...")
-                            dest_f.write(data)
+                        if (Path(file_path).stem in ['LOGDIR', 'PICDIR', 'SNDDIR', 'VIEWDIR', 'WORDS', 'OBJECT','VOL']):
+                            with open(file_path, 'rb') as f:
+                                data = f.read()
+                            if (len(filename) > 16):
+                                print(f"Warning: Filename '{filename}' is longer than 16 characters, failed creating image.")
+                                return False
+                            cbm_filename = filename[:16].upper().encode('ascii', 'strict')
+                            with dest_d.path(cbm_filename).open('w', ftype='seq') as dest_f:
+                                if (verbose):
+                                    print(f"Importing file {filename} to disk image as {cbm_filename.decode('ascii')}:SEQ...")
+                                dest_f.write(data)
         return True
     except ValueError as e:
         print(f"Invalid character in filename.")
@@ -72,15 +73,16 @@ def main():
         print(f"Error: {game_path} is not a directory.")
         sys.exit(1)
 
-    if (len(game_path) > 16):
-        print(f"Warning: Game path '{game_path}' is longer than 16 characters, failed creating image.")
-        sys.exit(1)
-
     if not is_valid_agi_game(game_path):
         print("The specified path does not appear to be a valid Sierra AGI game.")
         sys.exit(1)
 
     game_name = get_game_name(game_path)
+
+    if (len(game_name) > 16):
+        print(f"Warning: Game path '{game_path}' is longer than 16 characters, failed creating image.")
+        sys.exit(1)
+
     output_image = f"{game_name}.d81"
     base_disk_image = "mega65-agi.d81"
 

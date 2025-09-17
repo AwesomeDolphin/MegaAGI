@@ -44,7 +44,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/builddisk.py",
-            "args": ["kq1", "--verbose", "-a"],
+            "args": ["d:\\gog\\kings quest", "--verbose", "-a"],
         }
     ]
 }

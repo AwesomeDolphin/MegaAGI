@@ -31,7 +31,7 @@
 #include "view.h"
 
 uint8_t __far * const chipmem_base = (uint8_t __far *)0x40000;
-uint8_t __far * const chipmem2_base = (uint8_t __far *)0xff8e000;
+uint8_t __far * const chipmem2_base = (uint8_t __far *)0xff86000;
 uint8_t __huge * const attic_memory = (uint8_t __huge *)0x8000000;
 
 void memmanage_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {

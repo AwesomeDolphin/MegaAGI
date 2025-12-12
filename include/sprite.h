@@ -73,6 +73,7 @@ extern uint8_t priorities[169];
 extern view_info_t object_view;
 extern bool show_object_view;
 
+void sprite_draw_to_pic(void);
 void autoselect_loop(agisprite_t *sprite);
 uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed);
 void sprite_erase(uint8_t sprite_num);
@@ -83,10 +84,9 @@ void sprite_stop_all(void);
 void sprite_unanimate_all(void);
 void sprite_mark_drawable(uint8_t sprite_num);
 void sprite_setedge(uint8_t sprite_num, uint8_t edgenum);
-void sprite_draw_animated(void);
-void sprite_erase_animated(void);
-void sprite_draw_to_pic(void);
 void sprite_clearall(void);
+void sprite_undraw(void);
+void sprite_updateanddraw(void);
 void sprite_init(void);
 
 #endif

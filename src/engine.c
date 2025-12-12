@@ -32,17 +32,18 @@
 #include "view.h"
 #include "volume.h"
 #include "parser.h"
-#include "simplefile.h"
 #include "sound.h"
 #include "sprite.h"
+#include "textscr.h"
 #include "logic.h"
+#include "mapper.h"
 #include "memmanage.h"
 #include "main.h"
 
 volatile uint8_t frame_counter;
 volatile bool run_engine;
 
-#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+#pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
 
 volatile uint8_t run_cycles;
 volatile bool engine_running;
@@ -54,12 +55,24 @@ static const uint8_t joystick_direction[16] = {
     0, 6, 8, 7, 0, 5, 1, 0
 };
 
+void engine_bridge_pic_load(uint8_t pic_num) {
+    select_picdraw_mem();
+    pic_load(pic_num);
+    select_gamesave_mem();
+}
+
+void engine_bridge_draw_pic(bool clear) {
+    select_picdraw_mem();
+    draw_pic(clear);
+    select_gamesave_mem();
+}
+
 void engine_update_status_line(void) {
     if (!game_text) {
         if (status_line_enabled) {
             if (logic_vars[3] != status_line_score) {
                 status_line_score = logic_vars[3];
-                dialog_print_ascii(0, 0, true, (uint8_t __far *)"Score: %d of %d%p40", logic_vars[3], logic_vars[7]);
+                textscr_print_ascii(0, 0, true, (uint8_t  *)"Score: %d of %d%p40", logic_vars[3], logic_vars[7]);
             }
         }
     }
@@ -110,7 +123,7 @@ void handle_movement_joystick(void) {
 void engine_statusline(bool enable) {
     status_line_enabled = enable;
     if (!enable) {
-        dialog_print_ascii(0, 0, false, (uint8_t __far *)"%p40");
+        textscr_print_ascii(0, 0, false, (uint8_t *)"%p40");
     }
 }
 
@@ -123,7 +136,7 @@ void engine_allowinput(bool allowed) {
     if (input_ok) {
         engine_clear_keyboard();
     } else {
-        dialog_print_ascii(0, 22, false, (uint8_t __far *)"%p40");
+        textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
     }
 }
 
@@ -135,11 +148,13 @@ void run_loop(void) {
     sound_flag_needs_set = false;
     status_line_enabled = false;
     status_line_score = 255;
+
     hook_irq();
     view_init();
     sprite_init();
     logic_init();
     parser_init();
+    textscr_init();
     dialog_init();
     input_ok = false;
     player_control = true;
@@ -163,11 +178,11 @@ void run_loop(void) {
                     logic_set_flag(sound_flag_end);
                 }
                 engine_update_status_line();
-                sprite_erase_animated();
+                sprite_undraw();
                 handle_movement_joystick();
                 logic_run();
                 logic_reset_flag(11);
-                sprite_draw_animated();
+                sprite_updateanddraw();
                 run_cycles = 0;
                 if (logic_flag_isset(2) || logic_flag_isset(4) || (logic_vars[9] > 0)) {
                     // Parser did something

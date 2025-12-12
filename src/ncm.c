@@ -29,22 +29,20 @@
 #include "main.h"
 #include "dialog.h"
 
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
+
 volatile uint8_t __far *drawing_xpointer[2][160];
 uint8_t *fastdrawing_xpointer[160];
-static uint16_t printpos = 0;
-static uint16_t endpos;
-volatile uint8_t drawing_screen = 1;
-volatile uint8_t viewing_screen = 0;
-static volatile bool stop_flip;
 static uint8_t highcolor[16] = {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0};
 bool game_text;
 
 #pragma clang section bss="screenmem0"
-__far static uint16_t screen_memory_0[1525];
+__far uint16_t screen_memory_0[1525];
 #pragma clang section bss="screenmem1"
-__far static uint16_t screen_memory_1[1525];
+__far uint16_t screen_memory_1[1525];
 #pragma clang section bss="colorram"
-__far static uint16_t color_memory[1024];
+__far uint16_t color_memory[1024];
 #pragma clang section bss="prioritydata"
 __far uint8_t priority_screen[16384];
 #pragma clang section bss=""
@@ -61,36 +59,20 @@ typedef union q15_16 {
   } part;
 } q15_16t;
 
-uint8_t blackscreencmd[] = {0x00,               // End of token list
-                            0x07,               // Fill command
-                            0x00, 0x7d,         // count $7d00 bytes
-                            0x00, 0x00, 0x00,   // fill value $00
-                            0x00, 0x00, 0x05,   // destination start $050000
-                            0x00,               // command high byte
-                            0x00, 0x00,         // modulo
-                            0x00,
-                            0x03,               // Fill command
-                            0x00, 0x7d,         // Count $7d00 bytes
-                            0x00, 0x00, 0x00,   // Fill value $00
-                            0x00, 0x80, 0x05,   // Destination start $058000
-                            0x00,               // Command high byte
-                            0x00, 0x00          // modulo
-                           };
-
 uint8_t clrscreen0cmd[] =  {0x00,               // End of token list
                             0x07,               // Fill command
                             0x00, 0x7d,         // count $7d00 bytes
                             0xff, 0x00, 0x00,   // fill value $ff
                             0x00, 0x00, 0x05,   // destination start $050000
                             0x00,               // command high byte
-                            0x00, 0x00,         // modulo
+                            0x00,               // modulo
                             0x00,               // End of token list
                             0x03,               // Fill command
                             0xff, 0x3f,         // count $3fff bytes
                             0x44, 0x00, 0x00,   // fill value $44
                             0x00, 0x40, 0x01,   // destination start $014000
                             0x00,               // command high byte
-                            0x00, 0x00,         // modulo
+                            0x00,               // modulo
                            };
 
 uint8_t clrscreen1cmd[] =  {0x00,               // End of token list
@@ -99,14 +81,14 @@ uint8_t clrscreen1cmd[] =  {0x00,               // End of token list
                             0xff, 0x00, 0x00,   // fill value $ff
                             0x00, 0x80, 0x05,   // destination start $058000
                             0x00,               // command high byte
-                            0x00, 0x00,         // modulo
+                            0x00,               // modulo
                             0x00,               // End of token list
                             0x03,               // Fill command
                             0xff, 0x3f,         // count $3fff bytes
                             0x44, 0x00, 0x00,   // fill value $44
                             0x00, 0x40, 0x01,   // destination start $014000
                             0x00,               // command high byte
-                            0x00, 0x00,         // modulo
+                            0x00,               // modulo
                            };
 
 uint8_t copys0d1cmd[] =    {0x00,               // End of token list
@@ -115,7 +97,7 @@ uint8_t copys0d1cmd[] =    {0x00,               // End of token list
                             0x00, 0x00, 0x05,   // source start $050000
                             0x00, 0x80, 0x05,   // destination start $058000
                             0x00,               // command high byte
-                            0x00, 0x00,         // modulo
+                            0x00,               // modulo
                            };
 
 uint8_t copys1d0cmd[] =    {0x00,               // End of token list
@@ -124,117 +106,8 @@ uint8_t copys1d0cmd[] =    {0x00,               // End of token list
                             0x00, 0x80, 0x05,   // source start $058000
                             0x00, 0x00, 0x05,   // destination start $050000
                             0x00,               // command high byte
-                            0x00, 0x00,         // modulo
+                            0x00,               // modulo
                            };
-
-void gfx_print_asciichar(uint8_t character, bool reverse) {
-  if (character < 32) {
-    character = character + 0x80;
-  } else if (character < 64) {
-    character = character + 0x00;
-  } else if (character < 96) {
-    character = character + 0x00;
-  } else if (character < 128) {
-    character = character + 0xA0;
-  } else if (character < 160) {
-    character = character + 0x40;
-  } else if (character < 192) {
-    character = character + 0xC0;
-  } else {
-    character = character + 0x80;
-  }
-  if (reverse) {
-    character = character ^ 0x80;
-  }
-  screen_memory_0[printpos] = character;
-  screen_memory_1[printpos] = character;
-  color_memory[printpos] = 0x0100;
-  printpos++;
-}
-
-void gfx_print_scncode(uint8_t scncode) {
-  screen_memory_0[printpos] = scncode;
-  screen_memory_1[printpos] = scncode;
-  color_memory[printpos] = 0x0100;
-  printpos++;
-}
-
-void gfx_set_printpos(uint8_t x, uint8_t y) {
-  printpos = (y * 61) + 20 + x; 
-}
-
-void gfx_begin_print(uint8_t x, uint8_t y) {
-  if (game_text) {
-    printpos = (y * 61) + 21 + x;
-  } else {
-    printpos = (y * 61) + 20;
-    endpos = printpos+40;
-    screen_memory_0[printpos] = x * 8;
-    screen_memory_1[printpos] = x * 8;
-    printpos++;
-  }
-}
-
-void gfx_end_print(void) {
-  if (!game_text) {
-    if (printpos < endpos) {
-      screen_memory_0[printpos] = 0x140;
-      screen_memory_1[printpos] = 0x140;
-      color_memory[printpos] = 0x0010;       
-    } else if (printpos == endpos) {
-      screen_memory_0[printpos] = 0x0020;
-      screen_memory_1[printpos] = 0x0020;
-      color_memory[printpos] = 0x0100;       
-    }
-  }
-}
-
-void gfx_print_asciistr(uint8_t x, uint8_t y, bool reverse, uint8_t __far *output) {
-  gfx_begin_print(x,y);
-
-  uint8_t __far *ascii_string = output;
-  while (*ascii_string != 0) {
-    uint8_t asciichar = *ascii_string;
-    gfx_print_asciichar(asciichar, reverse);
-    ascii_string++;
-  }
-  gfx_end_print();
-}
-
-void gfx_clear_line(uint8_t y) {
-  printpos = (y * 61) + 20;
-  screen_memory_0[printpos] = 0x140;
-  screen_memory_1[printpos] = 0x140;
-  color_memory[printpos] = 0x0010;       
-}
-
-void gfx_set_textmode(bool enable_text) {
-  if (enable_text && !game_text) {
-    for (uint8_t i = 0; i < 25; i++) {
-      dialog_print_ascii(0, i, false, (uint8_t __far *)"%p40");
-    }
-    game_text = true;
-  } else {
-    for (uint8_t i = 0; i < 25; i++) {
-      gfx_clear_line(i);
-    }
-    game_text = false;
-  }
-}
-
-void gfx_waitf1(void) {
-  uint8_t foo;
-  do {
-      foo = ASCIIKEY;
-      ASCIIKEY = 0;
-  } while (foo != 0xF1);
-}
-
-void gfx_waitnokey(void) {
-  while (ASCIIKEY != 0) {
-      ASCIIKEY = 0;
-  }
-}
 
 int agi_q15round(q15_16t aNumber, int16_t dirn)
 {
@@ -333,16 +206,13 @@ void gfx_drawslowline(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t co
    }
 }
 
-void gfx_blackscreen(void) {
-  DMA.dmahigh = (uint8_t)(((uint16_t)blackscreencmd) >> 8);
-  DMA.etrig = (uint8_t)(((uint16_t)blackscreencmd) & 0xff);
-}
-
 void gfx_cleargfx(bool preserve_text) {
   if (drawing_screen == 0) {
+    DMA.dmabank = 0;
     DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen0cmd) >> 8);
     DMA.etrig = (uint8_t)(((uint16_t)clrscreen0cmd) & 0xff);
   } else {
+    DMA.dmabank = 0;
     DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen1cmd) >> 8);
     DMA.etrig = (uint8_t)(((uint16_t)clrscreen1cmd) & 0xff);
   }
@@ -371,11 +241,19 @@ if (!preserve_text) {
   }
 }
 
+#pragma clang section bss="" data="" rodata="" text=""
+
+volatile uint8_t drawing_screen = 0;
+volatile uint8_t viewing_screen = 1;
+static volatile bool stop_flip;
+
 void gfx_copygfx(uint8_t screen_num) {
   if (screen_num == 1) {
+    DMA.dmabank = 0;
     DMA.dmahigh = (uint8_t)(((uint16_t)copys1d0cmd) >> 8);
     DMA.etrig = (uint8_t)(((uint16_t)copys1d0cmd) & 0xff);
   } else {
+    DMA.dmabank = 0;
     DMA.dmahigh = (uint8_t)(((uint16_t)copys0d1cmd) >> 8);
     DMA.etrig = (uint8_t)(((uint16_t)copys0d1cmd) & 0xff);
   }
@@ -404,7 +282,7 @@ bool gfx_hold_flip(bool hold) {
   return old_hold;
 }
 
-#pragma clang section bss="midmembss" data="initsdata" rodata="initsrodata" text="initstext"
+#pragma clang section bss="banked_bss" data="initsdata" rodata="initsrodata" text="initstext"
 
 uint8_t palettedata[] =  {0x00, 0x00, 0x00,
                           0x00, 0x00, 0x8A,
@@ -423,6 +301,21 @@ uint8_t palettedata[] =  {0x00, 0x00, 0x00,
                           0xCF, 0xCF, 0x45,
                           0xCF, 0xCF, 0xCF};
 
+  uint8_t blackscreencmd[] = {0x00,               // End of token list
+                            0x07,               // Fill command
+                            0x00, 0x7d,         // count $7d00 bytes
+                            0x00, 0x00, 0x00,   // fill value $00
+                            0x00, 0x00, 0x05,   // destination start $050000
+                            0x00,               // command high byte
+                            0x00,               // modulo
+                            0x00,               // End of token list
+                            0x03,               // Fill command
+                            0x00, 0x7d,         // Count $7d00 bytes
+                            0x00, 0x00, 0x00,   // Fill value $00
+                            0x00, 0x80, 0x05,   // Destination start $058000
+                            0x00,               // Command high byte
+                            0x00                // modulo
+                           };
 
 void gfx_setupmem(void) {
   for (int y = 0; y < 25; y++) {
@@ -468,7 +361,7 @@ void gfx_setupmem(void) {
 
   uint32_t column0_address = 0x50000;
   uint32_t column1_address = 0x58000;
-  uint32_t fastcolumn_address = 0x8000;
+  uint32_t fastcolumn_address = 0x4000;
   for (uint8_t x = 0; x < 160; x++) {
     drawing_xpointer[0][x] = (uint8_t __far *)column0_address + (x >> 3) * 1600 + (x & 0x07);
     drawing_xpointer[1][x] = (uint8_t __far *)column1_address + (x >> 3) * 1600 + (x & 0x07);
@@ -483,11 +376,9 @@ void gfx_setupmem(void) {
     palette_index++;
   }
 
-  DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen0cmd) >> 8);
-  DMA.etrig = (uint8_t)(((uint16_t)clrscreen0cmd) & 0xff);
-  DMA.dmahigh = (uint8_t)(((uint16_t)clrscreen1cmd) >> 8);
-  DMA.etrig = (uint8_t)(((uint16_t)clrscreen1cmd) & 0xff);
-
+  DMA.dmabank = 0;
+  DMA.dmahigh = (uint8_t)(((uint16_t)blackscreencmd) >> 8);
+  DMA.etrig = (uint8_t)(((uint16_t)blackscreencmd) & 0xff);
 }
 
 void gfx_switchto(void) {

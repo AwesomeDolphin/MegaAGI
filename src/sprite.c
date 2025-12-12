@@ -28,6 +28,7 @@
 #include "irq.h"
 #include "logic.h"
 #include "main.h"
+#include "mapper.h"
 #include "memmanage.h"
 #include "sprite.h"
 #include "view.h"
@@ -35,11 +36,91 @@
 
 static void sprite_update_sprite(uint8_t sprite_num);
 static bool sprite_move_at_speed(agisprite_t *sprite);
+bool sprite_draw_animated(void);
+void sprite_erase_animated(void);
+
+#pragma clang section bss="banked_bss" data="hs_spritedata" rodata="hs_spriterodata" text="hs_spritetext"
 
 view_info_t object_view;
 bool show_object_view;
 bool object_view_drawn;
  
+void sprite_draw_to_pic(void) {
+    bool old_hold = gfx_hold_flip(true);
+    if (drawing_screen == 0) { 
+        select_graphics0_mem();
+    } else {
+        select_graphics1_mem();
+    }
+    
+    draw_cel(&object_view, object_view.cel_offset);
+
+    gfx_hold_flip(old_hold);
+}
+
+bool sprite_draw_animated(void) {
+    free_point = chipmem_alloc(1);
+
+    bool old_hold = gfx_hold_flip(true);
+    if (drawing_screen == 0) { 
+        select_graphics0_mem();
+    } else {
+        select_graphics1_mem();
+    }
+
+    bool ego_drawn = false;
+    for (int i = 0; i < animated_sprite_count; i++) {
+        agisprite_t sprite = sprites[animated_sprites[i]];
+        if (sprite.drawable) {
+            bool drew_something = draw_cel(&sprite.view_info, sprite.cel_index);
+            if (sprite.ego) {
+                ego_drawn = drew_something;
+            }
+            sprites[animated_sprites[i]] = sprite;
+        }
+    }
+
+    if (show_object_view) {
+        draw_cel(&object_view, 0);
+        object_view_drawn = true;
+    }
+
+    gfx_hold_flip(old_hold);
+
+    select_sprite_mem();
+
+    return ego_drawn;
+}
+
+void sprite_erase_animated(void) {
+    bool old_hold = gfx_hold_flip(true);
+    if (drawing_screen == 0) { 
+        select_graphics0_mem();
+    } else {
+        select_graphics1_mem();
+    }
+
+    if (object_view_drawn) {
+        erase_view(&object_view);
+        object_view_drawn = false;
+    }
+    
+    for (int i = animated_sprite_count; i > 0; i--) {
+        agisprite_t sprite = sprites[animated_sprites[i-1]];
+        if (sprite.drawable) {
+            erase_view(&sprite.view_info);
+        }
+    } 
+
+    gfx_hold_flip(old_hold);
+
+    select_sprite_mem();
+}
+
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
+uint8_t priorities[169];
+
 static uint8_t wander_pointers[9][3] = {
     {1,3,7},
     {4,5,6},
@@ -78,98 +159,6 @@ void sprite_sort(void) {
         i++;
     }
 }
-
-void sprite_draw_to_pic(void) {
-    bool old_hold = gfx_hold_flip(true);
-    if (drawing_screen == 0) { 
-        select_graphics0_mem();
-    } else {
-        select_graphics1_mem();
-    }
-    
-    draw_cel(&object_view, object_view.cel_offset);
-
-    select_execution_mem();
-    gfx_hold_flip(old_hold);
-}
-
-void sprite_draw_animated(void) {
-    for (int i = 0; i < animated_sprite_count; i++) {
-        if (sprites[animated_sprites[i]].updatable) {
-            sprite_update_sprite(animated_sprites[i]);
-        }
-    }
-
-    sprite_sort();
-
-    free_point = chipmem_alloc(1);
-
-    bool old_hold = gfx_hold_flip(true);
-    if (drawing_screen == 0) { 
-        select_graphics0_mem();
-    } else {
-        select_graphics1_mem();
-    }
-    
-    bool ego_drawn = false;
-    for (int i = 0; i < animated_sprite_count; i++) {
-        agisprite_t sprite = sprites[animated_sprites[i]];
-        if (sprite.drawable) {
-            bool drew_something = draw_cel(&sprite.view_info, sprite.cel_index);
-            if (sprite.ego) {
-                ego_drawn = drew_something;
-            }
-            sprites[animated_sprites[i]] = sprite;
-        }
-    }
-
-    if (show_object_view) {
-        draw_cel(&object_view, 0);
-        object_view_drawn = true;
-    }
-
-    select_execution_mem();
-    gfx_hold_flip(old_hold);
-
-    if (ego_drawn) {
-        logic_reset_flag(1);
-    } else {
-        logic_set_flag(1);
-    }
-}
-
-void sprite_erase_animated(void) {
-    bool old_hold = gfx_hold_flip(true);
-    if (drawing_screen == 0) { 
-        select_graphics0_mem();
-    } else {
-        select_graphics1_mem();
-    }
-    
-    if (object_view_drawn) {
-        erase_view(&object_view);
-        object_view_drawn = false;
-    }
-    
-    for (int i = animated_sprite_count; i > 0; i--) {
-        agisprite_t sprite = sprites[animated_sprites[i-1]];
-        if (sprite.drawable) {
-            erase_view(&sprite.view_info);
-        }
-    } 
-
-    select_execution_mem();
-    gfx_hold_flip(old_hold);
-
-    if (free_point > 0) {
-        chipmem_free(free_point);
-    }
-}
-
-
-#pragma clang section bss="midmembss" data="ultmemdata" rodata="ultmemrodata" text="ultmemtext"
-
-uint8_t priorities[169];
 
 void setup_priorities(void) {
     uint8_t priority_level = 4;
@@ -492,7 +481,10 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
     sprite.end_of_loop = 0;
     sprite.reverse = false;
     view_set(&sprite.view_info, view_number);
-    select_loop(&sprite.view_info, 0);
+    if (sprite.view_info.loop_number > sprite.view_info.number_of_loops) {
+        sprite.view_info.loop_number = 0;
+    }
+    select_loop(&sprite.view_info, sprite.view_info.loop_number);
     if (sprite.view_info.x_pos > 160 - sprite.view_info.width) {
         sprite.view_info.x_pos = 160 - sprite.view_info.width;
     }
@@ -604,6 +596,38 @@ void sprite_clearall(void) {
     for (int i = 0; i < sizeof(sprites); i++) {
         sprdatptr[i] = 0;
     }
+}
+
+void sprite_undraw(void) {
+    select_sprite_mem();
+    sprite_erase_animated();
+    select_engine_logiclow_mem();
+    if (free_point > 0) {
+        chipmem_free(free_point);
+    }
+}
+
+void sprite_updateanddraw(void) {
+    for (int i = 0; i < animated_sprite_count; i++) {
+        if (sprites[animated_sprites[i]].updatable) {
+            sprite_update_sprite(animated_sprites[i]);
+        }
+    }
+
+    sprite_sort();
+
+    select_sprite_mem();
+
+    bool ego_drawn = sprite_draw_animated();
+
+    select_engine_logiclow_mem();
+
+    if (ego_drawn) {
+        logic_reset_flag(1);
+    } else {
+        logic_set_flag(1);
+    }
+
 }
 
 void sprite_init(void) {

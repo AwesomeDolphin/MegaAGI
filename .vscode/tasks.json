@@ -15,9 +15,13 @@
             ]
         },
         {
-            "label" : "senddisk",
-            "command" : "mega65_ftp",
-            "args" : ["-e", "-c", "put agi.d81"]
+            "label": "senddisk",
+            "command": "mega65_ftp",
+            "args": [
+                "-e",
+                "-c",
+                "put agi.d81"
+            ]
         },
         {
             "label": "clean",
@@ -32,6 +36,26 @@
                 "clear": false
             },
             "problemMatcher": []
-         }
+        },
+        {
+            "label": "Run MEGA65",
+            "type": "shell",
+            "command": "etherload",
+            "args": [
+                "-r",
+                "-m",
+                "agi.d81",
+                "-5",
+                "--ntsc",
+                "agi.prg"
+            ],
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            "dependsOn": [
+                "senddisk"
+            ],
+            "problemMatcher": []
+        }
     ]
 }

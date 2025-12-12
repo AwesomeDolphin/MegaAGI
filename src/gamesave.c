@@ -31,15 +31,15 @@
 #include "irq.h"
 #include "main.h"
 #include "memmanage.h"
+#include "disk.h"
+#include "mapper.h"
 #include "pic.h"
-#include "simplefile.h"
 
 // Saveable data
 char game_id[8];
 
 uint16_t chipmem_allocoffset;
 uint16_t chipmem_lockoffset;
-uint16_t chipmem2_allocoffset;
 uint32_t atticmem_allocoffset;
 
 bool input_ok;
@@ -64,7 +64,7 @@ __far add_to_pic_command_t add_to_pic_commands[16];
 
 uint8_t __huge *gamesave_cache;
 
-#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
+#pragma clang section bss="banked_bss" data="gamesave_data" rodata="gamesave_rodata" text="gamesave_text"
 
 uint32_t gamesave_save_to_attic(void) {
     VICIV.bordercol = COLOR_GREEN;
@@ -77,8 +77,8 @@ uint32_t gamesave_save_to_attic(void) {
     gamesave_cache[9] = (chipmem_allocoffset >> 8) & 0xff;
     gamesave_cache[10] = chipmem_lockoffset & 0xff;
     gamesave_cache[11] = (chipmem_lockoffset >> 8) & 0xff;
-    gamesave_cache[12] = chipmem2_allocoffset & 0xff;
-    gamesave_cache[13] = (chipmem2_allocoffset >> 8) & 0xff;
+    gamesave_cache[12] = 0;
+    gamesave_cache[13] = 0;
     gamesave_cache[14] = atticmem_allocoffset & 0xff;
     gamesave_cache[15] = (atticmem_allocoffset >> 8) & 0xff;
     gamesave_cache[16] = (atticmem_allocoffset >> 16) & 0xff;
@@ -121,30 +121,12 @@ void gamesave_save_to_disk(char *filename) {
     uint8_t buffer[256];
 
     uint32_t save_size = gamesave_save_to_attic();
-    select_kernel_mem();
-    POKE(0xD030, 0x64);
+    strcat(filename, ".AGI");
 
-    simplecmdchan((uint8_t *)"I0:\r", 9);
-    simpleerrchan(buffer, 9);
-    uint8_t __huge *gamesave_file = gamesave_cache;
-    strcat(filename, ".AGI,S,W");
-    simpleopen(filename, strlen(filename), 9);
-    uint8_t __far *buffer_far = (uint8_t __far *)buffer;
-    for (uint32_t i = 0; i < save_size; i += 250) {
-        uint32_t chunk_size = (save_size - i > 250) ? 250 : (save_size - i);
-        memmanage_memcpy_huge_far(buffer_far, &gamesave_file[i], chunk_size);
-        simplewrite(buffer, chunk_size);
-    }
-    simpleclose();
-
-    simpleerrchan(buffer, 9);
-    uint8_t errcode = simpleerrcode(buffer);
+    uint8_t errcode = disk_save_attic(filename, atticmem_allocoffset, save_size, 9);
     if (errcode != 0) {
         dialog_show(false, (uint8_t __far *)"Error saving file:\n%s", buffer);
     }
-
-    POKE(0xD030, 0x44);
-    select_execution_mem();
 }
 
 
@@ -162,9 +144,6 @@ void gamesave_load_from_attic(void) {
 
     chipmem_lockoffset = gamesave_cache[10];
     chipmem_lockoffset |= (gamesave_cache[11] << 8);
-
-    chipmem2_allocoffset = gamesave_cache[12];
-    chipmem2_allocoffset |= (gamesave_cache[13] << 8);
 
     uint32_t temp;
     temp = gamesave_cache[14];
@@ -207,14 +186,14 @@ void gamesave_load_from_attic(void) {
     logic_set_flag(12);
 
     gfx_hold_flip(true);
-    pic_load(logic_vars[0]);
-    draw_pic(true);
-    pic_discard(logic_vars[0]);
+    engine_bridge_pic_load(logic_vars[0]);
+    engine_bridge_draw_pic(true);
+    chipmem_free(pic_offset);
     for (int i = 0; i < views_in_pic; i++) {
         if ((add_to_pic_commands[i].x_pos == 0xff) && (add_to_pic_commands[i].y_pos == 0xff)) {
             pic_offset = (add_to_pic_commands[i].loop_index << 8);
             pic_offset |= add_to_pic_commands[i].cel_index;
-            draw_pic(false);
+            engine_bridge_draw_pic(false);
         } else {
             view_load(add_to_pic_commands[i].view_number);
             view_set(&object_view, add_to_pic_commands[i].view_number);
@@ -226,7 +205,9 @@ void gamesave_load_from_attic(void) {
             object_view.priority = add_to_pic_commands[i].priority;
             object_view.priority_set = true;
             object_view.baseline_priority = add_to_pic_commands[i].baseline_priority;
+            select_sprite_mem();
             sprite_draw_to_pic();
+            select_engine_logichigh_mem();
             view_unload(add_to_pic_commands[i].view_number);
         }
     }
@@ -236,33 +217,14 @@ void gamesave_load_from_attic(void) {
 
 void gamesave_load_from_disk(char *filename) {
     gamesave_cache = attic_memory + atticmem_allocoffset;
-    strcat(filename, ".AGI,S,R");
+    strcat(filename, ".AGI");
     select_kernel_mem();
-    POKE(0xD030, 0x64);
-    uint8_t buffer[256];
+    uint32_t data_size;
+    select_engine_diskdriver_mem();
+    uint8_t errcode = disk_load_attic(filename, &data_size, 9);
 
-    simplecmdchan((uint8_t *)"I0:\r", 9);
-    simpleerrchan(buffer, 9);
-    simpleopen(filename, strlen(filename), 9);
-    size_t bytes_read;
-    do {
-        bytes_read = simpleread(buffer);
-        if (bytes_read > 0) {
-            for (size_t idx = 0; idx < bytes_read; idx++) {
-                gamesave_cache[idx] = buffer[idx];
-            }
-            gamesave_cache += bytes_read;
-        }
-    } while (bytes_read > 0);
-    simpleclose();
-
-    simpleerrchan(buffer, 9);
-    POKE(0xD030, 0x44);
-    select_execution_mem();
-
-    uint8_t errcode = simpleerrcode(buffer);
     if (errcode != 0) {
-        dialog_show(false, (uint8_t __far *)"Error reading file:\n%s", buffer);
+        dialog_show(false, (uint8_t __far *)"Error reading file:\n%d", errcode);
     } else {
         gamesave_cache = attic_memory + atticmem_allocoffset;
         gamesave_load_from_attic();

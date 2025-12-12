@@ -24,6 +24,7 @@
 #include "main.h"
 #include "gfx.h"
 #include "logic.h"
+#include "mapper.h"
 #include "memmanage.h"
 #include "parser.h"
 
@@ -31,13 +32,18 @@
 #define ALPHABET_SIZE 26
 #define XOR_VALUE 0x7f
 
-#pragma clang section bss="midmembss" data="ultmemdata" rodata="ultmemrodata" text="ultmemtext"
+#pragma clang section bss="banked_bss" data="parser_data" rodata="parser_rodata" text="parser_text"
+
+static bool parser_decode_string_internal(char *target);
+static void parser_init_internal(void);
 
 // Structure to represent our dictionary reference
 typedef struct dictionary {
-    uint16_t __far * letter_offsets;  // Points to the 26 16-bit offsets in memory
-    uint8_t __far * data;             // Points to the raw dictionary data
+    uint16_t __huge * letter_offsets;  // Points to the 26 16-bit offsets in memory
+    uint8_t __huge * data;             // Points to the raw dictionary data
 } dictionary_t;
+
+uint32_t token_data_offset;
 
 dictionary_t dict;
 uint8_t parser_word_index;
@@ -58,7 +64,7 @@ bool parser_find_word(const char* target) {
     }
 
     // Set current position in dictionary
-    uint8_t __far * current_pos = dict.data + offset;
+    uint8_t __huge * current_pos = dict.data + offset;
 
     // Buffer to reconstruct words
     char current_word[MAX_WORD_LENGTH] = {0};
@@ -157,7 +163,7 @@ void parser_cook_string(char *target) {
     }
 }
 
-bool parser_decode_string(char *target) {
+bool parser_decode_string_internal(char *target) {
     parser_cook_string(target);
     uint8_t index = 0;
     parser_word_index = 0;
@@ -177,12 +183,12 @@ bool parser_decode_string(char *target) {
 }
 
 // Initialize dictionary reference to pre-loaded memory
-void parser_init(void) {
+void parser_init_internal(void) {
     // Point to the 26 letter offsets at the start of the dictionary
-    dict.letter_offsets = (uint16_t __far *) (chipmem2_base+1);
+    dict.letter_offsets = (uint16_t __huge *) (attic_memory+token_data_offset);
     
     // Dictionary data starts right after the offsets
-    dict.data = chipmem2_base + 1;
+    dict.data = attic_memory + token_data_offset;
 
     for (int i = 0; i < 52; i += 2) {
         uint8_t temp = dict.data[i];
@@ -191,3 +197,15 @@ void parser_init(void) {
     }
 }
 
+#pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
+
+bool parser_decode_string(char *target) {
+    select_parser_mem();
+    return parser_decode_string_internal(target);
+}
+
+// Initialize dictionary reference to pre-loaded memory
+void parser_init(void) {
+    select_parser_mem();
+    parser_init_internal();
+}

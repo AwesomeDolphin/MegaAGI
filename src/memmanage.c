@@ -31,7 +31,6 @@
 #include "view.h"
 
 uint8_t __far * const chipmem_base = (uint8_t __far *)0x40000;
-uint8_t __far * const chipmem2_base = (uint8_t __far *)0xff86000;
 uint8_t __huge * const attic_memory = (uint8_t __huge *)0x8000000;
 
 void memmanage_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_string) {
@@ -44,6 +43,15 @@ void memmanage_strcpy_far_far(uint8_t __far *dest_string, uint8_t __far *src_str
 }
 
 void memmanage_strcpy_far_near(uint8_t *dest_string, uint8_t __far *src_string) {
+    *dest_string = *src_string;
+    while (*dest_string != 0) {
+        dest_string++;
+        src_string++;
+        *dest_string = *src_string;
+    }
+}
+
+void memmanage_strcpy_near_far(uint8_t __far *dest_string, uint8_t *src_string) {
     *dest_string = *src_string;
     while (*dest_string != 0) {
         dest_string++;
@@ -71,8 +79,7 @@ void memmanage_memcpy_huge_far(uint8_t __far *dest_mem, uint8_t __huge *src_mem,
 void memmanage_init(void) {
     chipmem_allocoffset = 1;
     chipmem_lockoffset = 1;
-    chipmem2_allocoffset = 1;
-    atticmem_allocoffset = 1;
+    atticmem_allocoffset = 0x4000;
 }
 
 uint16_t chipmem_alloc(uint16_t size) {
@@ -95,16 +102,6 @@ void chipmem_free_unlocked(void) {
     chipmem_allocoffset = chipmem_lockoffset;
     logic_purge(chipmem_allocoffset);
     view_purge(chipmem_allocoffset);
-}
-
-uint16_t chipmem2_alloc(uint16_t size) {
-    uint16_t old_offset = chipmem2_allocoffset;
-    chipmem2_allocoffset = chipmem2_allocoffset + size;
-    return old_offset;
-}
-
-void chipmem2_free(uint16_t offset) {
-    chipmem2_allocoffset = offset;
 }
 
 uint32_t atticmem_alloc(uint32_t size) {

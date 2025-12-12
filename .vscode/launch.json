@@ -17,15 +17,15 @@
         },
         {
             "name": "(MEGA65) Launch",
-            "type": "cppvsdbg",
+            "type": "cppdbg",
             "request": "launch",
             "preLaunchTask": "senddisk",
-            "program": "C:\\CommandLineApps\\etherload.exe",
-            "args": ["-r", "-m", "agi.d81", "-5", "--ntsc", "logosrc\\agi.lgo"],
+            "program": "/app/bin/host-spawn",
+            "args": ["etherload", "-r", "-m", "agi.d81", "-5", "--ntsc", ""],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
-            "console": "internalConsole"
+            "console": "internalConsole",
         },
         {
             "name": "(MEGA65) Upload",

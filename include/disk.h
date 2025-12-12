@@ -16,27 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ***************************************************************************/
 
-#ifndef LOGIC_H
-#define LOGIC_H
+void kernal_open(char *filename, uint8_t namelength, uint8_t device_number);
+uint8_t kernal_read(uint8_t *destination);
+void kernal_write(uint8_t *source, uint8_t length);
+void kernal_print(char *string);
+void kernal_close(void);
+void kernal_cmdchan(uint8_t *drive_command, uint8_t device_number);
+void kernal_errchan(uint8_t *statusmessage, uint8_t device_number);
+uint8_t simpleerrcode(uint8_t *statusmessage);
 
-#include <stdbool.h>
-extern uint8_t __far *logic_vars;
-extern uint8_t __far *logic_flags;
-extern uint32_t object_data_offset;
-extern bool debug;
-typedef struct logic_info {
-    uint16_t offset;
-    uint8_t __far *text_offset;
-} logic_info_t;
-
-void logic_set_flag(uint8_t flag);
-void logic_reset_flag(uint8_t flag);
-bool logic_flag_isset(uint8_t flag);
-void logic_set_controller(uint8_t flag);
-void logic_reset_all_controllers(void);
-void logic_load(uint8_t logic_num);
-void logic_run(void);
-void logic_purge(uint16_t freed_offset);
-void logic_init(void);
-
-#endif
+uint8_t disk_load_attic(char *name, uint32_t *data_size, uint8_t device);
+uint8_t disk_save_attic(char *filename, uint32_t attic_offset, uint32_t data_size, uint8_t device);
+void disk_enter_kernal(void);
+void disk_exit_kernal(void);

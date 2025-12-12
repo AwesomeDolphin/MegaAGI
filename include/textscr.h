@@ -16,11 +16,24 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ***************************************************************************/
 
-void simpleopen(char *filename, uint8_t namelength, uint8_t device_number);
-uint8_t simpleread(uint8_t *destination);
-void simplewrite(uint8_t *source, uint8_t length);
-void simpleprint(char *string);
-void simpleclose(void);
-void simplecmdchan(uint8_t *drive_command, uint8_t device_number);
-void simpleerrchan(uint8_t *statusmessage, uint8_t device_number);
-uint8_t simpleerrcode(uint8_t *statusmessage);
+#ifndef TEXTSCR_H
+#define TEXTSCR_H
+
+#include "main.h"
+
+extern __far uint8_t formatted_string_buffer[1024];
+extern __far uint8_t print_string_buffer[1024];
+
+void textscr_format_string_valist(uint8_t __far *formatstring, va_list ap);
+void textscr_print_asciichar(uint8_t character, bool reverse);
+void textscr_print_scncode(uint8_t scncode);
+void textscr_begin_print(uint8_t x, uint8_t y);
+void textscr_end_print(void);
+void textscr_set_printpos(uint8_t x, uint8_t y);
+void textscr_clear_line(uint8_t y);
+void textscr_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...);
+void textscr_set_textmode(bool enable_text);
+void textscr_clear_keyboard(void);
+void textscr_init(void);
+
+#endif

@@ -19,6 +19,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+extern uint32_t token_data_offset;
 extern uint8_t parser_word_index;
 extern uint16_t parser_word_numbers[20];
 extern const char * parser_word_pointers[20];

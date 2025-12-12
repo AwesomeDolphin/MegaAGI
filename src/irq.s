@@ -37,11 +37,6 @@ irq_tbl:
 
             .public hook_irq
 hook_irq:  
-		lda #0x00
-		ldx #0x00
-		ldy #0x00
-		ldz #0xB0
-		map
             ldz #0x00
             ldy #0x05
             ldx #0x7f
@@ -67,47 +62,9 @@ hook_loop2
             dex
             dez
             bpl hook_loop2
-
-		eom
+            cli
 		rts
 
             .public _nmi_rt
 _nmi_rt:
             rti
-
-            .public select_graphics0_mem
-select_graphics0_mem:  
-		lda #0x00
-		ldx #0x00
-		ldy #0x80
-		ldz #0xF4
-		map
-		eom
-		rts
-            .public select_graphics1_mem
-select_graphics1_mem:  
-		lda #0x00
-		ldx #0x00
-		ldy #0x00
-		ldz #0xF5
-		map
-		eom
-		rts
-            .public select_execution_mem
-select_execution_mem:  
-		lda #0x00
-		ldx #0x00
-		ldy #0x00
-		ldz #0xB0
-		map
-		eom
-		rts
-            .public select_kernel_mem
-select_kernel_mem:  
-		lda #0x00
-		ldx #0x00
-		ldy #0x00
-		ldz #0x83
-		map
-		eom
-		rts

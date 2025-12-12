@@ -2,9 +2,9 @@ VPATH = src
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # Common source files
-ASM_SRCS = simplefile.s irq.s
-C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c interrupt.c memmanage.c sprite.c logic.c parser.c init.c gamesave.c dialog.c
-C1541 = c1541
+ASM_SRCS = diskasm.s irq.s startup.s mapper.s
+C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c memmanage.c sprite.c logic.c parser.c init.c gamesave.c dialog.c disk.c textscr.c
+C1541 = flatpak run --command=c1541 net.sf.VICE
 INC = -I./include
 
 # Object files
@@ -21,6 +21,7 @@ GIT_MSG := Can't find git repo
 endif
 #add user define macro (-D) to gcc
 CFLAGS += -DGIT_MSG=\"$(strip "$(GIT_MSG)")\"
+CFLAGS += --no-cross-call --strong-inline --inline-on-matching-custom-text-section --no-interprocedural-cross-jump
 
 obj/%.o: %.s
 	as6502 --target=mega65 --list-file=$(@:%.o=%.clst) -o $@ $<
@@ -35,7 +36,7 @@ obj/%-debug.o: %.c
 	cc6502 --target=mega65 --debug --list-file=$(@:%.o=%.clst) -o $@ $<
 
 agi.prg:  mega65-agi.scm $(OBJS)
-	ln6502 --target=mega65 -o $@ $^ --raw-multiple-memories --output-format=prg --list-file=agi-mega65.cmap
+	ln6502 --verbose --target=mega65 -o $@ $^ --raw-multiple-memories --output-format=prg --cstartup=megaagi --rtattr exit=simplified --list-file=agi-mega65.cmap
 
 agi.elf: $(OBJS_DEBUG)
 	ln6502 --target=mega65 --debug -o $@ $^ --list-file=agi-debug.cmap --semi-hosted
@@ -46,23 +47,17 @@ agi.exo: agi.prg
 logosrc\agi.lgo: agi.exo
 	build-logo.cmd
 
-mega65-agi.d81: logosrc\agi.lgo
+mega65-agi.d81: agi.prg
 	$(C1541) -format "mega65,agi" d81 mega65-agi.d81
-	$(C1541) -attach mega65-agi.d81 -write logosrc\agi.lgo agi.c65
+	$(C1541) -attach mega65-agi.d81 -write agi.prg agi.c65
 	$(C1541) -attach mega65-agi.d81 -write COPYING copying,s
-	$(C1541) -attach mega65-agi.d81 -write inits.raw inits,s
-	$(C1541) -attach mega65-agi.d81 -write midmem.raw midmem,s
-	$(C1541) -attach mega65-agi.d81 -write himem.raw himem,s
-	$(C1541) -attach mega65-agi.d81 -write ultmem.raw ultmem,s
+	$(C1541) -attach mega65-agi.d81 -write gamecode.raw gamecode,s
 	
-agi.d81: logosrc\agi.lgo
+agi.d81: agi.prg
 	$(C1541) -format "agi,a1" d81 agi.d81
-	$(C1541) -attach agi.d81 -write logosrc\agi.lgo agi.c65
+	$(C1541) -attach agi.d81 -write agi.prg agi.c65
 	$(C1541) -attach agi.d81 -write COPYING copying,s
-	$(C1541) -attach agi.d81 -write inits.raw inits,s
-	$(C1541) -attach agi.d81 -write midmem.raw midmem,s
-	$(C1541) -attach agi.d81 -write himem.raw himem,s
-	$(C1541) -attach agi.d81 -write ultmem.raw ultmem,s
+	$(C1541) -attach agi.d81 -write gamecode.raw gamecode,s
 	$(C1541) -attach agi.d81 -write kq1/LOGDIR logdir,s
 	$(C1541) -attach agi.d81 -write kq1/PICDIR picdir,s
 	$(C1541) -attach agi.d81 -write kq1/SNDDIR snddir,s
@@ -73,7 +68,7 @@ agi.d81: logosrc\agi.lgo
 	$(C1541) -attach agi.d81 -write kq1/WORDS.TOK words.tok,s
 	$(C1541) -attach agi.d81 -write kq1/OBJECT object,s
 
-agisystem: mega65-agi.d81 agi.d81
+agisystem: agi.d81
 
 clean:
 	-rm $(OBJS) $(OBJS:%.o=%.clst) $(OBJS_DEBUG) $(OBJS_DEBUG:%.o=%.clst)

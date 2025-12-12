@@ -29,61 +29,36 @@
 #include "sound.h"
 #include "view.h"
 #include "volume.h"
+#include "mapper.h"
 #include "memmanage.h"
-#include "simplefile.h"
 #include "engine.h"
 #include "irq.h"
 
-#define ASCIIKEY (*(volatile uint8_t *)0xd610)
-#define PETSCIIKEY (*(volatile uint8_t *)0xd619)
-#define VICREGS ((volatile uint8_t *)0xd000)
-
-uint8_t mainpalettedata[] =  {0x00, 0x00, 0x00,
-                          0x0F, 0x0F, 0x0F,
-                          0x0F, 0x00, 0x00,
-                          0x00, 0x0F, 0x0F,
-                          0x0F, 0x00, 0x0F,
-                          0x00, 0x0F, 0x00,
-                          0x00, 0x00, 0x0F,
-                          0x0F, 0x0F, 0x00,
-                          0x0F, 0x06, 0x00,
-                          0x0A, 0x04, 0x00,
-                          0x0F, 0x07, 0x07,
-                          0x05, 0x05, 0x05,
-                          0x08, 0x08, 0x08,
-                          0x09, 0x0F, 0x09,
-                          0x09, 0x09, 0x0F,
-                          0x0B, 0x0B, 0x0B,
-};
+uint8_t copynonbankable[] =  {0x80,               // Source 0x80, attic ram
+                              0x80,
+                              0x81,               // Destination 0x00, chip ram
+                              0x00,
+                              0x00,               // End of token list
+                              0x00,               // Copy command
+                              0x00, 0x60,         // count $6000 bytes
+                              0x00, 0x40, 0x00,   // source start $8004000
+                              0x00, 0x20, 0x00,   // destination start $002000
+                              0x00,               // command high byte
+                              0x00,               // modulo
+                            };
 
 int main () {
-  uint8_t palette_index = 0;
-  for (int i = 0; i < 48; i += 3) {
-    PALETTE.red[palette_index] = mainpalettedata[i];
-    PALETTE.green[palette_index] = mainpalettedata[i+1];
-    PALETTE.blue[palette_index] = mainpalettedata[i+2];
-    palette_index++;
-  }
-
-  VICIV.bordercol = COLOR_BLACK;
-  VICIV.screencol = COLOR_BLACK;
-  VICIV.key = 0x47;
-  VICIV.key = 0x53;
-  VICIV.chrxscl = 120;
-  VICIV.ctrlb = VICIV.ctrlb | VIC3_H640_MASK;
-  VICIV.ctrlc = VICIV.ctrlc & (~VIC4_CHR16_MASK);
-  VICIV.chrcount = 80;
-  VICIV.linestep = 80;
-
-  simpleprint("\x93\x0b\x0e");
-  simpleprint("mega65 agi -- sIERRA agi PARSER FOR THE mega65! kq1 VERSION.\r");
-  POKE(1,133);
-
+  POKE(0xD020, 0x00);
+  
   memmanage_init();
 
   init_system();
-  
-  VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
+
+  DMA.dmahigh = (uint8_t)(((uint16_t)copynonbankable) >> 8);
+  DMA.etrig = (uint8_t)(((uint16_t)copynonbankable) & 0xff);
+
+  select_engine_diskdriver_mem();
+
   run_loop();
 
   return 0;

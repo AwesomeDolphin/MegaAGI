@@ -25,14 +25,13 @@
 #include "irq.h"
 #include "logic.h"
 #include "main.h"
-#include "simplefile.h"
 #include "volume.h"
 
 #define FARSID1 (*(volatile struct __sid __far *)0xffd3400)
 
 uint8_t __huge *sound_file;
-volatile uint16_t voice_offsets[3];
-volatile uint8_t voice_stopped[3] = {0};
+volatile uint16_t voice_offsets[3] = {0};
+volatile uint8_t voice_stopped[3] = {1};
 volatile uint16_t durations[3] = {0};
 volatile uint8_t voice_holds[3];
 volatile uint8_t sound_flag_end;

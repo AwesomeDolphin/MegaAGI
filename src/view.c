@@ -26,7 +26,6 @@
 #include <math.h>
 
 #include "gfx.h"
-#include "simplefile.h"
 #include "main.h"
 #include "memmanage.h"
 #include "volume.h"
@@ -45,6 +44,9 @@ static uint8_t lowprio;
 static uint8_t baseprio;
 static uint8_t highbaseprio;
 static uint8_t lowbaseprio; 
+
+#pragma clang section bss="banked_bss" data="hs_spritedata" rodata="hs_spriterodata" text="hs_spritetext"
+
 
 bool draw_cel(view_info_t *info, uint8_t cel) {
     uint8_t __far *loop_data = chipmem_base + info->loop_offset;
@@ -171,6 +173,8 @@ void erase_view(view_info_t *info) {
     }
 }
 
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
 bool select_loop(view_info_t *info, uint8_t loop_num) {
     uint8_t __far *view_data = chipmem_base + info->view_offset;
     if (loop_num < info->number_of_loops) {
@@ -178,6 +182,7 @@ bool select_loop(view_info_t *info, uint8_t loop_num) {
         uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
         uint8_t __far *loop_data = chipmem_base + loop_offset;
         info->loop_offset = loop_offset;
+        info->loop_number = loop_num;
         info->number_of_cels = loop_data[0];
         uint8_t __far *cell_ptr = loop_data + 1;
         info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
@@ -194,11 +199,13 @@ void view_set(view_info_t *info, uint8_t view_num) {
     info->view_offset = views[view_num];
     uint8_t __far *view_data = chipmem_base + info->view_offset;
     info->number_of_loops = view_data[0];
+    uint8_t __far *loop_ptr = view_data + (info->loop_number * 2) + 1;
+    uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
+    uint8_t __far *loop_data = chipmem_base + loop_offset;
+    info->number_of_cels = loop_data[0];
     info->desc_offset = info->view_offset + (info->number_of_loops * 2) + 1;
     info->priority_set = false;
 }
-
-#pragma clang section bss="midmembss" data="midmemdata" rodata="midmemrodata" text="midmemtext"
 
 void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
     uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};

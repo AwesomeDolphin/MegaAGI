@@ -16,17 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ***************************************************************************/
 
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <mega65.h>
-#include <stdbool.h>
-
-#include "engine.h"
-#include "sound.h"
-
-__attribute__((kernal_interrupt))
-void irq_handler(void) {
-    engine_interrupt_handler();
-    sound_interrupt_handler();
-}
+void select_graphics0_mem(void);
+void select_graphics1_mem(void);
+void select_engine_logiclow_mem(void);
+void select_engine_logichigh_mem(void);
+void select_sprite_mem(void);
+void select_engine_diskdriver_mem(void);
+void select_nokernel_mem(void);
+void select_kernel_mem(void);
+void select_picdraw_mem(void);
+void select_parser_mem(void);
+void select_gui_mem(void);
+void select_gamesave_mem(void);

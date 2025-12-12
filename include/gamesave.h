@@ -34,7 +34,6 @@ typedef struct add_to_pic_command {
 
 extern uint16_t chipmem_allocoffset;
 extern uint16_t chipmem_lockoffset;
-extern uint16_t chipmem2_allocoffset;
 extern uint32_t atticmem_allocoffset;
 
 extern bool input_ok;

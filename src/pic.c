@@ -29,6 +29,7 @@
 #include "gfx.h"
 #include "volume.h"
 #include "pic.h"
+#include "textscr.h"
 #include "main.h"
 #include "memmanage.h"
 
@@ -43,7 +44,7 @@ typedef struct fill_info {
 __far static fill_info_t fills[128];
 #pragma clang section bss=""
 
-#pragma clang section bss="midmembss" data="himemdata" rodata="himemrodata" text="himemtext"
+#pragma clang section bss="banked_bss" data="picdraw_data" rodata="picdraw_rodata" text="picdraw_text"
 static    uint8_t pic_color;
 static    uint8_t priority_color;
 static    uint8_t pic_on;
@@ -259,11 +260,7 @@ void draw_pic(bool clear_screen) {
 void pic_load(uint8_t pic_num) {
     pic_offset = load_volume_object(voPic, pic_num, &pic_length);
     if (pic_offset == 0) {
-        dialog_print_ascii(0, 0, false, (uint8_t __far *)"FAULT: Failed to load pic %d.", pic_num);
+        textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
         return;
     }
-}
-
-void pic_discard(uint8_t pic_num) {
-    chipmem_free(pic_offset);
 }

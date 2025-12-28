@@ -201,7 +201,9 @@ bool sprite_move_at_speed(agisprite_t *sprite) {
     // Check if z exceeds the distance
     if (dist >= distance_squared) {
         // We are within the target distance, so finish the move
-        logic_set_flag(sprite->prg_complete_flag);
+        if (sprite->prg_complete_flag > 0) {
+            logic_set_flag(sprite->prg_complete_flag);
+        }
         if (sprite->ego) {
             player_control = true;
         }

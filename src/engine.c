@@ -38,6 +38,8 @@
 #include "logic.h"
 #include "mapper.h"
 #include "memmanage.h"
+#include "mouse.h"
+#include "ports.h"
 #include "main.h"
 
 volatile uint8_t frame_counter;
@@ -50,7 +52,7 @@ volatile bool engine_running;
 bool status_line_enabled;
 uint8_t status_line_score;
 
-static const uint8_t joystick_direction[16] = {
+static const uint8_t joystick_direction_to_agi[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
     0, 6, 8, 7, 0, 5, 1, 0
 };
@@ -111,13 +113,51 @@ void engine_show_object(uint8_t view_num) {
 */
 
 void handle_movement_joystick(void) {
+    static bool joy_pressed = false;
+    if (!player_control) {
+        return;
+    }
+     
+    uint8_t new_object_dir = joystick_direction_to_agi[joystick_direction];
+    if (new_object_dir > 0) {
+        if (sprites[0].object_dir == 0) {
+            if (joy_pressed == false) {
+                sprites[0].object_dir = new_object_dir;
+                sprites[0].prg_movetype = pmmNone;
+                joy_pressed = true;
+            }
+        } else if ((new_object_dir != sprites[0].object_dir) || (sprites[0].prg_movetype == pmmMoveTo)) {
+            sprites[0].object_dir = new_object_dir;
+            sprites[0].prg_movetype = pmmNone;
+            joy_pressed = true;
+        } else if (joy_pressed == false) {
+            sprites[0].object_dir = 0;
+            joy_pressed = true;
+        }
+    } else {
+        joy_pressed = false;
+    }
+}
+
+void handle_movement_mouse(void) {
+    static bool mouse_down = false;
     if (!player_control) {
         return;
     }
 
-    uint8_t port2joy = PEEK(0xDC00) & 0x0f;
-    uint8_t new_object_dir = joystick_direction[port2joy];
-    sprites[0].object_dir = new_object_dir;
+    if (mouse_leftclick == 1) {
+        if ((mouse_ypos > 8) && (mouse_down == false)) {
+            sprites[0].prg_movetype = pmmMoveTo;
+            sprites[0].prg_x_destination = (mouse_xpos >> 1) - (sprites[0].view_info.width >> 1);
+            sprites[0].prg_y_destination = mouse_ypos - 8;
+            sprites[0].prg_speed = sprites[0].step_size;
+            sprites[0].prg_distance = sprites[0].prg_speed * sprites[0].prg_speed;
+            sprites[0].prg_complete_flag = 0;
+        }
+        mouse_down = true;
+    } else {
+        mouse_down = false;
+    }
 }
 
 void engine_statusline(bool enable) {
@@ -156,6 +196,7 @@ void run_loop(void) {
     parser_init();
     textscr_init();
     dialog_init();
+    mouse_init();
     input_ok = false;
     player_control = true;
     logic_set_flag(9);
@@ -179,7 +220,9 @@ void run_loop(void) {
                 }
                 engine_update_status_line();
                 sprite_undraw();
+                joyports_poll();
                 handle_movement_joystick();
+                handle_movement_mouse();
                 logic_run();
                 logic_reset_flag(11);
                 sprite_updateanddraw();
@@ -210,6 +253,7 @@ void engine_interrupt_handler(void) {
         return;
       }
 
+    mouse_irq();
     sound_interrupt_handler();
     
     frame_counter++;

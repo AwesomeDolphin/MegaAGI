@@ -2,7 +2,7 @@ VPATH = src
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # Common source files
-ASM_SRCS = diskasm.s irq.s startup.s mapper.s
+ASM_SRCS = diskasm.s irq.s startup.s mapper.s mouse.s ports.s
 C_SRCS = main.c ncm.c pic.c volume.c sound.c view.c engine.c memmanage.c sprite.c logic.c parser.c init.c gamesave.c dialog.c disk.c textscr.c
 C1541 = flatpak run --command=c1541 net.sf.VICE
 INC = -I./include

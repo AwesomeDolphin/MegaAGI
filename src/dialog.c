@@ -25,6 +25,7 @@
 #include <mega65.h>
 
 #include "dialog.h"
+#include "engine.h"
 #include "gfx.h"
 #include "main.h"
 #include "mapper.h"
@@ -39,6 +40,11 @@ typedef enum input_mode {
     imPressKey,
     imDialogField,
 } input_mode_t;
+
+typedef enum dialog_type {
+    dtSave,
+    dtRestore,
+} dialog_type_t;
 
 uint8_t dialog_first;
 uint8_t dialog_last;
@@ -62,6 +68,7 @@ uint8_t cursor_delay;
 uint8_t x_start;
 uint8_t y_start;
 input_mode_t dialog_input_mode;
+dialog_type_t active_dialog;
 
 static bool dialog_handleinput_internal(uint8_t ascii_key) {
     switch(ascii_key) {
@@ -121,10 +128,6 @@ static bool dialog_handleinput_internal(uint8_t ascii_key) {
 }
 
 void dialog_show_internal(bool accept_input) {
-    if (accept_input) {
-        textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
-    }
-
     msg_ptr = formatted_string_buffer;
     last_word = msg_ptr;
     word_length = 0;
@@ -236,6 +239,7 @@ void dialog_show_internal(bool accept_input) {
         input_start_column = 3;
         input_max_length = 12;
         dialog_input_mode = imDialogField;
+        textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
     } else {
         dialog_input_mode = imPressKey;
     }
@@ -321,6 +325,49 @@ void dialog_close(void) {
     show_object_view = false;
 }
 
+void dialog_gamesave_handler(char *filename) {
+    uint8_t len = strlen(filename);
+
+    for (uint8_t i = 0; i < len; i++) {
+        if ((filename[i] >= 97) && (filename[i] <= 122)) {
+            filename[i] = filename[i] - 32;
+        }
+    }
+
+    uint8_t errcode;
+    if (active_dialog == dtSave) {
+        select_gamesave_mem();
+        errcode = gamesave_save_to_disk(filename);
+        if (errcode != 0) {
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d saving game.");
+            dialog_show(false, print_string_buffer, errcode);
+        }
+    } else {
+        select_gamesave_mem();
+        errcode = gamesave_load_from_disk(filename);
+        if (errcode == 255) {
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this game.");
+            dialog_show(false, print_string_buffer, errcode);
+        } else if (errcode != 0) {
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d restoring game.");
+            dialog_show(false, print_string_buffer, errcode);
+        }
+    }
+    status_line_score = 255;
+}
+
+void dialog_gamesave_begin(bool save) {
+    if (save) {
+        active_dialog = dtSave;
+        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
+        dialog_show(true, print_string_buffer);
+    } else {
+        active_dialog = dtRestore;
+        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
+        dialog_show(true, print_string_buffer);
+    }
+}
+
 bool dialog_proc(void) {
     bool retval = false;
     switch (dialog_input_mode) {
@@ -348,8 +395,7 @@ bool dialog_proc(void) {
                 command_buffer[cmd_buf_ptr] = 0;
                 dialog_close();
                 dialog_input_mode = imParser;
-                select_gamesave_mem();
-                gamesave_dialog_handler(command_buffer);
+                dialog_gamesave_handler(command_buffer);
                 dialog_clear_keyboard();
             } else {
                 retval = true;

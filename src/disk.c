@@ -76,24 +76,31 @@
 }
 
  uint8_t disk_save_attic(char *filename, uint32_t attic_offset, uint32_t data_size, uint8_t device) {
+    static uint32_t chunk_size;
+    static uint32_t i;
+    static uint8_t idx;
     static uint8_t buffer[256];
     uint8_t __huge *data_source = NULL;
     data_source = attic_memory + attic_offset;
 
-    strcat(filename, ".AGI,S,W");
+    strncpy((char *)buffer, filename, 256-5);
+    strcat((char *)buffer, ",S,W");
+    size_t namelen = strlen((char *)buffer);
 
     // NO KERNAL CALLS ABOVE THIS LINE, NO NON-KERNAL CALLS BELOW THIS LINE
     disk_enter_kernal();
-    kernal_open(filename, strlen(filename), device);
+    kernal_open((char *)buffer, namelen, device);
 
-    for (uint32_t i = 0; i < data_size; i += 250) {
-        uint32_t chunk_size = (data_size - i > 250) ? 250 : (data_size - i);
-        for (size_t idx = 0; idx < chunk_size; idx++)
+    for (i = 0; i < data_size; i += 250) {
+        chunk_size = (data_size - i > 250) ? 250 : (data_size - i);
+        for (idx = 0; idx < chunk_size; idx++)
         {
             buffer[idx] = data_source[idx];
         }
         data_source += chunk_size;
-        kernal_write(buffer, chunk_size);
+        if (!kernal_write(buffer, chunk_size)) {
+            break;
+        }
     }
     kernal_close();
 

@@ -50,8 +50,6 @@ uint8_t block_active, block_x1, block_y1, block_x2, block_y2;
 uint8_t animated_sprite_count;
 uint16_t free_point;
 
-bool saving;
-
 #pragma clang section bss="extradata"
 __far agisprite_t sprites[256];
 __far uint8_t animated_sprites[256];
@@ -117,24 +115,21 @@ uint32_t gamesave_save_to_attic(void) {
     return offset;
 }
 
-void gamesave_save_to_disk(char *filename) {
-    uint8_t buffer[256];
-
+uint8_t gamesave_save_to_disk(char *filename) {
     uint32_t save_size = gamesave_save_to_attic();
     strcat(filename, ".AGI");
 
+    select_engine_diskdriver_mem();
     uint8_t errcode = disk_save_attic(filename, atticmem_allocoffset, save_size, 9);
-    if (errcode != 0) {
-        dialog_show(false, (uint8_t __far *)"Error saving file:\n%s", buffer);
-    }
+    select_engine_logichigh_mem();
+    return errcode;
 }
 
 
-void gamesave_load_from_attic(void) {
+uint8_t gamesave_load_from_attic(void) {
     for (int i = 0; i < 8; i++) {
         if (gamesave_cache[i] != game_id[i]) {
-            dialog_show(false, (uint8_t __far *)"Save game is not for this game!");
-            return;
+            return 255;
         }
     }
 
@@ -213,46 +208,20 @@ void gamesave_load_from_attic(void) {
     }
     gfx_hold_flip(false);
     VICIV.bordercol = COLOR_BLACK;
+    return 0;
 }
 
-void gamesave_load_from_disk(char *filename) {
+uint8_t gamesave_load_from_disk(char *filename) {
     gamesave_cache = attic_memory + atticmem_allocoffset;
     strcat(filename, ".AGI");
-    select_kernel_mem();
     uint32_t data_size;
     select_engine_diskdriver_mem();
     uint8_t errcode = disk_load_attic(filename, &data_size, 9);
+    select_engine_logichigh_mem();
 
     if (errcode != 0) {
-        dialog_show(false, (uint8_t __far *)"Error reading file:\n%d", errcode);
+        return errcode;
     } else {
-        gamesave_cache = attic_memory + atticmem_allocoffset;
-        gamesave_load_from_attic();
-    }
-}
-
-void gamesave_dialog_handler(char *filename) {
-    uint8_t len = strlen(filename);
-
-    for (uint8_t i = 0; i < len; i++) {
-        if ((filename[i] >= 97) && (filename[i] <= 122)) {
-            filename[i] = filename[i] - 32;
-        }
-    }
-
-    if (saving) {
-        gamesave_save_to_disk(filename);
-    } else {
-        gamesave_load_from_disk(filename);
-    }
-    status_line_score = 255;
-}
-
-void gamesave_begin(bool save) {
-    saving = save;
-    if (save) {
-        dialog_show(true, (uint8_t __far *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
-    } else {
-        dialog_show(true, (uint8_t __far *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
+        return gamesave_load_from_attic();
     }
 }

@@ -84,12 +84,18 @@ kernal_write:
 write$:
         lda (zp:_Zp+0),y
         jsr CHROUT
+        bcs writefail$
         iny
         cpy zp:_Zp+2
         bne write$
+        jsr CLRCHN
+        lda #0x01
+        rts
+writefail$:
+        jsr CLRCHN
         lda #0x00
-        jmp CLRCHN
-        
+        rts
+
         .public kernal_print
 kernal_print:
         ldy #0x00
@@ -213,6 +219,8 @@ disk_exit_kernal:
 
         .public disk_enter_kernal
 disk_enter_kernal:  
+        sei
+
         sta 0xd707
         
         .byte 0x80
@@ -243,7 +251,6 @@ disk_enter_kernal:
         .byte 0x00
         .byte 0x00
 
-        sei
         lda #0x00
         ldx #0x00
         ldy #0x00

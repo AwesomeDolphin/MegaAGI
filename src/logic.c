@@ -1116,13 +1116,13 @@ bool logic_run_high(void) {
         }
         case 0x7D: {
             // save.game
-            gamesave_begin(true);
+            dialog_gamesave_begin(true);
             program_counter += 1;
             break;
         }
         case 0x7E: {
             // restore.game
-            gamesave_begin(false);
+            dialog_gamesave_begin(false);
             program_counter += 1;
             break;
         }

@@ -18,7 +18,7 @@
 
 void kernal_open(char *filename, uint8_t namelength, uint8_t device_number);
 uint8_t kernal_read(uint8_t *destination);
-void kernal_write(uint8_t *source, uint8_t length);
+uint8_t kernal_write(uint8_t *source, uint8_t length);
 void kernal_print(char *string);
 void kernal_close(void);
 void kernal_cmdchan(uint8_t *drive_command, uint8_t device_number);

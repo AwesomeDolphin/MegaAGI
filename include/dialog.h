@@ -21,6 +21,8 @@
 
 #include "main.h"
 
+void dialog_gamesave_handler(char *filename);
+void dialog_gamesave_begin(bool save);
 void dialog_clear_keyboard(void);
 void dialog_show(bool accept_input, uint8_t __far *message_string, ...);
 void dialog_close(void);

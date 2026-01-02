@@ -483,7 +483,7 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
     sprite.end_of_loop = 0;
     sprite.reverse = false;
     view_set(&sprite.view_info, view_number);
-    if (sprite.view_info.loop_number > sprite.view_info.number_of_loops) {
+    if (sprite.view_info.loop_number >= sprite.view_info.number_of_loops) {
         sprite.view_info.loop_number = 0;
     }
     select_loop(&sprite.view_info, sprite.view_info.loop_number);

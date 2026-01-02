@@ -38,6 +38,8 @@ typedef struct view_info {
     bool priority_set;
     uint8_t baseline_priority;
     uint16_t desc_offset;
+    uint32_t view_cache;
+    uint16_t longest_loop_len;
 } view_info_t;
 
 bool draw_cel(view_info_t *info, uint8_t cel);

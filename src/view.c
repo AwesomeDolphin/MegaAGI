@@ -31,6 +31,7 @@
 #include "volume.h"
 #include "view.h"
 #include "irq.h"
+#include "textscr.h"
 
 static uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 static uint8_t drawview_trans;
@@ -44,7 +45,6 @@ static uint8_t lowprio;
 static uint8_t baseprio;
 static uint8_t highbaseprio;
 static uint8_t lowbaseprio; 
-
 #pragma clang section bss="banked_bss" data="hs_spritedata" rodata="hs_spriterodata" text="hs_spritetext"
 
 
@@ -173,17 +173,43 @@ void erase_view(view_info_t *info) {
     }
 }
 
-#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+#pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
+
+static uint8_t copyloop[] =         {0x80,               // Source 0x80, attic ram
+                              0x80,
+                              0x81,               // Destination 0x00, chip ram
+                              0x00,
+                              0x00,               // End of token list
+                              0x00,               // Copy command
+                              0x00, 0x00,         // count $0000 bytes
+                              0x00, 0x00, 0x00,   // source start $8000000
+                              0x00, 0x00, 0x04,   // destination start $040000
+                              0x00,               // command high byte
+                              0x00,               // modulo
+                            };
 
 bool select_loop(view_info_t *info, uint8_t loop_num) {
     uint8_t __far *view_data = chipmem_base + info->view_offset;
     if (loop_num < info->number_of_loops) {
-        uint8_t __far *loop_ptr = view_data + (loop_num * 2) + 1;
+        uint8_t __far *loop_ptr = view_data + (loop_num * 2) + 9;
         uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
         uint8_t __far *loop_data = chipmem_base + loop_offset;
         info->loop_offset = loop_offset;
         info->loop_number = loop_num;
         info->number_of_cels = loop_data[0];
+
+        copyloop[6] = view_data[7];
+        copyloop[7] = view_data[8];
+        copyloop[11] = view_data[1];
+        copyloop[12] = view_data[2];
+        uint32_t loop_start = info->view_cache + (info->longest_loop_len * loop_num);
+        copyloop[8] = loop_start & 0xff;
+        copyloop[9] = (loop_start & 0xff00) >> 8;
+        copyloop[10] = (loop_start & 0xff0000) >> 16;
+        DMA.dmabank = 0x03;
+        DMA.dmahigh = (uint8_t)(((uint16_t)copyloop) >> 8) + 0x60;
+        DMA.etrig = (uint8_t)(((uint16_t)copyloop) & 0xff);
+
         uint8_t __far *cell_ptr = loop_data + 1;
         info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
 
@@ -195,6 +221,8 @@ bool select_loop(view_info_t *info, uint8_t loop_num) {
     return false;
 }
 
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
 void view_set(view_info_t *info, uint8_t view_num) {
     info->view_offset = views[view_num];
     uint8_t __far *view_data = chipmem_base + info->view_offset;
@@ -205,6 +233,12 @@ void view_set(view_info_t *info, uint8_t view_num) {
     info->number_of_cels = loop_data[0];
     info->desc_offset = info->view_offset + (info->number_of_loops * 2) + 1;
     info->priority_set = false;
+    info->longest_loop_len = view_data[7];
+    info->longest_loop_len |= view_data[8] << 8;
+    info->view_cache = view_data[5];
+    info->view_cache <<= 16;
+    info->view_cache |= (view_data[4] << 8) & 0xFF00;
+    info->view_cache |= (view_data[3] & 0xff);
 }
 
 void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
@@ -212,7 +246,7 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
 
 
     uint8_t loop_count = view_location[2];
-    uint16_t view_offset = chipmem_alloc(1 + (loop_count * 2));
+    uint16_t view_offset = chipmem_alloc(9 + (loop_count * 2));
 
     uint8_t __far *view_dest_location = chipmem_base + view_offset;
     views[view_num] = view_offset;
@@ -236,6 +270,8 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
         chipmem_free(desc_dest_offset);
         chipmem_alloc(desc_length);
     }
+    uint16_t longest_loop_len = 0;
+    uint16_t metadata_len = 0;
     for (uint8_t loop_index = 0; loop_index < loop_count; loop_index++) {
         uint8_t loop_offset_loc = (loop_index * 2) + 5;
         uint16_t loop_source_offset = ((view_location[loop_offset_loc + 1]) << 8);
@@ -243,13 +279,51 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
         uint8_t __huge *loop_source_location = view_location + loop_source_offset;
         uint8_t cels_in_loop  = loop_source_location[0];
         uint16_t loop_overhead = 1 + (cels_in_loop * 2);
-        uint16_t loop_dest_offset = chipmem_alloc(loop_overhead);
-        view_dest_location[1 + (loop_index * 2)] = loop_dest_offset & 0xff;
-        view_dest_location[2 + (loop_index * 2)] = (loop_dest_offset & 0xff00) >> 8;
+        metadata_len += loop_overhead;
+        uint16_t loop_length = 0;
+        for (uint8_t cel_index = 0; cel_index < cels_in_loop; cel_index++) {
+            uint8_t cel_offset_loc = (cel_index * 2) + 1;
+            uint16_t cel_source_offset = ((loop_source_location[cel_offset_loc + 1]) << 8);
+            cel_source_offset |= loop_source_location[cel_offset_loc];
+            uint8_t __huge *cel_source_location = loop_source_location + cel_source_offset;
+            uint8_t cel_width = cel_source_location[0];
+            uint8_t cel_height = cel_source_location[1];
+            uint16_t cel_size = 3 + (cel_width * cel_height);
+            loop_length += cel_size;
+        }
+        if (loop_length > longest_loop_len) {
+            longest_loop_len = loop_length;
+        }
+    }
+    uint16_t metadata_offset = chipmem_alloc(metadata_len);
+    uint16_t loop_buffer = chipmem_alloc(longest_loop_len);
+    uint32_t loop_cache = atticmem_alloc(longest_loop_len * loop_count);
+    view_dest_location[1] = loop_buffer & 0xff;
+    view_dest_location[2] = (loop_buffer & 0xff00) >> 8;
+    view_dest_location[3] = loop_cache & 0xff;
+    view_dest_location[4] = (loop_cache & 0xff00) >> 8;
+    view_dest_location[5] = (loop_cache & 0xff0000) >> 16;
+    view_dest_location[6] = (loop_cache & 0xff000000) >> 24;
+    view_dest_location[7] = longest_loop_len & 0xff;
+    view_dest_location[8] = (longest_loop_len & 0xff00) >> 8;
+
+    for (uint8_t loop_index = 0; loop_index < loop_count; loop_index++) {
+        uint8_t loop_offset_loc = (loop_index * 2) + 5;
+        uint16_t loop_source_offset = ((view_location[loop_offset_loc + 1]) << 8);
+        loop_source_offset |= view_location[loop_offset_loc];
+        uint8_t __huge *loop_source_location = view_location + loop_source_offset;
+        uint8_t cels_in_loop  = loop_source_location[0];
+        uint16_t loop_overhead = 1 + (cels_in_loop * 2);
+        uint16_t loop_dest_offset = metadata_offset;
+        metadata_offset += loop_overhead;
+        view_dest_location[9 + (loop_index * 2)] = loop_dest_offset & 0xff;
+        view_dest_location[10 + (loop_index * 2)] = (loop_dest_offset & 0xff00) >> 8;
 
         uint8_t __far *loop_dest_location = chipmem_base + loop_dest_offset;
         loop_dest_location[0] = cels_in_loop;
     
+        uint32_t cel_cache_dest_offset = loop_cache + (longest_loop_len * loop_index);
+        uint16_t cel_buffer_location = loop_buffer;
         for (uint8_t cel_index = 0; cel_index < cels_in_loop; cel_index++) {
             uint8_t cel_offset_loc = (cel_index * 2) + 1;
             uint16_t cel_source_offset = ((loop_source_location[cel_offset_loc + 1]) << 8);
@@ -262,15 +336,16 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
             uint8_t cel_notmirrored_loop = (cel_source_location[2] & 0x70) >> 4;
             bool cel_mirrored = cel_mirroring ? (loop_index != cel_notmirrored_loop) : false;
             uint16_t cel_size = 3 + (cel_width * cel_height);
-            uint16_t cel_dest_offset = chipmem_alloc(cel_size);
-            loop_dest_location[1 + (cel_index * 2)] = cel_dest_offset & 0xff;
-            loop_dest_location[2 + (cel_index * 2)] = (cel_dest_offset & 0xff00) >> 8;
+            loop_dest_location[1 + (cel_index * 2)] = cel_buffer_location & 0xff;
+            loop_dest_location[2 + (cel_index * 2)] = (cel_buffer_location & 0xff00) >> 8;
 
-            uint8_t __far *cel_dest_location = chipmem_base + cel_dest_offset;
+            uint8_t __huge *cel_dest_location = attic_memory + cel_cache_dest_offset;
             cel_dest_location[0] = cel_width;
             cel_dest_location[1] = cel_height;
             cel_dest_location[2] = cel_source_location[2];
-        
+            cel_buffer_location += cel_size;
+            cel_cache_dest_offset += cel_size;
+
             uint16_t cur_x = 0;
             uint16_t cur_y = 0;
             uint16_t cel_offset = 3;
@@ -304,7 +379,6 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
             } while (cur_y < cel_height);
         }
     }
-
 }
 
 bool view_load(uint8_t view_num) {

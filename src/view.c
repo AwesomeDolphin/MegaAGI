@@ -34,32 +34,49 @@
 #include "textscr.h"
 #include "mapper.h"
 
-static uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+#pragma clang section bss="banked_bss" data="hs_spritedata" rodata="hs_spriterodata" text="hs_spritetext"
+
+static const uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+static const uint8_t high_nibble[256] = {
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+    0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1,
+    0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2, 0x2,
+    0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3,
+    0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4, 0x4,
+    0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x5,
+    0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6,
+    0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7,
+    0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8,
+    0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9,
+    0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa, 0xa,
+    0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb, 0xb,
+    0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc, 0xc,
+    0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd, 0xd,
+    0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe, 0xe,
+    0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf
+};
+
 static uint8_t drawview_trans;
 static int16_t drawview_left;
 static int16_t drawview_top;
 static uint8_t drawview_right;
 static uint8_t drawview_bottom;
 static uint8_t objprio;
-static uint8_t highprio;
-static uint8_t lowprio;
 static uint8_t baseprio;
-static uint8_t highbaseprio;
-static uint8_t lowbaseprio; 
-#pragma clang section bss="banked_bss" data="hs_spritedata" rodata="hs_spriterodata" text="hs_spritetext"
+static uint8_t prio_mask;
+static uint8_t prio_preserve_mask;
+static uint8_t prio_threshold;
+static uint8_t prio_compare;
+static uint8_t prio_base_compare;
+static uint8_t rle_color;
+static uint8_t rle_count;
 
-
-bool draw_cel(view_info_t *info, uint8_t cel) {
+bool draw_cel_forwards(view_info_t *info, uint8_t cel) {
     uint8_t __far *loop_data = chipmem_base + info->loop_offset;
     uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
     info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
 
     uint8_t __far *cel_data = chipmem_base + info->cel_offset;
-    info->width  = cel_data[0];
-    info->height = cel_data[1];
-
-    info->backbuffer_offset = chipmem_alloc(info->height * info->width);
-    uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
     uint16_t pixel_offset = 0;
 
     drawview_trans = colorval[cel_data[2] & 0x0f];
@@ -70,10 +87,6 @@ bool draw_cel(view_info_t *info, uint8_t cel) {
 
     objprio = colorval[info->priority];
     baseprio = colorval[info->baseline_priority];
-    highprio = objprio & 0xf0;
-    lowprio = objprio & 0x0f;
-    highbaseprio = baseprio & 0xf0;
-    lowbaseprio = baseprio & 0x0f;
 
     cel_data += 3;
     bool drew_something = false;;
@@ -86,70 +99,181 @@ bool draw_cel(view_info_t *info, uint8_t cel) {
         uint8_t highpix = draw_col & 1;
         volatile uint8_t __far *priority_pointer = &priority_screen[(drawview_top * 80) + xcolumn];
         uint8_t prioval;
+
         if (highpix) {
-            for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
-                if ((draw_row < 0) || (draw_row > 167)) {
-                    priority_pointer += 80;
-                    continue;
-                }
-                volatile uint8_t __far *scanprio_pointer = priority_pointer;
-                do {
-                    prioval = *scanprio_pointer & 0xf0;
-                    scanprio_pointer += 80;
-                } while (prioval < 0x40);
-                
-                priority_pointer += 80;
-                view_backbuf[pixel_offset] = *draw_pointer;
-                if (*cel_data != drawview_trans) {
-                    if ((prioval) <= highprio) {
-                        *draw_pointer = *cel_data;
-                        drew_something=true;
-                        if (info->priority_set) {
-                            if ((draw_row == drawview_bottom) && (highbaseprio < 0x40)) {
-                                *scanprio_pointer = (*scanprio_pointer & 0x0f) | highbaseprio;
-                            } else {
-                                *scanprio_pointer = (*scanprio_pointer & 0x0f) | highprio;
-                            }
-                        }
-                    }
-                }
-                draw_pointer += 8;
-                pixel_offset++;
-                cel_data++;
-            }
+            prio_mask = 0xf0;
+            prio_preserve_mask = 0x0f;
+            prio_threshold = 0x40;
         } else {
-            for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
-                if ((draw_row < 0) || (draw_row > 167)) {
-                    priority_pointer += 80;
-                    continue;
-                }
+            prio_mask = 0x0f;
+            prio_preserve_mask = 0xf0;
+            prio_threshold = 4;
+        }
+
+        // Mask the priority values once
+        prio_compare = objprio & prio_mask;
+        prio_base_compare = baseprio & prio_mask;
+
+        for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom;) {
+            if ((draw_row < 0) || (draw_row > 167)) {
+                priority_pointer += 80;
+                continue;
+            }
+            rle_count = high_nibble[*cel_data];
+            rle_color = colorval[*cel_data & 0x0f];
+
+            for (uint8_t counter = 0; counter < rle_count; counter++) {
                 volatile uint8_t __far *scanprio_pointer = priority_pointer;
                 do {
-                    prioval = *scanprio_pointer & 0x0f;
+                    prioval = *scanprio_pointer & prio_mask;
                     scanprio_pointer += 80;
-                } while (prioval < 4);
+                } while (prioval < prio_threshold);
                 priority_pointer += 80;
-                view_backbuf[pixel_offset] = *draw_pointer;
-                if (*cel_data != drawview_trans) {
-                    if ((prioval) <= lowprio) {
-                        *draw_pointer = *cel_data;
+
+                if (rle_color != drawview_trans) {
+                    if ((prioval) <= prio_compare) {
+                        *draw_pointer = rle_color;
                         drew_something=true;
                         if (info->priority_set) {
-                            if ((draw_row == drawview_bottom) && (lowbaseprio < 0x04)) {
-                                *scanprio_pointer = (*scanprio_pointer & 0xf0) | lowbaseprio;
+                            if ((draw_row == drawview_bottom) && (prio_base_compare < prio_threshold)) {
+                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_base_compare;
                             } else {
-                                *scanprio_pointer = (*scanprio_pointer & 0xf0) | lowprio;
+                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_compare;
                             }
                         }
                     }
                 }
                 draw_pointer += 8;
                 pixel_offset++;
-                cel_data++;
+                draw_row++;
             }
+            cel_data++;
         }
     }
     return drew_something;
+}
+
+bool draw_cel_backwards(view_info_t *info, uint8_t cel) {
+    uint8_t __far *loop_data = chipmem_base + info->loop_offset;
+    uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
+    info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
+
+    uint8_t __far *cel_data = chipmem_base + info->cel_offset;
+    uint16_t pixel_offset = 0;
+
+    drawview_trans = colorval[cel_data[2] & 0x0f];
+    drawview_left = info->x_pos;
+    drawview_top = info->y_pos - info->height + 1;
+    drawview_right = info->x_pos + info->width;
+    drawview_bottom = info->y_pos;
+
+    objprio = colorval[info->priority];
+    baseprio = colorval[info->baseline_priority];
+
+    cel_data += 3;
+    bool drew_something = false;;
+    for (int16_t draw_col = drawview_right-1; draw_col >= drawview_left; draw_col--) {
+        if ((draw_col == 0) || (draw_col > 158)) {
+            continue;
+        }
+        volatile uint8_t *draw_pointer = fastdrawing_xpointer[draw_col] + (drawview_top * 8);
+        uint8_t xcolumn = draw_col >> 1;
+        uint8_t highpix = draw_col & 1;
+        volatile uint8_t __far *priority_pointer = &priority_screen[(drawview_top * 80) + xcolumn];
+        uint8_t prioval;
+
+        if (highpix) {
+            prio_mask = 0xf0;
+            prio_preserve_mask = 0x0f;
+            prio_threshold = 0x40;
+        } else {
+            prio_mask = 0x0f;
+            prio_preserve_mask = 0xf0;
+            prio_threshold = 4;
+        }
+
+        // Mask the priority values once
+        prio_compare = objprio & prio_mask;
+        prio_base_compare = baseprio & prio_mask;
+
+        for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom;) {
+            if ((draw_row < 0) || (draw_row > 167)) {
+                priority_pointer += 80;
+                continue;
+            }
+            rle_count = high_nibble[*cel_data];
+            rle_color = colorval[*cel_data & 0x0f];
+
+            for (uint8_t counter = 0; counter < rle_count; counter++) {
+                volatile uint8_t __far *scanprio_pointer = priority_pointer;
+                do {
+                    prioval = *scanprio_pointer & prio_mask;
+                    scanprio_pointer += 80;
+                } while (prioval < prio_threshold);
+                priority_pointer += 80;
+
+                if (rle_color != drawview_trans) {
+                    if ((prioval) <= prio_compare) {
+                        *draw_pointer = rle_color;
+                        drew_something=true;
+                        if (info->priority_set) {
+                            if ((draw_row == drawview_bottom) && (prio_base_compare < prio_threshold)) {
+                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_base_compare;
+                            } else {
+                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_compare;
+                            }
+                        }
+                    }
+                }
+                draw_pointer += 8;
+                pixel_offset++;
+                draw_row++;
+            }
+            cel_data++;
+        }
+    }
+    return drew_something;
+}
+
+bool draw_cel(view_info_t *info, uint8_t cel) {
+    uint16_t pixel_offset = 0;
+
+    uint8_t __far *loop_data = chipmem_base + info->loop_offset;
+    uint8_t __far *cell_ptr = loop_data + (cel * 2) + 1;
+    info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
+
+    uint8_t __far *cel_data = chipmem_base + info->cel_offset;
+    info->width  = cel_data[0];
+    info->height = cel_data[1];
+
+    drawview_left = info->x_pos;
+    drawview_top = info->y_pos - info->height + 1;
+    drawview_right = info->x_pos + info->width;
+    drawview_bottom = info->y_pos;
+
+    info->backbuffer_offset = chipmem_alloc(info->height * info->width);
+    uint8_t __far *view_backbuf = chipmem_base + info->backbuffer_offset;
+
+    for (int16_t draw_col = drawview_left; draw_col < drawview_right; draw_col++) {
+        if ((draw_col > 0) && (draw_col < 159)) {
+            volatile uint8_t *draw_pointer = fastdrawing_xpointer[draw_col] + (drawview_top * 8);
+            for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom; draw_row++) {
+                if ((draw_row > 0) && (draw_row < 168)) {
+                    view_backbuf[pixel_offset] = *draw_pointer;
+                    draw_pointer += 8;
+                    pixel_offset++;
+                }
+            }
+        }
+    }
+
+    uint8_t mirrored = cel_data[2] & 0x80;
+    uint8_t normal_loop = high_nibble[cel_data[2] & 0x70];
+    if (mirrored && (normal_loop != info->loop_number)) {
+        return draw_cel_backwards(info, cel);
+    } else {
+        return draw_cel_forwards(info, cel);
+    }
 }
 
 void erase_view(view_info_t *info) {
@@ -177,9 +301,6 @@ void erase_view(view_info_t *info) {
 #pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
 
 void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
-    uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-
-
     uint8_t loop_count = view_location[2];
     uint16_t view_offset = chipmem_alloc(1 + (loop_count * 2));
 
@@ -206,10 +327,25 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
         chipmem_alloc(desc_length);
     }
 
+    uint8_t __huge *cel_atticmem_buffer_location;
     for (uint8_t loop_index = 0; loop_index < loop_count; loop_index++) {
         uint8_t loop_offset_loc = (loop_index * 2) + 5;
         uint16_t loop_source_offset = ((view_location[loop_offset_loc + 1]) << 8);
         loop_source_offset |= view_location[loop_offset_loc];
+        bool match_found = false;
+        for (uint8_t prev_loop_index = 0; prev_loop_index < loop_index; prev_loop_index++) {
+            uint8_t prev_loop_offset_loc = (prev_loop_index * 2) + 5;
+            uint16_t prev_loop_source_offset = ((view_location[prev_loop_offset_loc + 1]) << 8);
+            prev_loop_source_offset |= view_location[prev_loop_offset_loc];
+            if (loop_source_offset == prev_loop_source_offset) {
+                view_dest_location[1 + (loop_index * 2)] = view_dest_location[1 + (prev_loop_index * 2)];
+                view_dest_location[2 + (loop_index * 2)] = view_dest_location[2 + (prev_loop_index * 2)];
+                match_found = true;
+            }
+        }
+        if (match_found) {
+            continue;
+        }
         uint8_t __huge *loop_source_location = view_location + loop_source_offset;
         uint8_t cels_in_loop  = loop_source_location[0];
         uint16_t loop_overhead = 1 + (cels_in_loop * 2);
@@ -228,50 +364,67 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
             uint8_t cel_width = cel_source_location[0];
             uint8_t cel_height = cel_source_location[1];
             uint8_t cel_transparency = cel_source_location[2] & 0x0f;
-            uint8_t cel_mirroring = cel_source_location[2] & 0x80;
-            uint8_t cel_notmirrored_loop = (cel_source_location[2] & 0x70) >> 4;
-            bool cel_mirrored = cel_mirroring ? (loop_index != cel_notmirrored_loop) : false;
-            uint16_t cel_size = 3 + (cel_width * cel_height);
-            uint16_t cel_dest_offset = chipmem_alloc(cel_size);
-            loop_dest_location[1 + (cel_index * 2)] = cel_dest_offset & 0xff;
-            loop_dest_location[2 + (cel_index * 2)] = (cel_dest_offset & 0xff00) >> 8;
+            uint16_t cel_size = 3;
 
-            uint8_t __far *cel_dest_location = chipmem_base + cel_dest_offset;
-            cel_dest_location[0] = cel_width;
-            cel_dest_location[1] = cel_height;
-            cel_dest_location[2] = cel_source_location[2];
+            cel_atticmem_buffer_location = attic_memory + atticmem_allocoffset;
         
             uint16_t cur_x = 0;
             uint16_t cur_y = 0;
             uint16_t cel_offset = 3;
-            cel_dest_location += 3;
             do {
                 uint8_t pixcol = cel_source_location[cel_offset] >> 4;
                 uint8_t pixcnt = cel_source_location[cel_offset] & 0x0f;
                 if ((pixcol == 0) && (pixcnt == 0)) {
                     for (; cur_x < cel_width; cur_x++) {
-                        if (cel_mirrored) {
-                            uint16_t mirrored_col = cel_width - cur_x - 1;
-                            cel_dest_location[(mirrored_col * cel_height) + cur_y] = colorval[cel_transparency];
-                        } else {
-                            cel_dest_location[(cur_x * cel_height) + cur_y] = colorval[cel_transparency];
-                        }
+                        cel_atticmem_buffer_location[(cur_x * cel_height) + cur_y] = cel_transparency;
                     }
                     cur_x = 0;
                     cur_y++;
                 } else {
                     for (uint8_t count = 0; count < pixcnt; count++) {
-                        if (cel_mirrored) {
-                            uint16_t mirrored_col = cel_width - cur_x - 1;
-                            cel_dest_location[(mirrored_col * cel_height) + cur_y] = colorval[pixcol];
-                        } else {
-                            cel_dest_location[(cur_x * cel_height) + cur_y] = colorval[pixcol];
-                        }
+                        cel_atticmem_buffer_location[(cur_x * cel_height) + cur_y] = pixcol;
                         cur_x++;
                     }
                 }
                 cel_offset++;
             } while (cur_y < cel_height);
+
+            uint16_t cel_chipmem_dest_offset = chipmem_allocoffset;
+            loop_dest_location[1 + (cel_index * 2)] = cel_chipmem_dest_offset & 0xff;
+            loop_dest_location[2 + (cel_index * 2)] = (cel_chipmem_dest_offset & 0xff00) >> 8;
+
+            uint8_t __far *cel_chipmem_dest_location = chipmem_base + cel_chipmem_dest_offset;
+            cel_chipmem_dest_location[0] = cel_width;
+            cel_chipmem_dest_location[1] = cel_height;
+            cel_chipmem_dest_location[2] = cel_source_location[2];
+            cel_chipmem_dest_location += 3;
+
+            uint8_t color_val = 0;
+            uint8_t color_len = 0;
+            for (cur_x = 0; cur_x < cel_width; cur_x++) {
+                for (cur_y = 0; cur_y < cel_height; cur_y++) {
+                    if (color_len == 0) {
+                        color_val = cel_atticmem_buffer_location[(cur_x * cel_height) + cur_y];
+                        color_len = 1;
+                    } else {
+                        if ((color_val == cel_atticmem_buffer_location[(cur_x * cel_height) + cur_y]) && (color_len < 15)) {
+                            color_len++;
+                        } else {
+                            *cel_chipmem_dest_location = (color_len << 4) | color_val;
+                            cel_chipmem_dest_location++;
+                            color_val = cel_atticmem_buffer_location[(cur_x * cel_height) + cur_y];
+                            color_len = 1;
+                            cel_size++;
+                        }
+                    }
+                }
+                *cel_chipmem_dest_location = (color_len << 4) | color_val;
+                cel_chipmem_dest_location++;
+                color_len = 0;
+                cel_size++;
+            }
+
+            chipmem_alloc(cel_size);
         }
     }
 }

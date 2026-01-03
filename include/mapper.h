@@ -20,6 +20,7 @@ void select_graphics0_mem(void);
 void select_graphics1_mem(void);
 void select_engine_logiclow_mem(void);
 void select_engine_logichigh_mem(void);
+void select_engine_enginehigh_mem(void);
 void select_sprite_mem(void);
 void select_engine_diskdriver_mem(void);
 void select_nokernel_mem(void);

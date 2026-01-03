@@ -66,6 +66,16 @@ select_engine_logichigh_mem:
 		eom
 		rts
 
+        .public select_engine_enginehigh_mem
+select_engine_enginehigh_mem:  
+		lda #0x60
+		ldx #0x23
+		ldy #0x20
+		ldz #0x33
+		map
+		eom
+		rts
+
         .public select_sprite_mem
 select_sprite_mem:  
 		lda #0x00

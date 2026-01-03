@@ -264,7 +264,7 @@ void dialog_show_internal(bool accept_input) {
     }
 }
 
-#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+#pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
 
 static bool dialog_handleinput(void) {
     if (!input_ok) {
@@ -290,39 +290,6 @@ static bool dialog_handleinput(void) {
         return dialog_handleinput_internal(ascii_key);
     }
     return false;
-}
-
-void dialog_show(bool accept_input, uint8_t __far *message_string, ...) {
-    va_list ap;
-    va_start(ap, message_string);
-    textscr_format_string_valist(message_string, ap);
-    va_end(ap);
-
-    select_gui_mem();
-    dialog_show_internal(accept_input);
-}
-
-void dialog_clear_keyboard(void) {
-    if (input_ok && (dialog_input_mode != imDialogField)) {
-        command_buffer[0] = 0;
-        cmd_buf_ptr=0;
-        ASCIIKEY = 0;
-        input_line = 22;
-        input_start_column = 3;
-        input_max_length = 37;
-
-        textscr_print_ascii(0, 22, false, (uint8_t *)">%p40");
-    }
-}
-
-void dialog_close(void) {
-    for (uint8_t line = dialog_first; line <= dialog_last; line++)
-    {
-        textscr_clear_line(line);
-    }
-    dialog_first = 0;
-    dialog_last = 0;
-    show_object_view = false;
 }
 
 void dialog_gamesave_handler(char *filename) {
@@ -354,18 +321,6 @@ void dialog_gamesave_handler(char *filename) {
         }
     }
     status_line_score = 255;
-}
-
-void dialog_gamesave_begin(bool save) {
-    if (save) {
-        active_dialog = dtSave;
-        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
-        dialog_show(true, print_string_buffer);
-    } else {
-        active_dialog = dtRestore;
-        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
-        dialog_show(true, print_string_buffer);
-    }
 }
 
 bool dialog_proc(void) {
@@ -403,6 +358,53 @@ bool dialog_proc(void) {
         break;
     }
     return retval;
+}
+
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
+void dialog_gamesave_begin(bool save) {
+    if (save) {
+        active_dialog = dtSave;
+        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
+        dialog_show(true, print_string_buffer);
+    } else {
+        active_dialog = dtRestore;
+        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
+        dialog_show(true, print_string_buffer);
+    }
+}
+
+void dialog_show(bool accept_input, uint8_t __far *message_string, ...) {
+    va_list ap;
+    va_start(ap, message_string);
+    textscr_format_string_valist(message_string, ap);
+    va_end(ap);
+
+    select_gui_mem();
+    dialog_show_internal(accept_input);
+}
+
+void dialog_close(void) {
+    for (uint8_t line = dialog_first; line <= dialog_last; line++)
+    {
+        textscr_clear_line(line);
+    }
+    dialog_first = 0;
+    dialog_last = 0;
+    show_object_view = false;
+}
+
+void dialog_clear_keyboard(void) {
+    if (input_ok && (dialog_input_mode != imDialogField)) {
+        command_buffer[0] = 0;
+        cmd_buf_ptr=0;
+        ASCIIKEY = 0;
+        input_line = 22;
+        input_start_column = 3;
+        input_max_length = 37;
+
+        textscr_print_ascii(0, 22, false, (uint8_t *)">%p40");
+    }
 }
 
 void dialog_init(void) {

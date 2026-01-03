@@ -32,6 +32,7 @@
 #include "view.h"
 #include "irq.h"
 #include "textscr.h"
+#include "mapper.h"
 
 static uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 static uint8_t drawview_trans;
@@ -316,7 +317,9 @@ bool view_load(uint8_t view_num) {
         if (view_location == 0) {
             return false;
         }
+        select_engine_enginehigh_mem();
         unpack_view(view_num, view_location);
+        select_engine_logiclow_mem();
         return true;
     }
     return false;

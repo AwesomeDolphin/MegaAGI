@@ -212,7 +212,8 @@ uint8_t gamesave_load_from_attic(void) {
 }
 
 uint8_t gamesave_load_from_disk(char *filename) {
-    gamesave_cache = attic_memory + atticmem_allocoffset;
+    uint32_t gamesave_offset = atticmem_allocoffset;
+    gamesave_cache = attic_memory + gamesave_offset;
     strcat(filename, ".AGI");
     uint32_t data_size;
     select_engine_diskdriver_mem();
@@ -222,6 +223,8 @@ uint8_t gamesave_load_from_disk(char *filename) {
     if (errcode != 0) {
         return errcode;
     } else {
-        return gamesave_load_from_attic();
+        bool result = gamesave_load_from_attic();
+        atticmem_free(gamesave_offset);
+        return result;
     }
 }

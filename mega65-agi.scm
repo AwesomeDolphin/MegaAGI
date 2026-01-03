@@ -51,7 +51,7 @@
         )
 
         (memory gamecode
-            (address (#x8004000 . #x801bfff)) (type any)
+            (address (#x8004000 . #x801ffff)) (type any)
             (section
                 (gamecode_sprhs #x8004000)
                 (gamecode_sprls #x8006000)
@@ -62,6 +62,7 @@
                 (gamecode_parsr #x8016000)
                 (gamecode_gamsv #x8018000)
                 (gamecode_guidl #x801A000)
+                (gamecode_enghi #x801C000)
             )
         )
 
@@ -122,6 +123,12 @@
             (address (#xe000 . #xfff0))
             (scatter-to gamecode_guidl)
             (section gui_text gui_data gui_rodata)
+        )
+
+        (memory engine_high
+            (address (#x8000 . #xbfff))
+            (scatter-to gamecode_enghi)
+            (section eh_text eh_data eh_rodata)
         )
 
         (memory screenmem0

@@ -91,6 +91,7 @@ void engine_show_object(uint8_t view_num) {
     show_object_view = true;
     uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
     dialog_show(false, desc_data);
+    select_engine_logichigh_mem();
 }
 
 /*
@@ -212,6 +213,7 @@ void run_loop(void) {
         run_engine = false;
 
         run_cycles++;
+        select_engine_enginehigh_mem();
         if (!dialog_proc()) {
             if (run_cycles >= logic_vars[10]) {
                 if (sound_flag_needs_set) {

@@ -97,13 +97,25 @@ const uint8_t copybankable[] =   {0x80,               // Source 0x80, attic ram
                             0x81,               // Destination 0x00, chip ram
                             0x00,
                             0x00,               // End of token list
-                            0x00,               // Copy command
+                            0x04,               // Copy command
                             0x00, 0xa0,         // count $A000 bytes
                             0x00, 0xA0, 0x00,   // source start $800A000
                             0x00, 0x00, 0x03,   // destination start $030000
                             0x00,               // command high byte
                             0x00,               // modulo
-                           };
+                            
+                            0x80,               // Source 0x80, attic ram
+                            0x80,
+                            0x81,               // Destination 0x00, chip ram
+                            0x00,
+                            0x00,               // End of token list
+                            0x04,               // Copy command
+                            0x00, 0x40,         // count $4000 bytes
+                            0x00, 0xC0, 0x01,   // source start $801C000
+                            0x00, 0xA0, 0x03,   // destination start $03A000
+                            0x00,               // command high byte
+                            0x00,               // modulo
+                            };
 
 void init_print(char *printstring) {
   char *printchar = printstring;

@@ -44,6 +44,7 @@
 
 volatile uint8_t frame_counter;
 volatile bool run_engine;
+bool quit_flag;
 
 #pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
 
@@ -189,6 +190,7 @@ void run_loop(void) {
     sound_flag_needs_set = false;
     status_line_enabled = false;
     status_line_score = 255;
+    quit_flag = false;
 
     hook_irq();
     view_init();
@@ -207,7 +209,7 @@ void run_loop(void) {
     logic_vars[23] = 0x0f;
     logic_vars[24] = 37;
     logic_vars[25] = 3;
-    while (1) {
+    while (!quit_flag) {
         while(!run_engine);
         engine_running = true;
         run_engine = false;
@@ -243,6 +245,11 @@ void run_loop(void) {
         }
         engine_running = false;
     }
+    __asm (
+        " lda #0x7e\n"
+        " sta 0xd640\n"
+        " clv"
+    );
 }
 
 #pragma clang section bss="" data="" rodata="" text=""

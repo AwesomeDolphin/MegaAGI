@@ -22,6 +22,7 @@
 #include "main.h"
 
 extern uint8_t status_line_score;
+extern bool quit_flag;
 
 void run_loop(void);
 void engine_show_object(uint8_t view_num);

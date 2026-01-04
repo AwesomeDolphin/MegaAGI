@@ -608,6 +608,10 @@ bool logic_run_low(void) {
             program_counter += 3;
             break;
         }
+        default: {
+            textscr_print_ascii(0,1,false,(uint8_t *)"FAULT: UNKINST %x at %X", *program_counter, (uint32_t)program_counter);
+            while(1);
+        }
     }
     return true;
 }
@@ -929,6 +933,7 @@ bool logic_run_high(void) {
             break;
         }
         case 0x64: {
+            // stop.sound
             sound_stop();
             program_counter += 1;
             break;
@@ -1175,6 +1180,12 @@ bool logic_run_high(void) {
             program_counter += 1;
             break;
         }
+        case 0x86: {
+            // quit
+            quit_flag = true;
+            program_counter += 2;
+            break;
+        }
         case 0x88: {
             // pause
             dialog_show(false, (uint8_t __far *)"Game paused. Press Return to continue.");
@@ -1256,6 +1267,10 @@ bool logic_run_high(void) {
             }
             program_counter += 2;
             break;
+        }
+        default: {
+            textscr_print_ascii(0,1,false,(uint8_t *)"FAULT: UNKINST %x at %X", *program_counter, (uint32_t)program_counter);
+            while(1);
         }
     }
     return true;

@@ -140,6 +140,7 @@ void init_system(void)
   VICIV.key = 0x47;
   VICIV.key = 0x53;
 
+  VICIV.palsel = 0;
   uint8_t palette_index = 0;
   for (int i = 0; i < 48; i += 3)
   {

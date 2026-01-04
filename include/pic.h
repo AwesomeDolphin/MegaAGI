@@ -19,9 +19,14 @@
 #ifndef PIC_H
 #define PIC_H
 
-extern uint16_t pic_offset;
+typedef struct pic_descriptor {
+    uint16_t offset;
+    uint16_t length;
+} pic_descriptor_t;
 
-void draw_pic(bool clear_screen);
+extern __far pic_descriptor_t pic_descriptors[256];
+
+void draw_pic(uint8_t pic_num, bool clear_screen);
 void pic_load(uint8_t pic_num);
 
 

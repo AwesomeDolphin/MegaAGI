@@ -107,6 +107,8 @@ uint32_t gamesave_save_to_attic(void) {
     offset += sizeof(object_locations);
     memmanage_memcpy_far_huge(&gamesave_cache[offset], (uint8_t __far *)add_to_pic_commands, sizeof(add_to_pic_commands));
     offset += sizeof(add_to_pic_commands);
+    memmanage_memcpy_far_huge(&gamesave_cache[offset], (uint8_t __far *)pic_descriptors, sizeof(pic_descriptors));
+    offset += sizeof(pic_descriptors);
 
     memmanage_memcpy_far_huge(&gamesave_cache[offset], chipmem_base, 0x10000);
     offset += 0x10000;
@@ -176,19 +178,19 @@ uint8_t gamesave_load_from_attic(void) {
     offset += sizeof(object_locations);
     memmanage_memcpy_huge_far((uint8_t __far *)add_to_pic_commands, &gamesave_cache[offset], sizeof(add_to_pic_commands));
     offset += sizeof(add_to_pic_commands);
+    memmanage_memcpy_huge_far((uint8_t __far *)pic_descriptors, &gamesave_cache[offset], sizeof(pic_descriptors));
+    offset += sizeof(pic_descriptors);
 
     memmanage_memcpy_huge_far(chipmem_base, &gamesave_cache[offset], 0x10000);
     logic_set_flag(12);
 
     gfx_hold_flip(true);
     engine_bridge_pic_load(logic_vars[0]);
-    engine_bridge_draw_pic(true);
-    chipmem_free(pic_offset);
+    engine_bridge_draw_pic(logic_vars[0], true);
+    chipmem_free(pic_descriptors[logic_vars[0]].offset);
     for (int i = 0; i < views_in_pic; i++) {
         if ((add_to_pic_commands[i].x_pos == 0xff) && (add_to_pic_commands[i].y_pos == 0xff)) {
-            pic_offset = (add_to_pic_commands[i].loop_index << 8);
-            pic_offset |= add_to_pic_commands[i].cel_index;
-            engine_bridge_draw_pic(false);
+            engine_bridge_draw_pic(logic_vars[add_to_pic_commands[i].view_number], false);
         } else {
             view_load(add_to_pic_commands[i].view_number);
             view_set(&object_view, add_to_pic_commands[i].view_number);

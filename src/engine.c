@@ -64,9 +64,9 @@ void engine_bridge_pic_load(uint8_t pic_num) {
     select_gamesave_mem();
 }
 
-void engine_bridge_draw_pic(bool clear) {
+void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
     select_picdraw_mem();
-    draw_pic(clear);
+    draw_pic(pic_num, clear);
     select_gamesave_mem();
 }
 

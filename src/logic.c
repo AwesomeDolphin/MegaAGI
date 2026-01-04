@@ -245,6 +245,12 @@ bool logic_run_low(void) {
             logic_stack[logic_stack_ptr].return_address = program_counter + 2;
             logic_stack[logic_stack_ptr].return_logic_num = logic_num;
             logic_num = logic_vars[program_counter[1]];
+            if (logic_infos[logic_num].offset == 0) {
+                logic_load(logic_num);
+                logic_stack[logic_stack_ptr].free_offset = logic_infos[logic_num].offset;
+            } else {
+                logic_stack[logic_stack_ptr].free_offset = 0;
+            }
             program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
             break;
         }
@@ -261,7 +267,7 @@ bool logic_run_low(void) {
             gfx_hold_flip(true);
             VICIV.bordercol = COLOR_GREEN;
             views_in_pic = 0;
-            draw_pic(true);
+            draw_pic(logic_vars[program_counter[1]], true);
             status_line_score = 255;
             program_counter += 2;
             break;
@@ -275,7 +281,7 @@ bool logic_run_low(void) {
         }
         case 0x1B: {
             // discard.pic
-            chipmem_free(pic_offset);
+            chipmem_free(pic_descriptors[program_counter[1]].offset);
             program_counter += 2;
             break;
         }
@@ -284,14 +290,14 @@ bool logic_run_low(void) {
             gfx_hold_flip(true);
             VICIV.bordercol = COLOR_GREEN;
             add_to_pic_commands[views_in_pic].view_number = program_counter[1];
-            add_to_pic_commands[views_in_pic].loop_index = (pic_offset >> 8) & 0xff;
-            add_to_pic_commands[views_in_pic].cel_index = pic_offset & 0xff;
+            add_to_pic_commands[views_in_pic].loop_index = 0xff;
+            add_to_pic_commands[views_in_pic].cel_index = 0xff;
             add_to_pic_commands[views_in_pic].x_pos = 0xff;
             add_to_pic_commands[views_in_pic].y_pos = 0xff;
             add_to_pic_commands[views_in_pic].priority = 0xff;
             add_to_pic_commands[views_in_pic].baseline_priority = 0xff;
             views_in_pic++;
-            draw_pic(false);
+            draw_pic(logic_vars[program_counter[1]], false);
             status_line_score = 255;
             program_counter += 2;
             break;
@@ -395,6 +401,7 @@ bool logic_run_low(void) {
             agisprite_t sprite = sprites[program_counter[1]];
             sprite.loop_index = program_counter[2];
             sprite.loop_offset = select_loop(&sprite.view_info, program_counter[2]);
+            sprites[program_counter[1]] = sprite;
             program_counter += 3;
             break;
         }
@@ -403,6 +410,7 @@ bool logic_run_low(void) {
             agisprite_t sprite = sprites[program_counter[1]];
             sprite.loop_index = logic_vars[program_counter[2]];
             sprite.loop_offset = select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
+            sprites[program_counter[1]] = sprite;
             program_counter += 3;
             break;
         }
@@ -655,6 +663,12 @@ bool logic_test_commands(void) {
             result = ((logic_flags[program_counter[1] >> 3]) >> (program_counter[1] & 0x07)) & 0x01;
             program_counter += 2;
             break;
+        case 0x09: {
+            // has test
+            result = (object_locations[program_counter[1]] == 255);
+            program_counter += 2;
+            break;
+        }
         case 0x0B: {
             // posn test
             view_info_t vi = sprites[program_counter[1]].view_info;
@@ -732,6 +746,14 @@ bool logic_test(void) {
     bool or_mode = false;
     bool or_result;
     while(1) {
+        if (debug) {
+            textscr_print_ascii(0,1,false,(uint8_t *)"C:%x %X", logic_num, (uint32_t)program_counter);
+            textscr_print_ascii(0,2,false,(uint8_t *)"D:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
+            while(ASCIIKEY==0) {
+    
+            }
+            ASCIIKEY=0;
+        }
         switch (*program_counter) {
             case 0xfc: {
                 if (or_mode) {
@@ -1287,8 +1309,8 @@ void logic_run(void) {
 //            debug = 1;
 //        }
         if (debug) {
-            textscr_print_ascii(0,0,false,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
-            textscr_print_ascii(0,1,false,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
+            textscr_print_ascii(0,1,false,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
+            textscr_print_ascii(0,2,false,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
             while(ASCIIKEY==0) {
     
             }

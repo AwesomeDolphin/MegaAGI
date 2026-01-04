@@ -42,6 +42,7 @@ typedef struct fill_info {
 
 #pragma clang section bss="extradata"
 __far static fill_info_t fills[128];
+__far pic_descriptor_t pic_descriptors[256];
 #pragma clang section bss=""
 
 #pragma clang section bss="banked_bss" data="picdraw_data" rodata="picdraw_rodata" text="picdraw_text"
@@ -52,8 +53,6 @@ static    uint8_t priority_on;
 static uint8_t last_relative_x;
 static uint8_t last_relative_y;
 static uint16_t fill_pointer;
-static uint16_t pic_length;
-uint16_t pic_offset;
 
 void pset(uint8_t x, uint8_t y) {
     if (pic_on) {
@@ -154,14 +153,13 @@ void draw_fill(uint8_t in_x, uint8_t in_y) {
     }
 }
 
-void draw_pic(bool clear_screen) {
+void draw_pic(uint8_t pic_num, bool clear_screen) {
     if (clear_screen) {
         gfx_cleargfx(true);
     }
     dialog_close();
     uint8_t __far *pic_file;
-    pic_file = chipmem_base + pic_offset;
-
+    pic_file = chipmem_base + pic_descriptors[pic_num].offset;
     pic_on = 0;
     priority_on = 0;
     uint16_t index = 0;
@@ -249,7 +247,7 @@ void draw_pic(bool clear_screen) {
             default:
                 return;
         }
-    } while (index < pic_length);
+    } while (index < pic_descriptors[pic_num].length);
     pic_color = 0;
     pic_on = 1;
     priority_color = 4;
@@ -258,8 +256,10 @@ void draw_pic(bool clear_screen) {
 }
 
 void pic_load(uint8_t pic_num) {
-    pic_offset = load_volume_object(voPic, pic_num, &pic_length);
-    if (pic_offset == 0) {
+    uint16_t length;
+    pic_descriptors[pic_num].offset = load_volume_object(voPic, pic_num, &length);
+    pic_descriptors[pic_num].length = length;
+    if (pic_descriptors[pic_num].offset == 0) {
         textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
         return;
     }

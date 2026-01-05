@@ -50,6 +50,7 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     }
 
     sound_flag_end = flag_at_end;
+    logic_reset_flag(sound_flag_end);
 
     voice_offsets[0] = (sound_file[1] << 8) | sound_file[0];
     voice_offsets[1] = (sound_file[3] << 8) | sound_file[2];

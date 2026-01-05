@@ -582,7 +582,7 @@ void sprite_update_sprite(uint8_t sprite_num) {
                 }
             } else {
                 sprite.cel_index++;
-                if (sprite.cel_index >= (sprite.view_info.number_of_cels - 1)) {
+                if (sprite.cel_index > (sprite.view_info.number_of_cels - 1)) {
                     sprite.cel_index = (sprite.view_info.number_of_cels - 1);
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;

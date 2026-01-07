@@ -158,10 +158,14 @@ void textscr_print_asciistr(uint8_t x, uint8_t y, bool reverse, uint8_t __far *o
 }
 
 void textscr_clear_line(uint8_t y) {
-  printpos = (y * 61) + 20;
-  screen_memory_0[printpos] = 0x140;
-  screen_memory_1[printpos] = 0x140;
-  color_memory[printpos] = 0x0010;       
+  if (game_text) {
+    textscr_print_ascii(0, y, false, (uint8_t *)"%p40");
+  } else {
+    printpos = (y * 61) + 20;
+    screen_memory_0[printpos] = 0x140;
+    screen_memory_1[printpos] = 0x140;
+    color_memory[printpos] = 0x0010;       
+  }
 }
 
 void textscr_set_textmode(bool enable_text) {

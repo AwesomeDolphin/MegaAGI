@@ -281,7 +281,7 @@ bool logic_run_low(void) {
         }
         case 0x1B: {
             // discard.pic
-            chipmem_free(pic_descriptors[program_counter[1]].offset);
+            chipmem_free(pic_descriptors[logic_vars[program_counter[1]]].offset);
             program_counter += 2;
             break;
         }
@@ -617,7 +617,7 @@ bool logic_run_low(void) {
             break;
         }
         default: {
-            textscr_print_ascii(0,1,false,(uint8_t *)"FAULT: UNKINST %x at %X", *program_counter, (uint32_t)program_counter);
+            textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKLINS=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }
@@ -731,6 +731,20 @@ bool logic_test_commands(void) {
                 }
             }
             program_counter += 2 + (numwords * 2);
+            break;
+        }
+        case 0x10: {
+            // obj.in.box test
+            result = false;
+            view_info_t vi = sprites[program_counter[1]].view_info;
+            if ((program_counter[2] <= vi.x_pos) && (vi.x_pos <= program_counter[4]) && (program_counter[3] <= vi.y_pos) && (vi.y_pos <= program_counter[5])) {
+                static uint8_t view_right;
+                view_right = vi.x_pos + vi.width;
+                if ((program_counter[2] <= view_right) && (view_right <= program_counter[4])) {
+                    result = true;
+                }
+            }
+            program_counter += 6;
             break;
         }
         default:
@@ -1074,6 +1088,16 @@ bool logic_run_high(void) {
             program_counter += 3;
             break;
         }
+        case 0x73: {
+            // get.string
+            program_counter += 6;
+            break;
+        }
+        case 0x75: {
+            // parse
+            program_counter += 2;
+            break;
+        }
         case 0x77: {
             // prevent.input
             engine_allowinput(false);
@@ -1093,7 +1117,7 @@ bool logic_run_high(void) {
         }
         case 0x7A: {
             // add.to.pic
-            view_set(&object_view, program_counter[1]);
+/*            view_set(&object_view, program_counter[1]);
             select_loop(&object_view, program_counter[2]);
             object_view.cel_offset = program_counter[3];
             object_view.x_pos = program_counter[4];
@@ -1112,7 +1136,7 @@ bool logic_run_high(void) {
             views_in_pic++;
             select_sprite_mem();
             sprite_draw_to_pic();
-            select_engine_logichigh_mem();
+            select_engine_logichigh_mem();*/
             program_counter += 8;
             break;
         }
@@ -1273,6 +1297,16 @@ bool logic_run_high(void) {
             program_counter += 2;
             break;
         }
+        case 0xA3: {
+            // open.dialogue
+            program_counter += 1;
+            break;
+        }
+        case 0xA4: {
+            // close.dialogue
+            program_counter += 1;
+            break;
+        }
         case 0xfe: {
             int16_t branch_bytes = program_counter[2];
             branch_bytes = (branch_bytes << 8) | program_counter[1]; 
@@ -1291,7 +1325,7 @@ bool logic_run_high(void) {
             break;
         }
         default: {
-            textscr_print_ascii(0,1,false,(uint8_t *)"FAULT: UNKINST %x at %X", *program_counter, (uint32_t)program_counter);
+            textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKHINS=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }

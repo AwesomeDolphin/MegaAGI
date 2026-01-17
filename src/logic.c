@@ -57,7 +57,7 @@ typedef struct logic_stack_entry {
 static uint8_t logic_controllers[32];
 static logic_stack_entry_t logic_stack[16];
 static uint8_t __far *program_counter;
-static uint8_t __far *logic_strings;
+uint8_t __far *global_strings;
 static uint8_t logic_stack_ptr;
 
 uint32_t object_data_offset;
@@ -295,7 +295,7 @@ bool logic_run_low(void) {
             add_to_pic_commands[views_in_pic].x_pos = 0xff;
             add_to_pic_commands[views_in_pic].y_pos = 0xff;
             add_to_pic_commands[views_in_pic].priority = 0xff;
-            add_to_pic_commands[views_in_pic].baseline_priority = 0xff;
+            add_to_pic_commands[views_in_pic].margin = 0xff;
             views_in_pic++;
             draw_pic(logic_vars[program_counter[1]], false);
             status_line_score = 255;
@@ -322,8 +322,16 @@ bool logic_run_low(void) {
         }
         case 0x21: {
             // animate_obj
-            animated_sprites[animated_sprite_count] = program_counter[1];
-            animated_sprite_count++;
+            bool found = false;
+            for (uint8_t ctr = 0; ctr < animated_sprite_count; ctr++) {
+                if (animated_sprites[ctr] == program_counter[1]) {
+                    found = true;
+                }
+            }
+            if (!found) {
+                animated_sprites[animated_sprite_count] = program_counter[1];
+                animated_sprite_count++;
+            }
             program_counter += 2;
             break;
         }
@@ -423,6 +431,12 @@ bool logic_run_low(void) {
         case 0x30: {
             // set.cel.v
             sprites[program_counter[1]].cel_index = logic_vars[program_counter[2]];
+            program_counter += 3;
+            break;
+        }
+        case 0x31: {
+            // last.cel
+            logic_vars[program_counter[2]] = sprites[program_counter[1]].view_info.number_of_cels - 1;
             program_counter += 3;
             break;
         }
@@ -563,6 +577,7 @@ bool logic_run_low(void) {
             // end.of.loop
             sprites[program_counter[1]].cycling = false;
             sprites[program_counter[1]].end_of_loop = program_counter[2];
+            logic_reset_flag(program_counter[2]);
             sprites[program_counter[1]].reverse = false;
             sprites[program_counter[1]].cel_index = 0;
             program_counter += 3;
@@ -578,6 +593,7 @@ bool logic_run_low(void) {
             // reverse.loop
             sprites[program_counter[1]].cycling = false;
             sprites[program_counter[1]].end_of_loop = program_counter[2];
+            logic_reset_flag(program_counter[2]);
             sprites[program_counter[1]].reverse = true;
             sprites[program_counter[1]].cel_index = sprites[program_counter[1]].view_info.number_of_cels - 1;
             program_counter += 3;
@@ -739,10 +755,34 @@ bool logic_test_commands(void) {
             view_info_t vi = sprites[program_counter[1]].view_info;
             if ((program_counter[2] <= vi.x_pos) && (vi.x_pos <= program_counter[4]) && (program_counter[3] <= vi.y_pos) && (vi.y_pos <= program_counter[5])) {
                 static uint8_t view_right;
-                view_right = vi.x_pos + vi.width;
+                view_right = vi.x_pos + vi.width - 1;
                 if ((program_counter[2] <= view_right) && (view_right <= program_counter[4])) {
                     result = true;
                 }
+            }
+            program_counter += 6;
+            break;
+        }
+        case 0x11: {
+            // center.posn test
+            result = false;
+            view_info_t vi = sprites[program_counter[1]].view_info;
+            static uint8_t view_center;
+            view_center = vi.x_pos + (vi.width / 2);
+            if ((program_counter[2] <= view_center) && (view_center <= program_counter[4]) && (program_counter[3] <= vi.y_pos) && (vi.y_pos <= program_counter[5])) {
+                result = true;
+            }
+            program_counter += 6;
+            break;
+        }
+        case 0x12: {
+            // right.posn test
+            result = false;
+            view_info_t vi = sprites[program_counter[1]].view_info;
+            static uint8_t view_right;
+            view_right = vi.x_pos + vi.width - 1;
+            if ((program_counter[2] <= view_right) && (view_right <= program_counter[4]) && (program_counter[3] <= vi.y_pos) && (vi.y_pos <= program_counter[5])) {
+                result = true;
             }
             program_counter += 6;
             break;
@@ -1082,7 +1122,7 @@ bool logic_run_high(void) {
         }
         case 0x72: {
             // set.string
-            uint8_t __far *dest_string = logic_strings + (40 * program_counter[1]);
+            uint8_t __far *dest_string = global_strings + (40 * program_counter[1]);
             uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[2]);
             memmanage_strcpy_far_far(dest_string, src_string);
             program_counter += 3;
@@ -1117,7 +1157,7 @@ bool logic_run_high(void) {
         }
         case 0x7A: {
             // add.to.pic
-/*            view_set(&object_view, program_counter[1]);
+            view_set(&object_view, program_counter[1]);
             select_loop(&object_view, program_counter[2]);
             object_view.cel_offset = program_counter[3];
             object_view.x_pos = program_counter[4];
@@ -1125,18 +1165,32 @@ bool logic_run_high(void) {
             object_view.priority_override = true;
             object_view.priority = program_counter[6];
             object_view.priority_set = true;
-            object_view.baseline_priority = program_counter[7];
             add_to_pic_commands[views_in_pic].view_number = program_counter[1];
             add_to_pic_commands[views_in_pic].loop_index = program_counter[2];
             add_to_pic_commands[views_in_pic].cel_index = program_counter[3];
             add_to_pic_commands[views_in_pic].x_pos = program_counter[4];
             add_to_pic_commands[views_in_pic].y_pos = program_counter[5];
             add_to_pic_commands[views_in_pic].priority = program_counter[6];
-            add_to_pic_commands[views_in_pic].baseline_priority = program_counter[7];
+            add_to_pic_commands[views_in_pic].margin = program_counter[7];
             views_in_pic++;
             select_sprite_mem();
             sprite_draw_to_pic();
-            select_engine_logichigh_mem();*/
+            select_engine_logichigh_mem();
+            uint8_t y2 = 0;
+            for (uint8_t i = 11; i > 0; i--) {
+                if (priority_bands[i-1] < program_counter[5]+1){
+                    y2 = priority_bands[i-1];
+                    break;
+                }
+            }
+            if (y2 < (object_view.y_pos - object_view.height + 1)) {
+                y2 = (object_view.y_pos - object_view.height + 1);
+            }
+            gfx_drawslowline(program_counter[4], program_counter[5], program_counter[4], y2, program_counter[7] | 0x80);
+            gfx_drawslowline(program_counter[4] + object_view.width - 1, program_counter[5], program_counter[4] + object_view.width - 1, y2, program_counter[7] | 0x80);
+            gfx_drawslowline(program_counter[4], program_counter[5], program_counter[4] + object_view.width - 1,  program_counter[5], program_counter[7] | 0x80);
+            gfx_drawslowline(program_counter[4], y2, program_counter[4] + object_view.width - 1,  y2, program_counter[7] | 0x80);
+
             program_counter += 8;
             break;
         }
@@ -1234,7 +1288,8 @@ bool logic_run_high(void) {
         }
         case 0x88: {
             // pause
-            dialog_show(false, (uint8_t __far *)"Game paused. Press Return to continue.");
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game paused. Press Return to continue.");
+            dialog_show(false, print_string_buffer);
             program_counter += 1;
             break;
         }
@@ -1272,6 +1327,16 @@ bool logic_run_high(void) {
             if (!sprites[program_counter[1]].view_info.priority_override) {
                 sprites[program_counter[1]].view_info.priority = priorities[sprites[program_counter[1]].view_info.y_pos];
             }
+            program_counter += 4;
+            break;
+        }
+        case 0x95: {
+            // trace.on
+            program_counter += 1;
+            break;
+        }
+        case 0x96: {
+            // trace.info
             program_counter += 4;
             break;
         }
@@ -1418,13 +1483,13 @@ void logic_init(void) {
         logic_flags[counter] = 0;
     }
 
-    logic_strings = chipmem_base + chipmem_alloc(24 * 40);
+    global_strings = chipmem_base + chipmem_alloc(24 * 40);
     for (int counter = 0; counter < (24 * 40); counter++) {
-        logic_strings[counter] = 0x99;
+        global_strings[counter] = 0x99;
     }
 
     for (int counter = 0; counter < (24 * 40); counter++) {
-        logic_strings[counter] = 0x99;
+        global_strings[counter] = 0x99;
     }
 
     uint8_t __huge *object_ptr = attic_memory + object_data_offset;

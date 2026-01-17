@@ -36,7 +36,6 @@ typedef struct view_info {
     bool priority_override;
     uint8_t priority;
     bool priority_set;
-    uint8_t baseline_priority;
     uint16_t desc_offset;
 } view_info_t;
 

@@ -41,7 +41,7 @@ volatile bool sound_flag_needs_set;
 
 void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     if (sound_running) {
-        return;
+        sound_stop();
     }
     uint16_t length;
     sound_file = locate_volume_object(voSound, sound_num, &length);

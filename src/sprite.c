@@ -54,8 +54,8 @@ void sprite_draw_to_pic(void) {
     }
     
     draw_cel(&object_view, object_view.cel_offset);
-
     gfx_hold_flip(old_hold);
+    select_sprite_mem();
 }
 
 bool sprite_draw_animated(void) {
@@ -118,6 +118,8 @@ void sprite_erase_animated(void) {
 }
 
 #pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
+uint8_t priority_bands[11] = {48, 60, 72, 84, 96, 108, 120, 132, 144, 156, 168};
 
 uint8_t priorities[169];
 
@@ -563,8 +565,10 @@ void sprite_update_sprite(uint8_t sprite_num) {
             if (sprite.reverse) {
                 if (sprite.cel_index == 0) {
                     sprite.cel_index = sprite.view_info.number_of_cels;
+                } else {
+                    sprite.cel_index--;
                 }
-                sprite.cel_index--;
+
             } else {
                 sprite.cel_index++;
                 if (sprite.cel_index >= sprite.view_info.number_of_cels) {

@@ -31,6 +31,7 @@
 #include "mapper.h"
 #include "memmanage.h" 
 #include "parser.h"
+#include "pic.h"
 #include "textscr.h"
 
 #pragma clang section bss="banked_bss" data="gui_data" rodata="gui_rodata" text="gui_text"
@@ -69,6 +70,7 @@ uint8_t x_start;
 uint8_t y_start;
 input_mode_t dialog_input_mode;
 dialog_type_t active_dialog;
+bool show_priority;
 
 static bool dialog_handleinput_internal(uint8_t ascii_key) {
     switch(ascii_key) {
@@ -112,6 +114,9 @@ static bool dialog_handleinput_internal(uint8_t ascii_key) {
             break;
         case 0x2d:
             logic_set_controller(8);
+            break;
+        case 0xfd:
+            show_priority = true;
             break;
         default:
             if ((ascii_key >= 32) && (ascii_key < 127)) {
@@ -357,6 +362,10 @@ bool dialog_proc(void) {
             }
         break;
     }
+    if (show_priority) {
+        select_picdraw_mem();
+        pic_show_priority();
+    }
     return retval;
 }
 
@@ -417,4 +426,5 @@ void dialog_init(void) {
     cursor_delay = 0;
     dialog_input_mode = imParser;
     game_text = false;
+    show_priority = false;
 }

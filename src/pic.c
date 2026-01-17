@@ -87,19 +87,16 @@ void draw_relative_line(uint8_t coord) {
 }
 
 uint8_t can_fill(uint8_t x, uint8_t y) {
-    if ((pic_on == 0) && (priority_on == 0)) {
-        return 0;
-    }
     if ((x >= 160) || (y >= 168)) {
         return 0;
     }
-    if (pic_color == 15) {
-        return 0;
+    if (!priority_on && pic_on && (pic_color != 15)) {
+        return (gfx_get(x, y) == 15);
     }
-    if (pic_on == 0) {
+    if (priority_on && !pic_on && (priority_color != 4)) {
         return (gfx_getprio(x, y) == 4);
     }
-    return (gfx_get(x, y) == 15);
+    return (pic_on && (gfx_get(x, y) == 15) && (pic_color != 15));
 }
 
 void draw_fill(uint8_t in_x, uint8_t in_y) {
@@ -253,6 +250,19 @@ void draw_pic(uint8_t pic_num, bool clear_screen) {
     priority_color = 4;
     priority_on = 1;
     draw_line(0, 167, 159, 167);
+}
+
+void pic_show_priority(void) {
+    drawing_screen = 0;
+    viewing_screen = 0;
+
+    for (uint8_t col = 0; col < 160; col++) {
+        for (uint8_t row = 0; row < 168; row++) {
+            gfx_plotput(col, row, gfx_getprio(col, row));
+        }
+    }
+    VICIV.bordercol = COLOR_RED;
+    while(1);
 }
 
 void pic_load(uint8_t pic_num) {

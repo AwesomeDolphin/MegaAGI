@@ -29,7 +29,7 @@ typedef struct add_to_pic_command {
     uint8_t x_pos;
     uint8_t y_pos;
     uint8_t priority;
-    uint8_t baseline_priority;
+    uint8_t margin;
 } add_to_pic_command_t;
 
 extern uint16_t chipmem_allocoffset;

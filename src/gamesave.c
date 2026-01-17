@@ -201,7 +201,6 @@ uint8_t gamesave_load_from_attic(void) {
             object_view.priority_override = true;
             object_view.priority = add_to_pic_commands[i].priority;
             object_view.priority_set = true;
-            object_view.baseline_priority = add_to_pic_commands[i].baseline_priority;
             select_sprite_mem();
             sprite_draw_to_pic();
             select_engine_logichigh_mem();

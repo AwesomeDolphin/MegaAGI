@@ -62,12 +62,10 @@ static int16_t drawview_top;
 static uint8_t drawview_right;
 static uint8_t drawview_bottom;
 static uint8_t objprio;
-static uint8_t baseprio;
 static uint8_t prio_mask;
 static uint8_t prio_preserve_mask;
 static uint8_t prio_threshold;
 static uint8_t prio_compare;
-static uint8_t prio_base_compare;
 static uint8_t rle_color;
 static uint8_t rle_count;
 
@@ -77,7 +75,6 @@ bool draw_cel_forwards(view_info_t *info, uint8_t cel) {
     info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
 
     uint8_t __far *cel_data = chipmem_base + info->cel_offset;
-    uint16_t pixel_offset = 0;
 
     drawview_trans = colorval[cel_data[2] & 0x0f];
     drawview_left = info->x_pos;
@@ -86,7 +83,6 @@ bool draw_cel_forwards(view_info_t *info, uint8_t cel) {
     drawview_bottom = info->y_pos;
 
     objprio = colorval[info->priority];
-    baseprio = colorval[info->baseline_priority];
 
     cel_data += 3;
     bool drew_something = false;;
@@ -112,11 +108,11 @@ bool draw_cel_forwards(view_info_t *info, uint8_t cel) {
 
         // Mask the priority values once
         prio_compare = objprio & prio_mask;
-        prio_base_compare = baseprio & prio_mask;
 
         for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom;) {
             if ((draw_row < 0) || (draw_row > 167)) {
                 priority_pointer += 80;
+                draw_row++;
                 continue;
             }
             rle_count = high_nibble[*cel_data];
@@ -135,16 +131,12 @@ bool draw_cel_forwards(view_info_t *info, uint8_t cel) {
                         *draw_pointer = rle_color;
                         drew_something=true;
                         if (info->priority_set) {
-                            if ((draw_row == drawview_bottom) && (prio_base_compare < prio_threshold)) {
-                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_base_compare;
-                            } else {
-                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_compare;
-                            }
+                            scanprio_pointer -= 80;
+                            *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_compare;
                         }
                     }
                 }
                 draw_pointer += 8;
-                pixel_offset++;
                 draw_row++;
             }
             cel_data++;
@@ -159,7 +151,6 @@ bool draw_cel_backwards(view_info_t *info, uint8_t cel) {
     info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
 
     uint8_t __far *cel_data = chipmem_base + info->cel_offset;
-    uint16_t pixel_offset = 0;
 
     drawview_trans = colorval[cel_data[2] & 0x0f];
     drawview_left = info->x_pos;
@@ -168,7 +159,6 @@ bool draw_cel_backwards(view_info_t *info, uint8_t cel) {
     drawview_bottom = info->y_pos;
 
     objprio = colorval[info->priority];
-    baseprio = colorval[info->baseline_priority];
 
     cel_data += 3;
     bool drew_something = false;;
@@ -194,11 +184,11 @@ bool draw_cel_backwards(view_info_t *info, uint8_t cel) {
 
         // Mask the priority values once
         prio_compare = objprio & prio_mask;
-        prio_base_compare = baseprio & prio_mask;
 
         for (int16_t draw_row = drawview_top; draw_row <= drawview_bottom;) {
             if ((draw_row < 0) || (draw_row > 167)) {
                 priority_pointer += 80;
+                draw_row++;
                 continue;
             }
             rle_count = high_nibble[*cel_data];
@@ -217,16 +207,12 @@ bool draw_cel_backwards(view_info_t *info, uint8_t cel) {
                         *draw_pointer = rle_color;
                         drew_something=true;
                         if (info->priority_set) {
-                            if ((draw_row == drawview_bottom) && (prio_base_compare < prio_threshold)) {
-                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_base_compare;
-                            } else {
-                                *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_compare;
-                            }
+                            scanprio_pointer -= 80;
+                            *scanprio_pointer = (*scanprio_pointer & prio_preserve_mask) | prio_compare;
                         }
                     }
                 }
                 draw_pointer += 8;
-                pixel_offset++;
                 draw_row++;
             }
             cel_data++;

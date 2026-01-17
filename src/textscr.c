@@ -170,15 +170,15 @@ void textscr_clear_line(uint8_t y) {
 
 void textscr_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
+    game_text = true;
     for (uint8_t i = 0; i < 25; i++) {
       textscr_print_ascii(0, i, false, (uint8_t *)"%p40");
     }
-    game_text = true;
   } else {
+    game_text = false;
     for (uint8_t i = 0; i < 25; i++) {
       textscr_clear_line(i);
     }
-    game_text = false;
   }
 }
 
@@ -212,15 +212,15 @@ void textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
           break;
         }
         case 's': {
-          const char *wordptr = va_arg(ap, char*);
-          uint8_t wordchr = (uint8_t)*wordptr;
-          while (wordchr != 0) {
-            formatted_string_buffer[padlen] = wordchr;
+          uint8_t string_number = my_atoi(ascii_string + 1, &ascii_string);
+          uint8_t __far *src_string = global_strings + (40 * string_number);
+          uint8_t string_char = *src_string;
+          while (string_char != 0) {
+            formatted_string_buffer[padlen] = string_char;
             padlen++;
-            wordptr++;
-            wordchr = (uint8_t)*wordptr;
+            src_string++;
+            string_char = *src_string;
           };
-          ascii_string++;
           break;
         }
         case 'S': {

@@ -24,6 +24,7 @@
 extern volatile uint8_t __far *drawing_xpointer[2][160];
 extern uint8_t *fastdrawing_xpointer[160];
 extern volatile uint8_t drawing_screen;
+extern volatile uint8_t viewing_screen;
 extern __far uint16_t screen_memory_0[1525];
 extern __far uint16_t screen_memory_1[1525];
 extern __far uint16_t color_memory[1024];

@@ -69,6 +69,7 @@ typedef struct {
     bool ego;
 } agisprite_t;
 
+extern uint8_t priority_bands[11];
 extern uint8_t priorities[169];
 extern view_info_t object_view;
 extern bool show_object_view;

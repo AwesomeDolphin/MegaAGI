@@ -41,4 +41,6 @@ struct __F018 {
 /// DMA controller
 #define DMA (*(volatile struct __F018 *)0xd700)
 
+extern uint8_t __far *global_strings;
+
 #endif

@@ -32,5 +32,6 @@ void engine_allowinput(bool allowed);
 void engine_statusline(bool enable);
 void engine_bridge_pic_load(uint8_t pic_num);
 void engine_bridge_draw_pic(uint8_t pic_num, bool clear);
+void engine_bridge_add_to_pic(uint8_t add_command_num);
 
 #endif

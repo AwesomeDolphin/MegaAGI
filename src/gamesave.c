@@ -192,19 +192,7 @@ uint8_t gamesave_load_from_attic(void) {
         if ((add_to_pic_commands[i].x_pos == 0xff) && (add_to_pic_commands[i].y_pos == 0xff)) {
             engine_bridge_draw_pic(logic_vars[add_to_pic_commands[i].view_number], false);
         } else {
-            view_load(add_to_pic_commands[i].view_number);
-            view_set(&object_view, add_to_pic_commands[i].view_number);
-            select_loop(&object_view, add_to_pic_commands[i].loop_index);
-            object_view.cel_offset = add_to_pic_commands[i].cel_index;
-            object_view.x_pos = add_to_pic_commands[i].x_pos;
-            object_view.y_pos = add_to_pic_commands[i].y_pos;
-            object_view.priority_override = true;
-            object_view.priority = add_to_pic_commands[i].priority;
-            object_view.priority_set = true;
-            select_sprite_mem();
-            sprite_draw_to_pic();
-            select_engine_logichigh_mem();
-            view_unload(add_to_pic_commands[i].view_number);
+            engine_bridge_add_to_pic(i);
         }
     }
     gfx_hold_flip(false);

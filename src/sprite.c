@@ -53,7 +53,7 @@ void sprite_draw_to_pic(void) {
         select_graphics1_mem();
     }
     
-    draw_cel(&object_view, object_view.cel_offset);
+    draw_cel(&object_view, object_view.cel_index);
     gfx_hold_flip(old_hold);
     select_sprite_mem();
 }

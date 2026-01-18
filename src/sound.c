@@ -29,7 +29,7 @@
 
 #define FARSID1 (*(volatile struct __sid __far *)0xffd3400)
 
-uint8_t __huge *sound_file;
+volatile uint8_t __huge *sound_file;
 volatile uint16_t voice_offsets[3] = {0};
 volatile uint8_t voice_stopped[3] = {1};
 volatile uint16_t durations[3] = {0};
@@ -38,18 +38,29 @@ volatile uint8_t sound_flag_end;
 volatile uint8_t sound_running;
 volatile bool request_stop;
 volatile bool sound_flag_needs_set;
+volatile uint8_t next_sound_flag_end;
+volatile uint8_t __huge * next_sound_file;
+volatile bool sound_queued;
 
 void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
+    uint16_t length;
     if (sound_running) {
         sound_stop();
     }
-    uint16_t length;
-    sound_file = locate_volume_object(voSound, sound_num, &length);
-    if (sound_file == NULL) {
+
+    next_sound_file = locate_volume_object(voSound, sound_num, &length);
+    if (next_sound_file == NULL) {
         return;
     }
 
-    sound_flag_end = flag_at_end;
+    next_sound_flag_end = flag_at_end;
+    sound_queued = true;
+}
+
+static void sound_play_queued(void) {
+    sound_queued = false;
+    sound_file = next_sound_file;
+    sound_flag_end = next_sound_flag_end;
     logic_reset_flag(sound_flag_end);
 
     voice_offsets[0] = (sound_file[1] << 8) | sound_file[0];
@@ -81,18 +92,6 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
 void sound_stop(void) {
     if (sound_running) {
         request_stop = true;
-        while(sound_running) {
-            // Wait for sound to stop
-        }
-        if (sound_flag_needs_set) {
-            sound_flag_needs_set = false;
-            logic_set_flag(sound_flag_end);
-        }
-    }
-}
-
-void wait_sound(void) {
-    while (sound_running) {
     }
 }
 
@@ -160,5 +159,9 @@ void sound_interrupt_handler(void) {
         FARSID1.amp = 0x00;
         sound_flag_needs_set = true;
         sound_running = 0;
+    }
+
+    if (!sound_running && sound_queued) {
+        sound_play_queued();
     }
 }

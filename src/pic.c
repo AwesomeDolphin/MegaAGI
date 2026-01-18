@@ -32,6 +32,7 @@
 #include "textscr.h"
 #include "main.h"
 #include "memmanage.h"
+#include "mapper.h"
 
 typedef struct fill_info {
     int16_t x1;
@@ -250,6 +251,39 @@ void draw_pic(uint8_t pic_num, bool clear_screen) {
     priority_color = 4;
     priority_on = 1;
     draw_line(0, 167, 159, 167);
+}
+
+void pic_add_to_pic(uint8_t pic_command) {
+    views_in_pic++;
+
+    view_set(&object_view, add_to_pic_commands[pic_command].view_number);
+    select_loop(&object_view, add_to_pic_commands[pic_command].loop_index);
+    object_view.cel_index = add_to_pic_commands[pic_command].cel_index;
+    object_view.x_pos = add_to_pic_commands[pic_command].x_pos;
+    object_view.y_pos = add_to_pic_commands[pic_command].y_pos;
+    object_view.priority_override = true;
+    object_view.priority = add_to_pic_commands[pic_command].priority;
+    object_view.priority_set = true;
+
+    select_sprite_mem();
+    sprite_draw_to_pic();
+    select_engine_logichigh_mem();
+    if (add_to_pic_commands[pic_command].margin < 4) {
+        uint8_t y2 = 0;
+        for (uint8_t i = 11; i > 0; i--) {
+            if (priority_bands[i-1] < object_view.y_pos){
+                y2 = priority_bands[i-1];
+                break;
+            }
+        }
+        if (y2 < (object_view.y_pos - object_view.height + 1)) {
+            y2 = (object_view.y_pos - object_view.height + 1);
+        }
+        gfx_drawslowline(object_view.x_pos, object_view.y_pos, object_view.x_pos, y2, add_to_pic_commands[pic_command].margin | 0x80);
+        gfx_drawslowline(object_view.x_pos + object_view.width - 1, object_view.y_pos, object_view.x_pos + object_view.width - 1, y2, add_to_pic_commands[pic_command].margin | 0x80);
+        gfx_drawslowline(object_view.x_pos, object_view.y_pos, object_view.x_pos + object_view.width - 1,  object_view.y_pos, add_to_pic_commands[pic_command].margin | 0x80);
+        gfx_drawslowline(object_view.x_pos, y2, object_view.x_pos + object_view.width - 1,  y2, add_to_pic_commands[pic_command].margin | 0x80);
+    }
 }
 
 void pic_show_priority(void) {

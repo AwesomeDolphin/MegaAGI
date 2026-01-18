@@ -64,6 +64,12 @@ void engine_bridge_pic_load(uint8_t pic_num) {
     select_gamesave_mem();
 }
 
+void engine_bridge_add_to_pic(uint8_t add_command_num) {
+    select_picdraw_mem();
+    pic_add_to_pic(add_command_num);
+    select_gamesave_mem();
+}
+
 void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
     select_picdraw_mem();
     draw_pic(pic_num, clear);

@@ -40,8 +40,6 @@
 #include "view.h"
 #include "volume.h"
 
-#pragma clang section bss="extradata"
-
 #pragma clang section bss="banked_bss" data="data" rodata="data" text="code"
 static uint8_t logic_num; 
 
@@ -1157,14 +1155,6 @@ bool logic_run_high(void) {
         }
         case 0x7A: {
             // add.to.pic
-            view_set(&object_view, program_counter[1]);
-            select_loop(&object_view, program_counter[2]);
-            object_view.cel_offset = program_counter[3];
-            object_view.x_pos = program_counter[4];
-            object_view.y_pos = program_counter[5];
-            object_view.priority_override = true;
-            object_view.priority = program_counter[6];
-            object_view.priority_set = true;
             add_to_pic_commands[views_in_pic].view_number = program_counter[1];
             add_to_pic_commands[views_in_pic].loop_index = program_counter[2];
             add_to_pic_commands[views_in_pic].cel_index = program_counter[3];
@@ -1172,25 +1162,9 @@ bool logic_run_high(void) {
             add_to_pic_commands[views_in_pic].y_pos = program_counter[5];
             add_to_pic_commands[views_in_pic].priority = program_counter[6];
             add_to_pic_commands[views_in_pic].margin = program_counter[7];
+            select_picdraw_mem();
+            pic_add_to_pic(views_in_pic);
             views_in_pic++;
-            select_sprite_mem();
-            sprite_draw_to_pic();
-            select_engine_logichigh_mem();
-            uint8_t y2 = 0;
-            for (uint8_t i = 11; i > 0; i--) {
-                if (priority_bands[i-1] < program_counter[5]+1){
-                    y2 = priority_bands[i-1];
-                    break;
-                }
-            }
-            if (y2 < (object_view.y_pos - object_view.height + 1)) {
-                y2 = (object_view.y_pos - object_view.height + 1);
-            }
-            gfx_drawslowline(program_counter[4], program_counter[5], program_counter[4], y2, program_counter[7] | 0x80);
-            gfx_drawslowline(program_counter[4] + object_view.width - 1, program_counter[5], program_counter[4] + object_view.width - 1, y2, program_counter[7] | 0x80);
-            gfx_drawslowline(program_counter[4], program_counter[5], program_counter[4] + object_view.width - 1,  program_counter[5], program_counter[7] | 0x80);
-            gfx_drawslowline(program_counter[4], y2, program_counter[4] + object_view.width - 1,  y2, program_counter[7] | 0x80);
-
             program_counter += 8;
             break;
         }

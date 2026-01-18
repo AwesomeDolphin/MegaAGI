@@ -27,6 +27,7 @@ typedef struct pic_descriptor {
 extern __far pic_descriptor_t pic_descriptors[256];
 
 void draw_pic(uint8_t pic_num, bool clear_screen);
+void pic_add_to_pic(uint8_t pic_command);
 void pic_show_priority(void);
 void pic_load(uint8_t pic_num);
 

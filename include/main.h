@@ -42,5 +42,6 @@ struct __F018 {
 #define DMA (*(volatile struct __F018 *)0xd700)
 
 extern uint8_t __far *global_strings;
+extern volatile bool run_engine;
 
 #endif

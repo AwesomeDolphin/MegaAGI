@@ -262,8 +262,8 @@ void run_loop(void) {
 
 __attribute__((interrupt))
 void engine_interrupt_handler(void) {
-    volatile uint8_t __far *far_irr = (uint8_t __far *)0xffd3019;
-    if (!((*far_irr) & 0x01)) {
+    volatile uint8_t *irr = (uint8_t *)0xd019;
+    if (!((*irr) & 0x01)) {
         // not a raster interrupt, ignore
         return;
       }
@@ -273,9 +273,11 @@ void engine_interrupt_handler(void) {
     
     frame_counter++;
     if (frame_counter >= 3) {
-        gfx_flippage();
+        if (!engine_running) {
+            gfx_flippage();
+        }
         run_engine = true;
         frame_counter = 0;
     }
-    *far_irr = *far_irr; // ack interrupt
+    *irr = *irr; // ack interrupt
 }

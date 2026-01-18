@@ -195,6 +195,7 @@ bool logic_run_low(void) {
         }
         case 0x12: {
             // new.screen
+            VICIV.bordercol = COLOR_GREEN;
             gfx_hold_flip(true);
             sprite_stop_all();
             sprite_unanimate_all();

@@ -32,6 +32,7 @@
 #include "memmanage.h" 
 #include "parser.h"
 #include "pic.h"
+#include "ports.h"
 #include "textscr.h"
 
 #pragma clang section bss="banked_bss" data="gui_data" rodata="gui_rodata" text="gui_text"
@@ -245,8 +246,6 @@ void dialog_show_internal(bool accept_input) {
         input_max_length = 12;
         dialog_input_mode = imDialogField;
         textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
-    } else {
-        dialog_input_mode = imPressKey;
     }
 
     y_start++;
@@ -261,11 +260,38 @@ void dialog_show_internal(bool accept_input) {
     textscr_print_scncode(0xFE);
     textscr_end_print();
 
-    dialog_time = logic_vars[21];
-    if (dialog_time > 0) {
-        dialog_time = (dialog_time * 15) / 10;
-    } else {
-        dialog_time = 0xffff;
+    if (!logic_flag_isset(15)) {
+        dialog_time = logic_vars[21];
+        if (dialog_time > 0) {
+            dialog_time = (dialog_time * 15) / 10;
+        }
+
+        joyports_poll();
+        uint8_t prev_joybutton = joystick_fire;
+        uint8_t prev_mousebutton = mouse_leftclick;
+
+        while (1) {
+            joyports_poll();
+            uint8_t joypress = !prev_joybutton && joystick_fire;
+            uint8_t mousepress = !prev_mousebutton && mouse_leftclick;
+
+            if ((ASCIIKEY != 0) || joypress || mousepress || (dialog_time == 1)) {
+                ASCIIKEY = 0;
+                dialog_close();
+                dialog_input_mode = imParser;
+                break;
+            } else {
+                prev_joybutton = joystick_fire;
+                prev_mousebutton = mouse_leftclick;
+            }
+
+            if (run_engine) {
+                run_engine = false;
+                if (dialog_time > 0) {
+                    dialog_time--;
+                }
+            }
+        }
     }
 }
 
@@ -338,16 +364,6 @@ bool dialog_proc(void) {
             }
         break;
         case imPressKey:
-            if ((ASCIIKEY != 0) || (dialog_time == 1)) {
-                ASCIIKEY = 0;
-                dialog_close();
-                dialog_input_mode = imParser;
-            } else {
-                retval = true;
-            }
-            if (dialog_time > 0) {
-                dialog_time--;
-            }
         break;
         case imDialogField:
             select_gui_mem();

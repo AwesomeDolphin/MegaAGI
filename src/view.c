@@ -426,6 +426,9 @@ bool select_loop(view_info_t *info, uint8_t loop_num) {
         info->loop_offset = loop_offset;
         info->loop_number = loop_num;
         info->number_of_cels = loop_data[0];
+        if (info->cel_index >= info->number_of_cels) {
+            info->cel_index = 0;
+        }
         uint8_t __far *cell_ptr = loop_data + 1;
         info->cel_offset = (*cell_ptr | ((*(cell_ptr + 1)) << 8));
 

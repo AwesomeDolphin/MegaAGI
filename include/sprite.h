@@ -35,9 +35,7 @@ typedef struct {
 
     uint8_t view_number;
 
-    uint16_t loop_offset;
     uint8_t loop_index;
-    uint8_t cel_index;
 
     uint8_t object_dir;
     bool drawable;

@@ -26,6 +26,7 @@ typedef struct view_info {
     uint16_t view_offset;
     uint8_t loop_number;
     uint16_t loop_offset;
+    uint8_t cel_index;
     uint16_t cel_offset;
     uint8_t number_of_cels;
     uint8_t number_of_loops;

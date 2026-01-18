@@ -72,7 +72,7 @@ bool sprite_draw_animated(void) {
     for (int i = 0; i < animated_sprite_count; i++) {
         agisprite_t sprite = sprites[animated_sprites[i]];
         if (sprite.drawable) {
-            bool drew_something = draw_cel(&sprite.view_info, sprite.cel_index);
+            bool drew_something = draw_cel(&sprite.view_info, sprite.view_info.cel_index);
             if (sprite.ego) {
                 ego_drawn = drew_something;
             }
@@ -244,7 +244,7 @@ void autoselect_loop(agisprite_t *sprite) {
     if (new_loop != 255) {
         if (new_loop != sprite->loop_index) {
             sprite->loop_index = new_loop;
-            sprite->loop_offset = select_loop(&sprite->view_info, new_loop);
+            select_loop(&sprite->view_info, new_loop);
         }
     }
 }
@@ -300,7 +300,6 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
     uint8_t object_border = 0;
     int16_t new_xpos = sprite->view_info.x_pos + view_dx;
     int16_t new_ypos = sprite->view_info.y_pos + view_dy;
-
     if (new_xpos <= -1) {
         object_border = 4;
         sprite->object_dir = 0;
@@ -478,7 +477,7 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
 
     sprite.view_number = view_number;
     sprite.object_dir = 0;
-    sprite.cel_index = 0;
+    sprite.view_info.cel_index = 0;
     sprite.loop_index = 0;
     sprite.cycle_time = 1;
     sprite.cycle_count = 1;
@@ -563,31 +562,31 @@ void sprite_update_sprite(uint8_t sprite_num) {
         sprite.cycle_count  = sprite.cycle_time;
         if (sprite.cycling) {
             if (sprite.reverse) {
-                if (sprite.cel_index == 0) {
-                    sprite.cel_index = sprite.view_info.number_of_cels;
+                if (sprite.view_info.cel_index == 0) {
+                    sprite.view_info.cel_index = sprite.view_info.number_of_cels;
                 } else {
-                    sprite.cel_index--;
+                    sprite.view_info.cel_index--;
                 }
 
             } else {
-                sprite.cel_index++;
-                if (sprite.cel_index >= sprite.view_info.number_of_cels) {
-                    sprite.cel_index = 0;
+                sprite.view_info.cel_index++;
+                if (sprite.view_info.cel_index >= sprite.view_info.number_of_cels) {
+                    sprite.view_info.cel_index = 0;
                 }
             }
         }
         if (sprite.end_of_loop > 0) {
             if (sprite.reverse) {
-                if (sprite.cel_index == 0) {
+                if (sprite.view_info.cel_index == 0) {
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;
                 } else {
-                    sprite.cel_index--;
+                    sprite.view_info.cel_index--;
                 }
             } else {
-                sprite.cel_index++;
-                if (sprite.cel_index > (sprite.view_info.number_of_cels - 1)) {
-                    sprite.cel_index = (sprite.view_info.number_of_cels - 1);
+                sprite.view_info.cel_index++;
+                if (sprite.view_info.cel_index > (sprite.view_info.number_of_cels - 1)) {
+                    sprite.view_info.cel_index = (sprite.view_info.number_of_cels - 1);
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;
                 }

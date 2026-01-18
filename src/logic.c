@@ -408,7 +408,7 @@ bool logic_run_low(void) {
             // set.loop
             agisprite_t sprite = sprites[program_counter[1]];
             sprite.loop_index = program_counter[2];
-            sprite.loop_offset = select_loop(&sprite.view_info, program_counter[2]);
+            select_loop(&sprite.view_info, program_counter[2]);
             sprites[program_counter[1]] = sprite;
             program_counter += 3;
             break;
@@ -417,20 +417,20 @@ bool logic_run_low(void) {
             // set.loop.v
             agisprite_t sprite = sprites[program_counter[1]];
             sprite.loop_index = logic_vars[program_counter[2]];
-            sprite.loop_offset = select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
+            select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
             sprites[program_counter[1]] = sprite;
             program_counter += 3;
             break;
         }
         case 0x2F: {
             // set.cel
-            sprites[program_counter[1]].cel_index = program_counter[2];
+            sprites[program_counter[1]].view_info.cel_index = program_counter[2];
             program_counter += 3;
             break;
         }
         case 0x30: {
             // set.cel.v
-            sprites[program_counter[1]].cel_index = logic_vars[program_counter[2]];
+            sprites[program_counter[1]].view_info.cel_index = logic_vars[program_counter[2]];
             program_counter += 3;
             break;
         }
@@ -442,7 +442,7 @@ bool logic_run_low(void) {
         }
         case 0x32: {
             // current.cel
-            logic_vars[program_counter[2]] = sprites[program_counter[1]].cel_index;
+            logic_vars[program_counter[2]] = sprites[program_counter[1]].view_info.cel_index;
             program_counter += 3;
             break;
         }
@@ -579,7 +579,7 @@ bool logic_run_low(void) {
             sprites[program_counter[1]].end_of_loop = program_counter[2];
             logic_reset_flag(program_counter[2]);
             sprites[program_counter[1]].reverse = false;
-            sprites[program_counter[1]].cel_index = 0;
+            sprites[program_counter[1]].view_info.cel_index = 0;
             program_counter += 3;
             break;
         }
@@ -595,7 +595,7 @@ bool logic_run_low(void) {
             sprites[program_counter[1]].end_of_loop = program_counter[2];
             logic_reset_flag(program_counter[2]);
             sprites[program_counter[1]].reverse = true;
-            sprites[program_counter[1]].cel_index = sprites[program_counter[1]].view_info.number_of_cels - 1;
+            sprites[program_counter[1]].view_info.cel_index = sprites[program_counter[1]].view_info.number_of_cels - 1;
             program_counter += 3;
             break;
         }

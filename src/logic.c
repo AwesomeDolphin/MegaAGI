@@ -89,11 +89,14 @@ void logic_reset_all_controllers(void) {
     } 
 }
 
-uint16_t logic_locate_message(uint8_t logic_num, uint8_t message_num) {
+uint8_t __far * logic_locate_message(uint8_t logic_num_query, uint8_t message_num) {
+    if (logic_num_query == 255) {
+        logic_num_query = logic_num;
+    }
     uint16_t message_index = (message_num * 2) + 1;
-    uint16_t message_offset = logic_infos[logic_num].text_offset[message_index + 1] << 8;
-    message_offset |= logic_infos[logic_num].text_offset[message_index] + 1;
-    return message_offset;
+    uint16_t message_offset = logic_infos[logic_num_query].text_offset[message_index + 1] << 8;
+    message_offset |= logic_infos[logic_num_query].text_offset[message_index] + 1;
+    return logic_infos[logic_num_query].text_offset + message_offset;
 }
 
 #pragma clang section bss="banked_bss" data="ll_data" rodata="ll_rodata" text="ll_text"
@@ -681,6 +684,10 @@ bool logic_test_commands(void) {
         case 0x09: {
             // has test
             result = (object_locations[program_counter[1]] == 255);
+            if (result == true) {
+                textscr_print_ascii(0,1,false,(uint8_t *)"%d %X", logic_num, (uint32_t)program_counter);
+                while(1);
+            }
             program_counter += 2;
             break;
         }
@@ -1015,28 +1022,28 @@ bool logic_run_high(void) {
         }
         case 0x65: {
             // print
-            uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[1]);
+            uint8_t __far *src_string =  logic_locate_message(logic_num, program_counter[1]);
             dialog_show(false, src_string);
             program_counter += 2;
             break;
         }
         case 0x66: {
             // print.v
-            uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[1]]);
+            uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[1]]);
             dialog_show(false, src_string);
             program_counter += 2;
             break;
         }
         case 0x67: {
             // display
-            uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[3]);
+            uint8_t __far *src_string = logic_locate_message(logic_num, program_counter[3]);
             textscr_print_ascii(program_counter[2], program_counter[1], false, (uint8_t *)"%S", src_string);
             program_counter += 4;
             break;
         }
         case 0x68: {
             // display.v
-            uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, logic_vars[program_counter[3]]);
+            uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[3]]);
             textscr_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], false, (uint8_t *)"%S", src_string);
             program_counter += 4;
             break;
@@ -1122,7 +1129,7 @@ bool logic_run_high(void) {
         case 0x72: {
             // set.string
             uint8_t __far *dest_string = global_strings + (40 * program_counter[1]);
-            uint8_t __far *src_string = logic_infos[logic_num].text_offset + logic_locate_message(logic_num, program_counter[2]);
+            uint8_t __far *src_string = logic_locate_message(logic_num, program_counter[2]);
             memmanage_strcpy_far_far(dest_string, src_string);
             program_counter += 3;
             break;
@@ -1237,8 +1244,9 @@ bool logic_run_high(void) {
         }
         case 0x82: {
             // random
-            uint16_t randrange = (program_counter[1] - program_counter[2]);
-            uint16_t randval = (rand() % randrange) + program_counter[1];
+            int min = (program_counter[1] < program_counter[2]) ? program_counter[1] : program_counter[2];
+            int max = (program_counter[1] < program_counter[2]) ? program_counter[2] : program_counter[1];
+            uint16_t randval = (abs(rand()) % (max - min + 1)) + min;
             logic_vars[program_counter[3]] = randval;
             program_counter += 4;
             break;
@@ -1274,12 +1282,13 @@ bool logic_run_high(void) {
             break;
         }
         case 0x8F: {
-            uint16_t message_offset = logic_locate_message(logic_num, program_counter[1]);
+            uint8_t __far *message_offset = logic_locate_message(logic_num, program_counter[1]);
             for (uint16_t counter = 0; counter < 7; counter++) {
-                game_id[counter] = logic_infos[logic_num].text_offset[message_offset + counter];
+                game_id[counter] = *message_offset;
                 if (game_id[counter] == 0) {
                     break;
                 }
+                message_offset++;
             }
             game_id[7] = 0;
             program_counter += 2;
@@ -1468,7 +1477,9 @@ void logic_init(void) {
     }
 
     uint8_t __huge *object_ptr = attic_memory + object_data_offset;
-    uint8_t number_of_objects = object_ptr[2];
+    uint8_t number_of_objects = object_ptr[0];
+    number_of_objects |= object_ptr[1] << 8;
+    number_of_objects /= 3;
     for (int counter = 0; counter < 256; counter++) {
         if (counter < number_of_objects) {
             object_locations[counter] = object_ptr[((counter + 1) * 3) + 2];

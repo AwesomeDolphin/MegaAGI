@@ -26,6 +26,7 @@
 
 #include "textscr.h"
 #include "gfx.h"
+#include "logic.h"
 #include "main.h"
 #include "memmanage.h" 
 #include "parser.h"
@@ -208,6 +209,18 @@ void textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
             padlen++;
             wordptr++;
             wordchr = (uint8_t)*wordptr;
+          };
+          break;
+        }
+        case 'm': {
+          uint8_t string_number = my_atoi(ascii_string + 1, &ascii_string);
+          uint8_t __far *src_string = logic_locate_message(255, string_number);
+          uint8_t string_char = *src_string;
+          while (string_char != 0) {
+            formatted_string_buffer[padlen] = string_char;
+            padlen++;
+            src_string++;
+            string_char = *src_string;
           };
           break;
         }

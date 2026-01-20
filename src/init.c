@@ -30,11 +30,6 @@
 #include "volume.h"
 uint32_t __attribute__((zpage)) my_quad;
 
-static uint32_t init_objmem_offset;
-static uint32_t init_objmem_size;
-static uint32_t init_wdsmem_offset;
-static uint32_t init_wdsmem_size;
-
 #pragma clang section bss = "banked_bss" data = "initsdata" rodata = "initsrodata" text = "initstext"
 
 static uint8_t __far * const initscrmem_base = (uint8_t __far *)0x12000;
@@ -202,17 +197,17 @@ void init_system(void)
 
 void init_load_words(void)
 {
-  init_wdsmem_offset = atticmem_allocoffset;
+  uint32_t init_wdsmem_size;
+  token_data_offset = atticmem_allocoffset;
   disk_load_attic("WORDS.TOK", &init_wdsmem_size, 8);
-  token_data_offset = init_wdsmem_offset;
 }
 
 void init_load_objects(void)
 {
   object_data_offset = atticmem_allocoffset;
+  uint32_t init_objmem_size;
   disk_load_attic("OBJECT", &init_objmem_size, 8);
-
-  uint8_t __huge *object_ptr = attic_memory + init_objmem_offset;
+  uint8_t __huge *object_ptr = attic_memory + object_data_offset;
   char avis_durgan[12] = "Avis Durgan";
   uint8_t avis = 0;
   for (uint16_t index = 0; index < init_objmem_size; index++)

@@ -29,6 +29,7 @@ typedef struct logic_info {
     uint8_t __far *text_offset;
 } logic_info_t;
 
+uint8_t __far * logic_locate_message(uint8_t logic_num_query, uint8_t message_num);
 void logic_set_flag(uint8_t flag);
 void logic_reset_flag(uint8_t flag);
 bool logic_flag_isset(uint8_t flag);

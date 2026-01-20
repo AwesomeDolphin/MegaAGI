@@ -51,10 +51,13 @@ uint16_t parser_word_numbers[20];
 const char * parser_word_pointers[20];
 
 // Function to find a word in the dictionary and collect matching word numbers
-bool parser_find_word(const char* target) {
+const char * parser_find_word(const char* target) {
     // Check if first letter is in range a-z
     parser_word_pointers[parser_word_index] = target;
     char first_letter = target[0];
+    if (first_letter == '\0') {
+        return NULL;
+    }
     int offset_index = first_letter - 'a';
     uint16_t offset = dict.letter_offsets[offset_index];
     
@@ -70,10 +73,9 @@ bool parser_find_word(const char* target) {
     char current_word[MAX_WORD_LENGTH] = {0};
     int current_word_len = 0;
     
-    int target_len = strlen(target);
-    
     bool first = true;
     // Iterate through words in this section
+    uint8_t longest_word_len = 0;
     while (1) {
         // Read prefix length
         uint8_t prefix_len = *current_pos++;
@@ -117,25 +119,30 @@ bool parser_find_word(const char* target) {
         word_number = *(current_pos + 1);
         current_pos += 2;
 
-        // OPTIMIZATION 3: Early length check
-        if (current_word_len != target_len) {
-            continue;
-        }
-        
-        int comp_result = strcmp(current_word, target);
+        int comp_result = strncmp(current_word, target, current_word_len);
         // Compare with target
         if (comp_result == 0) {
             // Match found, store word number if not 0
             if (word_number > 0) {
-                parser_word_numbers[parser_word_index] = word_number;
-                parser_word_pointers[parser_word_index] = target;
-                parser_word_index++;
+                if (current_word_len > longest_word_len) {
+                    longest_word_len = current_word_len;
+                    parser_word_numbers[parser_word_index] = word_number;
+                    parser_word_pointers[parser_word_index] = target;
+                }
             }
-            return true;
         }
     }
+
+    if (longest_word_len > 0) {
+        parser_word_index++;
+        target += longest_word_len;
+        if (*target == ' ') {
+            target++;
+        }
+        return target;
+    }
     
-    return false;
+    return NULL;
 }
 
 void parser_cook_string(char *target) {
@@ -164,18 +171,18 @@ void parser_cook_string(char *target) {
 }
 
 bool parser_decode_string_internal(char *target) {
+    const char *cur_parse = target;
     parser_cook_string(target);
     uint8_t index = 0;
     parser_word_index = 0;
-    char *token = strtok(target, " ");
     logic_vars[9] = 0;
-    while (token != NULL) {
-        if (!parser_find_word(token)){
+    while (*cur_parse != '\0') {
+        cur_parse = parser_find_word(cur_parse);
+        if (cur_parse == NULL) {
             logic_vars[9] = index + 1;
             break;
         }
         index++;
-        token = strtok(NULL, " ");
     }
     logic_set_flag(2);
     logic_reset_flag(4);

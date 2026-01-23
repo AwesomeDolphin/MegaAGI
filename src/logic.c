@@ -1136,6 +1136,7 @@ bool logic_run_high(void) {
         }
         case 0x73: {
             // get.string
+            dialog_get_string(program_counter[1], program_counter[2], program_counter[3], program_counter[4], program_counter[5]);
             program_counter += 6;
             break;
         }

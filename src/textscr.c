@@ -118,7 +118,11 @@ void textscr_print_scncode(uint8_t scncode) {
 }
 
 void textscr_set_printpos(uint8_t x, uint8_t y) {
-  printpos = (y * 61) + 20 + x; 
+  if (game_text) {
+    printpos = (y * 61) + 21 + x; 
+  } else {
+    printpos = (y * 61) + 20 + x; 
+  }
 }
 
 void textscr_begin_print(uint8_t x, uint8_t y) {
@@ -171,10 +175,10 @@ void textscr_clear_line(uint8_t y) {
 
 void textscr_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
-    game_text = true;
     for (uint8_t i = 0; i < 25; i++) {
       textscr_print_ascii(0, i, false, (uint8_t *)"%p40");
     }
+    game_text = true;
   } else {
     game_text = false;
     for (uint8_t i = 0; i < 25; i++) {
@@ -183,7 +187,7 @@ void textscr_set_textmode(bool enable_text) {
   }
 }
 
-void textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
+uint16_t textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
   char buffer[17];
   uint16_t padlen = 0;
   uint8_t __far *ascii_string = formatstring;
@@ -222,6 +226,19 @@ void textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
             src_string++;
             string_char = *src_string;
           };
+          break;
+        }
+        case 'M': {
+          uint32_t string_number = va_arg(ap, unsigned int);
+          uint8_t __far *src_string = logic_locate_message(255, string_number);
+          uint8_t string_char = *src_string;
+          while (string_char != 0) {
+            formatted_string_buffer[padlen] = string_char;
+            padlen++;
+            src_string++;
+            string_char = *src_string;
+          };
+          ascii_string++;
           break;
         }
         case 's': {
@@ -297,17 +314,19 @@ void textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
     ascii_string++;
   }
   formatted_string_buffer[padlen] = 0;
+  return padlen;
 }
 
-void textscr_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...) {
+uint16_t textscr_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...) {
     va_list ap;
     va_start(ap, formatstring);
 
     memmanage_strcpy_near_far(print_string_buffer, formatstring);
-    textscr_format_string_valist(print_string_buffer, ap);
+    uint16_t len = textscr_format_string_valist(print_string_buffer, ap);
     va_end(ap);
 
     textscr_print_asciistr(x, y, reverse, formatted_string_buffer);
+    return len;
 }
 
 void textscr_init(void) {

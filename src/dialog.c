@@ -39,7 +39,6 @@
 
 typedef enum input_mode {
     imParser,
-    imPressKey,
     imDialogField,
 } input_mode_t;
 
@@ -297,32 +296,6 @@ void dialog_show_internal(bool accept_input) {
 
 #pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
 
-static bool dialog_handleinput(void) {
-    if (!input_ok) {
-        return false;
-    }
-    cursor_delay++;
-    if (cursor_delay > 5) {
-        if (cursor_flag) {
-            textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-            textscr_print_asciichar(' ', false);
-        } else {
-            textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-            textscr_print_asciichar(' ', true);
-        }
-        cursor_flag = !cursor_flag;
-        cursor_delay = 0;
-    }
-
-    uint8_t ascii_key = ASCIIKEY;
-    if (ascii_key != 0) {
-        ASCIIKEY = 0;
-        select_gui_mem();
-        return dialog_handleinput_internal(ascii_key);
-    }
-    return false;
-}
-
 void dialog_gamesave_handler(char *filename) {
     uint8_t len = strlen(filename);
 
@@ -358,16 +331,14 @@ bool dialog_proc(void) {
     bool retval = false;
     switch (dialog_input_mode) {
         case imParser:
-            if (dialog_handleinput()) {
+            if (dialog_handleinput(false)) {
                 command_buffer[cmd_buf_ptr] = 0;
                 parser_decode_string(command_buffer);
             }
         break;
-        case imPressKey:
-        break;
         case imDialogField:
             select_gui_mem();
-            if (dialog_handleinput()) {
+            if (dialog_handleinput(false)) {
                 command_buffer[cmd_buf_ptr] = 0;
                 dialog_close();
                 dialog_input_mode = imParser;
@@ -386,6 +357,32 @@ bool dialog_proc(void) {
 }
 
 #pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
+bool dialog_handleinput(bool force_accept) {
+    if (!input_ok && !force_accept) {
+        return false;
+    }
+    cursor_delay++;
+    if (cursor_delay > 5) {
+        if (cursor_flag) {
+            textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
+            textscr_print_asciichar(' ', false);
+        } else {
+            textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
+            textscr_print_asciichar(' ', true);
+        }
+        cursor_flag = !cursor_flag;
+        cursor_delay = 0;
+    }
+
+    uint8_t ascii_key = ASCIIKEY;
+    if (ascii_key != 0) {
+        ASCIIKEY = 0;
+        select_gui_mem();
+        return dialog_handleinput_internal(ascii_key);
+    }
+    return false;
+}
 
 void dialog_gamesave_begin(bool save) {
     if (save) {
@@ -417,6 +414,23 @@ void dialog_close(void) {
     dialog_first = 0;
     dialog_last = 0;
     show_object_view = false;
+}
+
+void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uint8_t column, uint8_t max) {
+    command_buffer[0] = 0;
+    cmd_buf_ptr=0;
+    ASCIIKEY = 0;
+    input_line = row;
+    input_max_length = max;
+
+    input_start_column = column + textscr_print_ascii(column, row, false, (uint8_t *)"%M", prompt);
+
+    while(!dialog_handleinput(true)) {
+        while(!run_engine);
+        run_engine = false;
+    }
+    uint8_t __far *dest_string = global_strings + (40 * destination_str);
+    memmanage_strcpy_near_far(dest_string, (uint8_t *)command_buffer);
 }
 
 void dialog_clear_keyboard(void) {

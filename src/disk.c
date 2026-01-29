@@ -24,6 +24,7 @@
 #include "disk.h"
 #include "gamesave.h"
 #include "memmanage.h"
+#include "mouse.h"
 
 #pragma clang section bss = "diskbss" data = "diskdata" rodata = "diskrodata" text = "disktext"
 
@@ -37,6 +38,8 @@
     strncpy((char *)buffer, name, 256-5);
     strcat((char *)buffer, ",S,R");
     size_t namelen = strlen((char *)buffer);
+
+    mouse_hide();
 
     // NO KERNAL CALLS ABOVE THIS LINE, NO NON-KERNAL CALLS BELOW THIS LINE
     disk_enter_kernal();
@@ -64,6 +67,7 @@
 
     // NO KERNAL CALLS BELOW THIS LINE, NO NON-KERNAL CALLS ABOVE THIS LINE
     disk_exit_kernal();
+    mouse_show();
 
     if (errcode == 0) {
         *data_size = local_data_size;
@@ -87,6 +91,7 @@
     strcat((char *)buffer, ",S,W");
     size_t namelen = strlen((char *)buffer);
 
+    mouse_hide();
     // NO KERNAL CALLS ABOVE THIS LINE, NO NON-KERNAL CALLS BELOW THIS LINE
     disk_enter_kernal();
     kernal_open((char *)buffer, namelen, device);
@@ -109,6 +114,7 @@
 
     // NO KERNAL CALLS BELOW THIS LINE, NO NON-KERNAL CALLS ABOVE THIS LINE
     disk_exit_kernal();
+    mouse_show();
 
     return errcode;
 }

@@ -32,6 +32,8 @@ palsel: .equlab 0xd070
         .section zzpage,bss
 mouse_zp1:
         .space 1,0
+mouse_bits:
+        .space 1,0
         .public mouse_prvx
 mouse_prvx:
         .space 1,0
@@ -116,9 +118,22 @@ mouse_init:
         sta sprx64
         sta spr16
         sta spren
+        sta mouse_bits
 
         rts
 
+        .public mouse_hide
+mouse_hide:
+        lda #0x00
+        sta spren
+        rts
+
+        .public mouse_show
+mouse_show:
+        lda mouse_bits
+        sta spren
+        rts
+        
         .public mouse_irq
 mouse_irq:
         ldy mouse_prvx

@@ -259,6 +259,10 @@ void dialog_show_internal(bool accept_input) {
     textscr_print_scncode(0xFE);
     textscr_end_print();
 
+    if (accept_input) {
+        return;
+    }
+    
     if (!logic_flag_isset(15)) {
         dialog_time = logic_vars[21];
         if (dialog_time > 0) {
@@ -312,16 +316,25 @@ void dialog_gamesave_handler(char *filename) {
         if (errcode != 0) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d saving game.");
             dialog_show(false, print_string_buffer, errcode);
+        } else {
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game saved.");
+            dialog_show(false, print_string_buffer);
         }
     } else {
         select_gamesave_mem();
         errcode = gamesave_load_from_disk(filename);
         if (errcode == 255) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this game.");
-            dialog_show(false, print_string_buffer, errcode);
+            dialog_show(false, print_string_buffer);
+        } else if (errcode == 254) {
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this version of MegaAGI.");
+            dialog_show(false, print_string_buffer);
         } else if (errcode != 0) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d restoring game.");
             dialog_show(false, print_string_buffer, errcode);
+        } else {
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game restored.");
+            dialog_show(false, print_string_buffer);
         }
     }
     status_line_score = 255;

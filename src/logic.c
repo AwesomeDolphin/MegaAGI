@@ -54,6 +54,7 @@ typedef struct logic_stack_entry {
 
 static uint8_t logic_controllers[32];
 static logic_stack_entry_t logic_stack[16];
+static uint8_t parse_buffer[41];
 static uint8_t __far *program_counter;
 uint8_t __far *global_strings;
 static uint8_t logic_stack_ptr;
@@ -199,6 +200,7 @@ bool logic_run_low(void) {
         case 0x12: {
             // new.screen
             VICIV.bordercol = COLOR_GREEN;
+            sound_stop();
             gfx_hold_flip(true);
             sprite_stop_all();
             sprite_unanimate_all();
@@ -684,10 +686,6 @@ bool logic_test_commands(void) {
         case 0x09: {
             // has test
             result = (object_locations[program_counter[1]] == 255);
-            if (result == true) {
-                textscr_print_ascii(0,1,false,(uint8_t *)"%d %X", logic_num, (uint32_t)program_counter);
-                while(1);
-            }
             program_counter += 2;
             break;
         }
@@ -1060,6 +1058,7 @@ bool logic_run_high(void) {
             // text.screen
             engine_allowinput(false);
             textscr_set_textmode(true);
+            VICIV.bordercol = COLOR_BLACK;
             program_counter += 1;
             break;
         }
@@ -1067,6 +1066,7 @@ bool logic_run_high(void) {
             // graphics 
             textscr_set_textmode(false);
             engine_allowinput(true);
+            status_line_score=255;
             program_counter += 1;
             break;
         }
@@ -1142,6 +1142,11 @@ bool logic_run_high(void) {
         }
         case 0x75: {
             // parse
+            logic_reset_flag(2);
+            logic_reset_flag(4);
+            uint8_t __far *src_string = global_strings + (40 * program_counter[1]);
+            memmanage_strcpy_far_near(parse_buffer, src_string);
+            parser_decode_string((char *)parse_buffer);
             program_counter += 2;
             break;
         }

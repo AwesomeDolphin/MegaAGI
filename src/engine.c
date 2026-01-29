@@ -215,6 +215,7 @@ void run_loop(void) {
     logic_vars[23] = 0x0f;
     logic_vars[24] = 37;
     logic_vars[25] = 3;
+    logic_set_flag(5);
     while (!quit_flag) {
         while(!run_engine);
         engine_running = true;

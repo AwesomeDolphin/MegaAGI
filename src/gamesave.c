@@ -61,6 +61,7 @@ __far add_to_pic_command_t add_to_pic_commands[16];
 #pragma clang section bss=""
 
 uint8_t __huge *gamesave_cache;
+char *gamesaveid = "MASFV110";
 
 #pragma clang section bss="banked_bss" data="gamesave_data" rodata="gamesave_rodata" text="gamesave_text"
 
@@ -68,33 +69,37 @@ uint32_t gamesave_save_to_attic(void) {
     VICIV.bordercol = COLOR_GREEN;
     gamesave_cache = attic_memory + atticmem_allocoffset;
     for (int i = 0; i < 8; i++) {
-        gamesave_cache[i] = game_id[i];
+        gamesave_cache[i] = gamesaveid[i];
     }
 
-    gamesave_cache[8] = chipmem_allocoffset & 0xff;
-    gamesave_cache[9] = (chipmem_allocoffset >> 8) & 0xff;
-    gamesave_cache[10] = chipmem_lockoffset & 0xff;
-    gamesave_cache[11] = (chipmem_lockoffset >> 8) & 0xff;
-    gamesave_cache[12] = 0;
-    gamesave_cache[13] = 0;
-    gamesave_cache[14] = atticmem_allocoffset & 0xff;
-    gamesave_cache[15] = (atticmem_allocoffset >> 8) & 0xff;
-    gamesave_cache[16] = (atticmem_allocoffset >> 16) & 0xff;
-    gamesave_cache[17] = (atticmem_allocoffset >> 24) & 0xff;
-    gamesave_cache[18] = input_ok;
-    gamesave_cache[19] = player_control;
-    gamesave_cache[20] = horizon_line;
-    gamesave_cache[21] = block_active;
-    gamesave_cache[22] = block_x1;
-    gamesave_cache[23] = block_y1;
-    gamesave_cache[24] = block_x2;
-    gamesave_cache[25] = block_y2;
-    gamesave_cache[26] = animated_sprite_count;
-    gamesave_cache[27] = free_point & 0xff;
-    gamesave_cache[28] = (free_point >> 8) & 0xff;
-    gamesave_cache[29] = views_in_pic;
+    for (int i = 0; i < 8; i++) {
+        gamesave_cache[i+8] = game_id[i];
+    }
 
-    uint32_t offset = 30;
+    gamesave_cache[16] = chipmem_allocoffset & 0xff;
+    gamesave_cache[17] = (chipmem_allocoffset >> 8) & 0xff;
+    gamesave_cache[18] = chipmem_lockoffset & 0xff;
+    gamesave_cache[19] = (chipmem_lockoffset >> 8) & 0xff;
+    gamesave_cache[20] = 0;
+    gamesave_cache[21] = 0;
+    gamesave_cache[22] = atticmem_allocoffset & 0xff;
+    gamesave_cache[23] = (atticmem_allocoffset >> 8) & 0xff;
+    gamesave_cache[24] = (atticmem_allocoffset >> 16) & 0xff;
+    gamesave_cache[25] = (atticmem_allocoffset >> 24) & 0xff;
+    gamesave_cache[26] = input_ok;
+    gamesave_cache[27] = player_control;
+    gamesave_cache[28] = horizon_line;
+    gamesave_cache[29] = block_active;
+    gamesave_cache[30] = block_x1;
+    gamesave_cache[31] = block_y1;
+    gamesave_cache[32] = block_x2;
+    gamesave_cache[33] = block_y2;
+    gamesave_cache[34] = animated_sprite_count;
+    gamesave_cache[35] = free_point & 0xff;
+    gamesave_cache[36] = (free_point >> 8) & 0xff;
+    gamesave_cache[37] = views_in_pic;
+
+    uint32_t offset = 38;
     memmanage_memcpy_far_huge(&gamesave_cache[offset], (uint8_t __far *)sprites, sizeof(sprites));
     offset += sizeof(sprites);
     memmanage_memcpy_far_huge(&gamesave_cache[offset], (uint8_t __far *)animated_sprites, sizeof(animated_sprites));
@@ -123,49 +128,55 @@ uint8_t gamesave_save_to_disk(char *filename) {
 
     select_engine_diskdriver_mem();
     uint8_t errcode = disk_save_attic(filename, atticmem_allocoffset, save_size, 9);
-    select_engine_logichigh_mem();
+    select_engine_enginehigh_mem();
     return errcode;
 }
 
 
 uint8_t gamesave_load_from_attic(void) {
     for (int i = 0; i < 8; i++) {
-        if (gamesave_cache[i] != game_id[i]) {
+        if (gamesave_cache[i] != gamesaveid[i]) {
+            return 254;
+        }
+    }
+
+    for (int i = 0; i < 8; i++) {
+        if (gamesave_cache[i+8] != game_id[i]) {
             return 255;
         }
     }
 
     VICIV.bordercol = COLOR_GREEN;
-    chipmem_allocoffset = gamesave_cache[8];
-    chipmem_allocoffset |= (gamesave_cache[9] << 8);
+    chipmem_allocoffset = gamesave_cache[16];
+    chipmem_allocoffset |= (gamesave_cache[17] << 8);
 
-    chipmem_lockoffset = gamesave_cache[10];
-    chipmem_lockoffset |= (gamesave_cache[11] << 8);
+    chipmem_lockoffset = gamesave_cache[18];
+    chipmem_lockoffset |= (gamesave_cache[19] << 8);
 
     uint32_t temp;
-    temp = gamesave_cache[14];
+    temp = gamesave_cache[22];
     atticmem_allocoffset = temp;
-    temp = gamesave_cache[15];
+    temp = gamesave_cache[23];
     atticmem_allocoffset |= (temp << 8);
-    temp = gamesave_cache[16];
+    temp = gamesave_cache[24];
     atticmem_allocoffset |= (temp << 16);
-    temp = gamesave_cache[17];
+    temp = gamesave_cache[25];
     atticmem_allocoffset |= (temp << 24);
 
-    input_ok = gamesave_cache[18];
-    player_control = gamesave_cache[19];
-    horizon_line = gamesave_cache[20];
-    block_active = gamesave_cache[21];
-    block_x1 = gamesave_cache[22];
-    block_y1 = gamesave_cache[23];
-    block_x2 = gamesave_cache[24];
-    block_y2 = gamesave_cache[25];
-    animated_sprite_count = gamesave_cache[26];
-    free_point = gamesave_cache[27];
-    free_point |= (gamesave_cache[28] << 8);
-    views_in_pic = gamesave_cache[29];
+    input_ok = gamesave_cache[26];
+    player_control = gamesave_cache[27];
+    horizon_line = gamesave_cache[28];
+    block_active = gamesave_cache[29];
+    block_x1 = gamesave_cache[30];
+    block_y1 = gamesave_cache[31];
+    block_x2 = gamesave_cache[32];
+    block_y2 = gamesave_cache[33];
+    animated_sprite_count = gamesave_cache[34];
+    free_point = gamesave_cache[35];
+    free_point |= (gamesave_cache[36] << 8);
+    views_in_pic = gamesave_cache[37];
 
-    uint32_t offset = 30;
+    uint32_t offset = 38;
     memmanage_memcpy_huge_far((uint8_t __far *)sprites, &gamesave_cache[offset], sizeof(sprites));
     offset += sizeof(sprites);
     memmanage_memcpy_huge_far((uint8_t __far *)animated_sprites, &gamesave_cache[offset], sizeof(animated_sprites));
@@ -206,13 +217,14 @@ uint8_t gamesave_load_from_disk(char *filename) {
     strcat(filename, ".AGI");
     uint32_t data_size;
     select_engine_diskdriver_mem();
-    uint8_t errcode = disk_load_attic(filename, &data_size, 9);
-    select_engine_logichigh_mem();
+    static uint8_t load_errcode;
+    load_errcode = disk_load_attic(filename, &data_size, 9);
+    select_engine_enginehigh_mem();
 
-    if (errcode != 0) {
-        return errcode;
+    if (load_errcode != 0) {
+        return load_errcode;
     } else {
-        bool result = gamesave_load_from_attic();
+        uint8_t result = gamesave_load_from_attic();
         atticmem_free(gamesave_offset);
         return result;
     }

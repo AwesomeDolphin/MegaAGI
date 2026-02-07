@@ -99,7 +99,7 @@ void sound_interrupt_handler(void) {
     uint8_t acted = 0;
     for (uint8_t voice=0; voice < 3; voice++) {
         --durations[voice];
-        if (!voice_stopped[voice]) {
+        if (!voice_stopped[voice] && logic_flag_isset(9)) {
             acted = 1;
             uint16_t voice_offset = voice_offsets[voice];
             volatile struct __sid_voice __far *sid;

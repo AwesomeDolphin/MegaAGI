@@ -21,12 +21,14 @@
 
 #include "main.h"
 
+void dialog_handle_setkey(uint8_t ascii, uint8_t keycode, uint8_t controller);
+void dialog_recall(void);
 void dialog_gamesave_handler(char *filename);
 void dialog_gamesave_begin(bool save);
 void dialog_clear_keyboard(void);
 void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uint8_t column, uint8_t max);
 void dialog_show(bool accept_input, uint8_t __far *message_string, ...);
-bool dialog_handleinput(bool force_accept);
+bool dialog_handleinput(bool force_accept, bool mapkeys);
 void dialog_close(void);
 bool dialog_proc(void);
 void dialog_init(void);

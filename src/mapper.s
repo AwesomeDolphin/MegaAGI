@@ -23,8 +23,17 @@
         .extern engine_interrupt_handler
         .extern my_quad
 
-        .section code
+hmem_picdraw:   .equ 0x01
+hmem_parser:    .equ 0x02
+hmem_gui:       .equ 0x03
+hmem_gamesave:  .equ 0x04
 
+        .section banked_bss,bss
+        .public himem_mapbank
+himem_mapbank:
+        .space 1,0
+
+        .section code
         .public select_graphics0_mem
 select_graphics0_mem:  
 		lda #0xC0
@@ -122,6 +131,9 @@ select_kernel_mem:
 
 		.public select_picdraw_mem
 select_picdraw_mem:
+        lda himem_mapbank
+        cmp #hmem_picdraw
+        beq +
 		sta 0xd707
         
         .byte 0x80
@@ -137,10 +149,17 @@ select_picdraw_mem:
         .byte 0x00
         .byte 0x00
         .byte 0x00
-		rts
+
+        lda #hmem_picdraw
+        sta himem_mapbank
+
++:		rts
 
 		.public select_parser_mem
 select_parser_mem:
+        lda himem_mapbank
+        cmp #hmem_parser
+        beq +
 		sta 0xd707
         
         .byte 0x80
@@ -156,10 +175,17 @@ select_parser_mem:
         .byte 0x00
         .byte 0x00
         .byte 0x00
-		rts
+
+        lda #hmem_parser
+        sta himem_mapbank
+
++:		rts
 
 		.public select_gui_mem
 select_gui_mem:
+        lda himem_mapbank
+        cmp #hmem_gui
+        beq +
 		sta 0xd707
         
         .byte 0x80
@@ -175,10 +201,16 @@ select_gui_mem:
         .byte 0x00
         .byte 0x00
         .byte 0x00
-		rts
+
+        lda #hmem_gui
+        sta himem_mapbank
++:		rts
 
 		.public select_gamesave_mem
 select_gamesave_mem:
+        lda himem_mapbank
+        cmp #hmem_gamesave
+        beq +
 		sta 0xd707
         
         .byte 0x80
@@ -194,4 +226,7 @@ select_gamesave_mem:
         .byte 0x00
         .byte 0x00
         .byte 0x00
-		rts
+
+        lda #hmem_gamesave
+        sta himem_mapbank
++:		rts

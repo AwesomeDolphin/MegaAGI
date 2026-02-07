@@ -47,6 +47,18 @@ typedef enum dialog_type {
     dtRestore,
 } dialog_type_t;
 
+typedef struct keymap {
+    uint8_t ascii;
+    uint8_t alt_pressed;
+    uint8_t controller;
+} keymap_t;
+
+typedef struct keycode_conv {
+    uint8_t key2;
+    uint8_t ascii;
+    bool alt_pressed;
+} keycode_conv_t;
+
 uint8_t dialog_first;
 uint8_t dialog_last;
 uint16_t dialog_time;
@@ -63,6 +75,7 @@ uint8_t input_start_column;
 uint8_t input_max_length;
 
 static char command_buffer[38];
+static char prev_command_buffer[38];
 static uint8_t cmd_buf_ptr = 0;
 bool cursor_flag;
 uint8_t cursor_delay;
@@ -70,13 +83,97 @@ uint8_t x_start;
 uint8_t y_start;
 input_mode_t dialog_input_mode;
 dialog_type_t active_dialog;
-bool show_priority;
+static keymap_t keymaps[30];
+uint8_t used_keymaps;
 
-static bool dialog_handleinput_internal(uint8_t ascii_key) {
+const keycode_conv_t pckeycodes[] = {
+    // ALT A-Z
+    {0x1e, 0xe5, true},
+    {0x30, 0xfa, true},
+    {0x2e, 0xe7, true},
+    {0x30, 0xf0, true},
+    {0x12, 0xe6, true},
+    {0x21, 0x00, true},
+    {0x22, 0xe8, true},
+    {0x23, 0xfd, true},
+    {0x17, 0xed, true},
+    {0x24, 0xe9, true},
+    {0x25, 0xe1, true},
+    {0x26, 0xf3, true},
+    {0x32, 0xb5, true},
+    {0x31, 0xf1, true},
+    {0x18, 0xf8, true},
+    {0x19, 0xb6, true},
+    {0x10, 0xa9, true},
+    {0x13, 0xae, true},
+    {0x1f, 0xa7, true},
+    {0x14, 0xfe, true},
+    {0x16, 0xfc, true},
+    {0x2f, 0xd3, true},
+    {0x11, 0xae, true},
+    {0x2d, 0xd7, true},
+    {0x15, 0xff, true},
+    {0x2c, 0xf7, true},
+
+    // ALT 1-0
+    {0x78, 0xa1, true},
+    {0x79, 0xaa, true},
+    {0x7a, 0xa4, true},
+    {0x7b, 0xa2, true},
+    {0x7c, 0xb0, true},
+    {0x7d, 0xa5, true},
+    {0x7e, 0xb4, true},
+    {0x7f, 0xe2, true},
+    {0x80, 0xda, true},
+    {0x81, 0xdb, true},
+
+    // F1-F12
+    {0x3b, 0xf1, false},
+    {0x3c, 0xf2, false},
+    {0x3d, 0xf3, false},
+    {0x3e, 0xf4, false},
+    {0x3f, 0xf5, false},
+    {0x40, 0xf6, false},
+    {0x41, 0xf7, false},
+    {0x42, 0xf8, false},
+    {0x43, 0xf9, false},
+    {0x44, 0xfa, false},
+    {0x85, 0xfb, false},
+    {0x86, 0xfc, false},
+};
+
+void dialog_handle_setkey_internal(uint8_t ascii, uint8_t keycode, uint8_t controller) {
+    if (keycode == 0) {
+        keymaps[used_keymaps].ascii = ascii;
+        keymaps[used_keymaps].alt_pressed = false;
+        keymaps[used_keymaps].controller = controller;
+        used_keymaps++;
+    } else {
+        if (ascii == 0) {
+            uint16_t keycode_num = sizeof(pckeycodes) / sizeof(keycode_conv_t);
+            for (uint16_t cnt = 0; cnt < keycode_num; cnt++) {
+                if (keycode == pckeycodes[cnt].key2) {
+                    keymaps[used_keymaps].ascii = pckeycodes[cnt].ascii;
+                    keymaps[used_keymaps].alt_pressed = pckeycodes[cnt].alt_pressed;
+                    keymaps[used_keymaps].controller = controller;
+                    used_keymaps++;
+                }
+            }
+        }
+    }
+}
+static bool dialog_handlemappedkey_internal(uint8_t ascii_key, bool alt_flag) {
+    for (uint8_t cnt = 0; cnt < used_keymaps; cnt++) {
+        if ((keymaps[cnt].ascii == ascii_key) && (keymaps[cnt].alt_pressed == alt_flag)) {
+            logic_set_controller(keymaps[cnt].controller);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool dialog_handleinput_internal(uint8_t ascii_key, bool alt_flag) {
     switch(ascii_key) {
-        case 0x09:
-            logic_set_controller(4);
-            break;
         case 0x14:
             if (cmd_buf_ptr > 0) {
                 textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
@@ -88,36 +185,6 @@ static bool dialog_handleinput_internal(uint8_t ascii_key) {
             break;
         case 0x0d:
             return true;
-        case 0xf5:
-            logic_set_controller(1);
-            break;
-        case 0xf7:
-            logic_set_controller(2);
-            break;
-        case 0xf9:
-            logic_set_controller(3);
-            break;
-        case 0x1b:
-            logic_set_controller(14);
-            break;
-        case 0x1f:
-            logic_set_controller(18);
-            break;
-        case 0xf1:
-            logic_set_controller(18);
-            break;
-        case 0x3d:
-            logic_set_controller(5);
-            break;
-        case 0x30:
-            logic_set_controller(7);
-            break;
-        case 0x2d:
-            logic_set_controller(8);
-            break;
-        case 0xfd:
-            show_priority = true;
-            break;
         default:
             if ((ascii_key >= 32) && (ascii_key < 127)) {
                 if (cmd_buf_ptr < input_max_length) {
@@ -130,6 +197,17 @@ static bool dialog_handleinput_internal(uint8_t ascii_key) {
             break;
     }
     return false;
+}
+
+void dialog_recall_internal(void) {
+    dialog_clear_keyboard();
+    cmd_buf_ptr = 0;
+    while (prev_command_buffer[cmd_buf_ptr] != 0) {
+        command_buffer[cmd_buf_ptr] = prev_command_buffer[cmd_buf_ptr];
+        textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
+        textscr_print_asciichar(prev_command_buffer[cmd_buf_ptr], false);
+        cmd_buf_ptr++;
+    }
 }
 
 void dialog_show_internal(bool accept_input) {
@@ -344,14 +422,20 @@ bool dialog_proc(void) {
     bool retval = false;
     switch (dialog_input_mode) {
         case imParser:
-            if (dialog_handleinput(false)) {
+            if (dialog_handleinput(false, true)) {
                 command_buffer[cmd_buf_ptr] = 0;
+                cmd_buf_ptr = 0;
+                while (command_buffer[cmd_buf_ptr] != 0) {
+                    prev_command_buffer[cmd_buf_ptr] = command_buffer[cmd_buf_ptr];
+                    cmd_buf_ptr++;
+                }
+                prev_command_buffer[cmd_buf_ptr] = 0;
                 parser_decode_string(command_buffer);
             }
         break;
         case imDialogField:
             select_gui_mem();
-            if (dialog_handleinput(false)) {
+            if (dialog_handleinput(false, false)) {
                 command_buffer[cmd_buf_ptr] = 0;
                 dialog_close();
                 dialog_input_mode = imParser;
@@ -362,16 +446,11 @@ bool dialog_proc(void) {
             }
         break;
     }
-    if (show_priority) {
-        select_picdraw_mem();
-        pic_show_priority();
-    }
     return retval;
 }
 
 #pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
-
-bool dialog_handleinput(bool force_accept) {
+bool dialog_handleinput(bool force_accept, bool mapkeys) {
     if (!input_ok && !force_accept) {
         return false;
     }
@@ -389,12 +468,29 @@ bool dialog_handleinput(bool force_accept) {
     }
 
     uint8_t ascii_key = ASCIIKEY;
+    uint8_t modkey = MODKEY;
     if (ascii_key != 0) {
         ASCIIKEY = 0;
         select_gui_mem();
-        return dialog_handleinput_internal(ascii_key);
+        if (mapkeys) {
+            if (dialog_handlemappedkey_internal(ascii_key, modkey & 0x10)) {
+                // The mapped key was handled, so swallow it
+                return false;
+            }
+        }
+        return dialog_handleinput_internal(ascii_key, modkey & 0x10);
     }
     return false;
+}
+
+void dialog_handle_setkey(uint8_t ascii, uint8_t keycode, uint8_t controller) {
+    select_gui_mem();
+    dialog_handle_setkey_internal(ascii, keycode, controller);
+}
+
+void dialog_recall(void) {
+    select_gui_mem();
+    dialog_recall_internal();
 }
 
 void dialog_gamesave_begin(bool save) {
@@ -438,7 +534,7 @@ void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uin
 
     input_start_column = column + textscr_print_ascii(column, row, false, (uint8_t *)"%M", prompt);
 
-    while(!dialog_handleinput(true)) {
+    while(!dialog_handleinput(true, false)) {
         while(!run_engine);
         run_engine = false;
     }
@@ -460,6 +556,8 @@ void dialog_clear_keyboard(void) {
 }
 
 void dialog_init(void) {
+    prev_command_buffer[0] = 0;
+    used_keymaps = 0;
     dialog_first = 0;
     dialog_last = 0;
     input_line = 22;
@@ -469,5 +567,4 @@ void dialog_init(void) {
     cursor_delay = 0;
     dialog_input_mode = imParser;
     game_text = false;
-    show_priority = false;
 }

@@ -74,6 +74,12 @@ void logic_reset_flag(uint8_t flag) {
     logic_flags[flag_reg] &= flag_reg_val;
 }
 
+void logic_toggle_flag(uint8_t flag) {
+    uint8_t flag_reg = (flag >> 3);
+    uint8_t flag_reg_val = (1 << (flag & 0x07));
+    logic_flags[flag_reg] ^= flag_reg_val;
+}
+
 bool logic_flag_isset(uint8_t flag) {
     return (((logic_flags[flag >> 3]) >> (flag & 0x07)) & 0x01);
 }
@@ -184,6 +190,11 @@ bool logic_run_low(void) {
         }
         case 0x0D: {
             logic_reset_flag(program_counter[1]);
+            program_counter += 2;
+            break;
+        }
+        case 0x0e: {
+            logic_toggle_flag(program_counter[1]);
             program_counter += 2;
             break;
         }
@@ -1164,6 +1175,7 @@ bool logic_run_high(void) {
         }
         case 0x79: {
             // set.key
+            dialog_handle_setkey(program_counter[1], program_counter[2], program_counter[3]);
             program_counter += 4;
             break;
         }
@@ -1282,6 +1294,19 @@ bool logic_run_high(void) {
             program_counter += 1;
             break;
         }
+        case 0x89: {
+            // echo.line
+            dialog_recall();
+            program_counter += 1;
+            break;
+        }
+        case 0x8b: {
+            // init.joy
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Use mouse in port 1.\nUse joystick in port 2.");
+            dialog_show(false, print_string_buffer);
+            program_counter += 1;
+            break;
+        }
         case 0x8E: {
             // script.size
             program_counter += 2;
@@ -1394,9 +1419,9 @@ void logic_run(void) {
     logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
-//        if (*program_counter == 0x63) {
-//            debug = 1;
-//        }
+        //if (logic_num == 92) {
+        //    debug = 1;
+        //}
         if (debug) {
             textscr_print_ascii(0,1,false,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
             textscr_print_ascii(0,2,false,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));

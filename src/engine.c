@@ -52,6 +52,7 @@ volatile uint8_t run_cycles;
 volatile bool engine_running;
 bool status_line_enabled;
 uint8_t status_line_score;
+bool status_line_sound;
 
 static const uint8_t joystick_direction_to_agi[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
@@ -79,9 +80,14 @@ void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
 void engine_update_status_line(void) {
     if (!game_text) {
         if (status_line_enabled) {
-            if (logic_vars[3] != status_line_score) {
+            if ((logic_vars[3] != status_line_score) || (logic_flag_isset(9) != status_line_sound)) {
                 status_line_score = logic_vars[3];
-                textscr_print_ascii(0, 0, true, (uint8_t  *)"Score: %d of %d%p40", logic_vars[3], logic_vars[7]);
+                status_line_sound = logic_flag_isset(9);
+                if (status_line_sound) {
+                    textscr_print_ascii(0, 0, true, (uint8_t  *)"Score: %d of %d%p27Sound: On%p40", logic_vars[3], logic_vars[7]);
+                } else {
+                    textscr_print_ascii(0, 0, true, (uint8_t  *)"Score: %d of %d%p27Sound: Off%p40", logic_vars[3], logic_vars[7]);
+                }
             }
         }
     }
@@ -196,6 +202,7 @@ void run_loop(void) {
     sound_flag_needs_set = false;
     status_line_enabled = false;
     status_line_score = 255;
+    status_line_sound = true;
     quit_flag = false;
 
     hook_irq();
@@ -210,7 +217,7 @@ void run_loop(void) {
     player_control = true;
     logic_set_flag(9);
     logic_set_flag(11);
-    logic_vars[20] = 5;
+    logic_vars[20] = 128;
     logic_vars[22] = 3;
     logic_vars[23] = 0x0f;
     logic_vars[24] = 37;

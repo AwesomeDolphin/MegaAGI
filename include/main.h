@@ -32,6 +32,7 @@ struct __F018 {
 };
 
 #define CHAR_CLEARHOME '\223'
+#define MODKEY (*(volatile uint8_t *)0xd60a)
 #define ASCIIKEY (*(volatile uint8_t *)0xd610)
 #define PETSCIIKEY (*(volatile uint8_t *)0xd619)
 #define VICREGS ((volatile uint8_t *)0xd000)

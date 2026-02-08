@@ -142,6 +142,16 @@ const keycode_conv_t pckeycodes[] = {
     {0x86, 0xfc, false},
 };
 
+bool dialog_nokeys_internal(void) {
+    for (uint8_t ctr = 0; ctr < 9; ctr++) {
+        POKE(0xd614, ctr);
+        if (PEEK(0xD613) != 0xff) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void dialog_handle_setkey_internal(uint8_t ascii, uint8_t keycode, uint8_t controller) {
     if (keycode == 0) {
         keymaps[used_keymaps].ascii = ascii;
@@ -172,7 +182,7 @@ static bool dialog_handlemappedkey_internal(uint8_t ascii_key, bool alt_flag) {
     return false;
 }
 
-static bool dialog_handleinput_internal(uint8_t ascii_key, bool alt_flag) {
+static bool dialog_handleinput_internal(uint8_t ascii_key, bool alt_flag, bool *cancelled) {
     switch(ascii_key) {
         case 0x14:
             if (cmd_buf_ptr > 0) {
@@ -184,6 +194,14 @@ static bool dialog_handleinput_internal(uint8_t ascii_key, bool alt_flag) {
             }
             break;
         case 0x0d:
+            if (cancelled != NULL) {
+                *cancelled = false;
+            }
+            return true;
+        case 0x1b:
+            if (cancelled != NULL) {
+                *cancelled = true;
+            }
             return true;
         default:
             if ((ascii_key >= 32) && (ascii_key < 127)) {
@@ -210,7 +228,7 @@ void dialog_recall_internal(void) {
     }
 }
 
-void dialog_show_internal(bool accept_input) {
+bool dialog_show_internal(bool accept_input, bool ok_cancel) {
     msg_ptr = formatted_string_buffer;
     last_word = msg_ptr;
     word_length = 0;
@@ -338,7 +356,7 @@ void dialog_show_internal(bool accept_input) {
     textscr_end_print();
 
     if (accept_input) {
-        return;
+        return true;
     }
     
     if (!logic_flag_isset(15)) {
@@ -355,12 +373,26 @@ void dialog_show_internal(bool accept_input) {
             joyports_poll();
             uint8_t joypress = !prev_joybutton && joystick_fire;
             uint8_t mousepress = !prev_mousebutton && mouse_leftclick;
-
-            if ((ASCIIKEY != 0) || joypress || mousepress || (dialog_time == 1)) {
+            uint8_t asciival = ASCIIKEY;
+            if (asciival != 0) {
                 ASCIIKEY = 0;
+                while (!dialog_nokeys_internal()) {
+                    ASCIIKEY = 0;
+                }
+                if (asciival == 0x1b) {
+                    dialog_close();
+                    dialog_input_mode = imParser;
+                    return false;
+                } else if (asciival == 0x0d) {
+                    dialog_close();
+                    dialog_input_mode = imParser;
+                    return true;
+                }
+            }
+            if (!ok_cancel && (joypress || mousepress || (dialog_time == 1))) {
                 dialog_close();
                 dialog_input_mode = imParser;
-                break;
+                return true;
             } else {
                 prev_joybutton = joystick_fire;
                 prev_mousebutton = mouse_leftclick;
@@ -374,6 +406,7 @@ void dialog_show_internal(bool accept_input) {
             }
         }
     }
+    return true;
 }
 
 #pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
@@ -393,26 +426,26 @@ void dialog_gamesave_handler(char *filename) {
         errcode = gamesave_save_to_disk(filename);
         if (errcode != 0) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d saving game.");
-            dialog_show(false, print_string_buffer, errcode);
+            dialog_show(false, false, print_string_buffer, errcode);
         } else {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game saved.");
-            dialog_show(false, print_string_buffer);
+            dialog_show(false, false, print_string_buffer);
         }
     } else {
         select_gamesave_mem();
         errcode = gamesave_load_from_disk(filename);
         if (errcode == 255) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this game.");
-            dialog_show(false, print_string_buffer);
+            dialog_show(false, false, print_string_buffer);
         } else if (errcode == 254) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this version of MegaAGI.");
-            dialog_show(false, print_string_buffer);
+            dialog_show(false, false, print_string_buffer);
         } else if (errcode != 0) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d restoring game.");
-            dialog_show(false, print_string_buffer, errcode);
+            dialog_show(false, false, print_string_buffer, errcode);
         } else {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game restored.");
-            dialog_show(false, print_string_buffer);
+            dialog_show(false, false, print_string_buffer);
         }
     }
     status_line_score = 255;
@@ -420,9 +453,10 @@ void dialog_gamesave_handler(char *filename) {
 
 bool dialog_proc(void) {
     bool retval = false;
+    bool cancelled = false;
     switch (dialog_input_mode) {
         case imParser:
-            if (dialog_handleinput(false, true)) {
+            if (dialog_handleinput(false, true, NULL)) {
                 command_buffer[cmd_buf_ptr] = 0;
                 cmd_buf_ptr = 0;
                 while (command_buffer[cmd_buf_ptr] != 0) {
@@ -435,11 +469,13 @@ bool dialog_proc(void) {
         break;
         case imDialogField:
             select_gui_mem();
-            if (dialog_handleinput(false, false)) {
+            if (dialog_handleinput(false, false, &cancelled)) {
                 command_buffer[cmd_buf_ptr] = 0;
                 dialog_close();
                 dialog_input_mode = imParser;
-                dialog_gamesave_handler(command_buffer);
+                if (!cancelled) {
+                    dialog_gamesave_handler(command_buffer);
+                }
                 dialog_clear_keyboard();
             } else {
                 retval = true;
@@ -450,7 +486,7 @@ bool dialog_proc(void) {
 }
 
 #pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
-bool dialog_handleinput(bool force_accept, bool mapkeys) {
+bool dialog_handleinput(bool force_accept, bool mapkeys, bool *cancelled) {
     if (!input_ok && !force_accept) {
         return false;
     }
@@ -478,7 +514,7 @@ bool dialog_handleinput(bool force_accept, bool mapkeys) {
                 return false;
             }
         }
-        return dialog_handleinput_internal(ascii_key, modkey & 0x10);
+        return dialog_handleinput_internal(ascii_key, modkey & 0x10, cancelled);
     }
     return false;
 }
@@ -497,22 +533,22 @@ void dialog_gamesave_begin(bool save) {
     if (save) {
         active_dialog = dtSave;
         memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
-        dialog_show(true, print_string_buffer);
+        dialog_show(true, false, print_string_buffer);
     } else {
         active_dialog = dtRestore;
         memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
-        dialog_show(true, print_string_buffer);
+        dialog_show(true, false, print_string_buffer);
     }
 }
 
-void dialog_show(bool accept_input, uint8_t __far *message_string, ...) {
+bool dialog_show(bool accept_input, bool ok_cancel, uint8_t __far *message_string, ...) {
     va_list ap;
     va_start(ap, message_string);
     textscr_format_string_valist(message_string, ap);
     va_end(ap);
 
     select_gui_mem();
-    dialog_show_internal(accept_input);
+    return dialog_show_internal(accept_input, ok_cancel);
 }
 
 void dialog_close(void) {
@@ -534,7 +570,7 @@ void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uin
 
     input_start_column = column + textscr_print_ascii(column, row, false, (uint8_t *)"%M", prompt);
 
-    while(!dialog_handleinput(true, false)) {
+    while(!dialog_handleinput(true, false, NULL)) {
         while(!run_engine);
         run_engine = false;
     }

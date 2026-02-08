@@ -103,7 +103,7 @@ void engine_show_object(uint8_t view_num) {
     object_view.priority = 0x0f;
     show_object_view = true;
     uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
-    dialog_show(false, desc_data);
+    dialog_show(false, false, desc_data);
     select_engine_logichigh_mem();
 }
 

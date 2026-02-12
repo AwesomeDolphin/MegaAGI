@@ -1248,6 +1248,13 @@ bool logic_run_high(void) {
             for (int counter = 0; counter < 32; counter++) {
                 logic_flags[counter] = 0;
             }
+            logic_set_flag(9);
+            logic_set_flag(11);
+            logic_vars[20] = 128;
+            logic_vars[22] = 3;
+            logic_vars[23] = 0x0f;
+            logic_vars[24] = 37;
+            logic_vars[25] = 3;
             logic_set_flag(5);
             logic_set_flag(6);
             sprite_clearall();
@@ -1300,6 +1307,12 @@ bool logic_run_high(void) {
         case 0x89: {
             // echo.line
             dialog_recall();
+            program_counter += 1;
+            break;
+        }
+        case 0x8a: {
+            // cancel_line
+            dialog_clear_keyboard();
             program_counter += 1;
             break;
         }
@@ -1359,25 +1372,35 @@ bool logic_run_high(void) {
             break;
         }
         case 0x9C:
-            // Set Menu
+            // set.menu
+            dialog_set_menu(program_counter[1]);
             program_counter += 2;
             break;
         case 0x9D:
-            // Set Menu Item
+            // set.menu.item
+            dialog_set_menu_item(program_counter[1], program_counter[2]);
             program_counter += 3;
             break;
         case 0x9E:
-            // Submit Menu
+            // submit.menu
             program_counter += 1;
             break;
         case 0x9F: {
             // enable.item
+            dialog_enable_menu_item(program_counter[1]);
             program_counter += 2;
             break;
         }
         case 0xA0: {
             // disable.item
+            dialog_disable_menu_item(program_counter[1]);
             program_counter += 2;
+            break;
+        }
+        case 0xA1: {
+            // menu.input
+            dialog_draw_menubar();
+            program_counter += 1;
             break;
         }
         case 0xA3: {

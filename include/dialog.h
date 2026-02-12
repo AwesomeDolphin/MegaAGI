@@ -21,11 +21,16 @@
 
 #include "main.h"
 
+void dialog_draw_menubar(void);
 void dialog_handle_setkey(uint8_t ascii, uint8_t keycode, uint8_t controller);
 void dialog_recall(void);
 void dialog_gamesave_handler(char *filename);
 void dialog_gamesave_begin(bool save);
 void dialog_clear_keyboard(void);
+void dialog_enable_menu_item(uint8_t controller_number);
+void dialog_disable_menu_item(uint8_t controller_number);
+void dialog_set_menu(uint8_t message_number);
+void dialog_set_menu_item(uint8_t message_number, uint8_t controller);
 void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uint8_t column, uint8_t max);
 bool dialog_show(bool accept_input, bool ok_cancel, uint8_t __far *message_string, ...);
 bool dialog_handleinput(bool force_accept, bool mapkeys, bool *cancelled);

@@ -192,6 +192,12 @@ void init_system(void)
   DMA.dmahigh = (uint8_t)(((uint16_t)copybankable) >> 8);
   DMA.etrig = (uint8_t)(((uint16_t)copybankable) & 0xff);
 
+  uint8_t __far *chardst = (uint8_t __far *)0x29ee0;
+  uint8_t charsrc[] = {0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xff, 0xff, 0xff, 0x00, 0x00, 0xff, 0xff, 0xff};
+  for (uint8_t ctr = 0; ctr < 16; ctr++) {
+    *chardst = charsrc[ctr];
+    chardst++;
+  }
   init_agi_files();
 }
 

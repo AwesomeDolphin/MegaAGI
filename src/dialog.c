@@ -35,11 +35,36 @@
 #include "ports.h"
 #include "textscr.h"
 
+typedef struct menu_bar_entry {
+    uint8_t text[25];
+    uint8_t drop_start_x;
+    uint8_t drop_height;
+    uint8_t max_length;
+    uint8_t menu_entries_ptr;
+} menu_bar_entry_t;
+
+typedef struct menu_entry {
+    uint8_t text[25];
+    uint8_t enabled;
+    uint8_t controller;
+    uint8_t end;
+} menu_entry_t;
+
+#pragma clang section bss="extradata"
+uint8_t __far menu_bar_current;
+uint8_t __far menu_opt_start;
+uint8_t __far menu_opt_current;
+uint8_t __far menu_bar_used;
+uint8_t __far menu_opts_used;
+menu_bar_entry_t __far main_menus[10];
+menu_entry_t __far menu_entries[40];
+
 #pragma clang section bss="banked_bss" data="gui_data" rodata="gui_rodata" text="gui_text"
 
 typedef enum input_mode {
     imParser,
     imDialogField,
+    imDialogMenu,
 } input_mode_t;
 
 typedef enum dialog_type {
@@ -142,6 +167,88 @@ const keycode_conv_t pckeycodes[] = {
     {0x86, 0xfc, false},
 };
 
+static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_only);
+static bool dialog_handlemenuinput(void);
+
+void dialog_draw_menudrop_item_internal(uint8_t item_num) {
+    textscr_set_printpos(2, item_num + 2);
+    bool highlight = (item_num != menu_opt_current);
+    uint8_t menu_item_num = (menu_opt_start + item_num);
+    uint8_t ptr = 0;
+    while (menu_entries[menu_item_num].text[ptr] != 0) {
+        textscr_print_asciichar(menu_entries[menu_item_num].text[ptr], highlight);
+        ptr++;
+    }
+    while (ptr < main_menus[menu_bar_current].max_length) {
+        textscr_print_asciichar(' ', highlight);
+        ptr++;
+    }
+}
+
+void dialog_draw_menudrop_internal(void) {
+    box_width = main_menus[menu_bar_current].max_length;
+    box_height = main_menus[menu_bar_current].drop_height;
+    x_start = main_menus[menu_bar_current].drop_start_x;
+    y_start = 1;
+
+    line_length = 0;
+    textscr_begin_print(x_start, y_start);
+    textscr_print_scncode(0xF0);
+    while (line_length < box_width) {
+        textscr_print_scncode(0XDD);
+        line_length++;
+    }
+    textscr_print_scncode(0xEE);
+    textscr_end_print();
+
+    for (uint8_t cnt = 0; cnt < box_height; cnt++) {
+        line_length = 0;
+        y_start++;
+        textscr_begin_print(x_start, y_start);
+        textscr_print_scncode(0xDC);
+        while (line_length < box_width) {
+            textscr_print_asciichar(' ', true);
+            line_length++;
+        }
+        textscr_print_scncode(0xDC);
+        textscr_end_print();
+    }
+
+    y_start++;
+    line_length = 0;
+    textscr_begin_print(x_start, y_start);
+    textscr_print_scncode(0xED);
+    while (line_length < box_width) {
+        textscr_print_scncode(0XDD);
+        line_length++;
+    }
+    textscr_print_scncode(0xFD);
+    textscr_end_print();
+    
+    y_start++;
+    dialog_first = 1;
+    dialog_last = y_start;
+    menu_opt_current = 0;
+    menu_opt_start = main_menus[menu_bar_current].menu_entries_ptr;
+    for (uint8_t cnt = 0; cnt < main_menus[menu_bar_current].drop_height; cnt++) {
+        dialog_draw_menudrop_item_internal(cnt);
+    }
+}
+
+void dialog_draw_menubar_internal(void) {
+    textscr_set_printpos(1, 0);
+    for (uint8_t menu = 0; menu < menu_bar_used; menu++) {
+        bool highlight = (menu != menu_bar_current);
+        textscr_print_asciichar(' ', true);
+        uint8_t ptr = 0;
+        while (main_menus[menu].text[ptr] != 0) {
+            textscr_print_asciichar(main_menus[menu].text[ptr], highlight);
+            ptr++;
+        }
+    }
+    dialog_draw_menudrop_internal();
+}
+
 bool dialog_nokeys_internal(void) {
     for (uint8_t ctr = 0; ctr < 9; ctr++) {
         POKE(0xd614, ctr);
@@ -177,6 +284,77 @@ static bool dialog_handlemappedkey_internal(uint8_t ascii_key, bool alt_flag) {
         if ((keymaps[cnt].ascii == ascii_key) && (keymaps[cnt].alt_pressed == alt_flag)) {
             logic_set_controller(keymaps[cnt].controller);
             return true;
+        }
+    }
+    return false;
+}
+
+static bool dialog_handlemenuinput_internal(uint8_t ascii_key) {
+    switch(ascii_key) {
+        case 0x0d: {
+            uint8_t menu_item_num = (menu_opt_start + menu_opt_current);
+            logic_set_controller(menu_entries[menu_item_num].controller);
+            return true;
+        }
+        case 0x11: {
+            if (menu_opt_current < (main_menus[menu_bar_current].drop_height - 1)) {
+                uint8_t old_sel = menu_opt_current;
+                bool found = false;
+                do {
+                    menu_opt_current++;
+                    uint8_t menu_item_num = (menu_opt_start + menu_opt_current);
+                    if (menu_entries[menu_item_num].enabled) {
+                        found = true;
+                        break;
+                    }
+                } while (menu_opt_current < main_menus[menu_bar_current].drop_height);
+                if (!found) {
+                    menu_opt_current = old_sel;
+                } else {
+                    dialog_draw_menudrop_item_internal(old_sel);
+                    dialog_draw_menudrop_item_internal(menu_opt_current);
+                }
+            }
+            break;
+        }
+        case 0x1b:
+            return true;
+        case 0x1d: {
+            if (menu_bar_current < (menu_bar_used - 1)) {
+                dialog_close();
+                menu_bar_current++;
+                dialog_draw_menubar_internal();
+            }
+            break;
+        }
+        case 0x91: {
+            if (menu_opt_current > 0) {
+                uint8_t old_sel = menu_opt_current;
+                bool found = false;
+                do {
+                    menu_opt_current--;
+                    uint8_t menu_item_num = (menu_opt_start + menu_opt_current);
+                    if (menu_entries[menu_item_num].enabled) {
+                        found = true;
+                        break;
+                    }
+                } while (menu_opt_current < 128);
+                if (!found) {
+                    menu_opt_current = old_sel;
+                } else {
+                    dialog_draw_menudrop_item_internal(old_sel);
+                    dialog_draw_menudrop_item_internal(menu_opt_current);
+                }
+            }
+            break;
+        }
+        case 0x9d: {
+            if (menu_bar_current > 0) {
+                dialog_close();
+                menu_bar_current--;
+                dialog_draw_menubar_internal();
+            }
+            break;
         }
     }
     return false;
@@ -228,7 +406,7 @@ void dialog_recall_internal(void) {
     }
 }
 
-bool dialog_show_internal(bool accept_input, bool ok_cancel) {
+static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_only) {
     msg_ptr = formatted_string_buffer;
     last_word = msg_ptr;
     word_length = 0;
@@ -288,18 +466,18 @@ bool dialog_show_internal(bool accept_input, bool ok_cancel) {
     line_length = 0;
 
     textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xEC);
+    textscr_print_scncode(0xF0);
     while (line_length < box_width) {
-        textscr_print_scncode(0XE2);
+        textscr_print_scncode(0xDD);
         line_length++;
     }
-    textscr_print_scncode(0xFB);
+    textscr_print_scncode(0xEE);
     textscr_end_print();
 
     line_length = 0;
     y_start++;
     textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0x61);
+    textscr_print_scncode(0xDC);
     do {
         msg_char = *msg_ptr;
         if (msg_char >= 32) {
@@ -310,11 +488,11 @@ bool dialog_show_internal(bool accept_input, bool ok_cancel) {
                 textscr_print_asciichar(' ', true);
                 line_length++;
             }
-            textscr_print_scncode(0xE1);
+            textscr_print_scncode(0xDC);
             textscr_end_print();
             y_start++;
             textscr_begin_print(x_start, y_start);
-            textscr_print_scncode(0x61);
+            textscr_print_scncode(0xDC);
             line_length = 0;
         }
         msg_ptr++;
@@ -323,21 +501,21 @@ bool dialog_show_internal(bool accept_input, bool ok_cancel) {
         textscr_print_asciichar(' ', true);
         line_length++;
     }
-    textscr_print_scncode(0xE1);
+    textscr_print_scncode(0xDC);
     textscr_end_print();
 
     if (accept_input) {
         line_length = 0;
-        textscr_set_printpos(3, y_start - 1);
-        while (line_length < (box_width - 2)) {
+        textscr_set_printpos(2, y_start);
+        while (line_length < box_width) {
             textscr_print_asciichar(' ', false);
             line_length++;
         }
         command_buffer[0] = 0;
         cmd_buf_ptr=0;
         ASCIIKEY = 0;
-        input_line = y_start - 1;
-        input_start_column = 3;
+        input_line = y_start;
+        input_start_column = 2;
         input_max_length = 12;
         dialog_input_mode = imDialogField;
         textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
@@ -347,15 +525,15 @@ bool dialog_show_internal(bool accept_input, bool ok_cancel) {
     dialog_last = y_start;
     line_length = 0;
     textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xFC);
+    textscr_print_scncode(0xED);
     while (line_length < box_width) {
-        textscr_print_scncode(0X62);
+        textscr_print_scncode(0XDD);
         line_length++;
     }
-    textscr_print_scncode(0xFE);
+    textscr_print_scncode(0xFD);
     textscr_end_print();
 
-    if (accept_input) {
+    if (accept_input || draw_only) {
         return true;
     }
     
@@ -481,11 +659,101 @@ bool dialog_proc(void) {
                 retval = true;
             }
         break;
+        case imDialogMenu:
+            select_gui_mem();
+            if (dialog_handlemenuinput()) {
+                dialog_close();
+                dialog_input_mode = imParser;
+                dialog_clear_keyboard();
+                status_line_score = 255;
+                while (!dialog_nokeys_internal()) {
+                    ASCIIKEY = 0;
+                }
+            } else {
+                retval = true;
+            }
+        break;
     }
     return retval;
 }
 
 #pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+void dialog_draw_menubar(void) {
+    textscr_print_ascii(0, 0, true, (uint8_t *)"%p40");
+    menu_bar_current = 0;
+    dialog_input_mode = imDialogMenu;
+    select_gui_mem();
+    dialog_draw_menubar_internal();
+    while (!dialog_nokeys_internal()) {
+        ASCIIKEY = 0;
+    }
+}
+
+void dialog_enable_menu_item(uint8_t controller_number) {
+    for (uint8_t counter = 0; counter < menu_opts_used; counter++) {
+        if (menu_entries[counter].controller == controller_number) {
+            menu_entries[counter].enabled = 1;
+        }
+    }
+}
+
+void dialog_disable_menu_item(uint8_t controller_number) {
+    for (uint8_t counter = 0; counter < menu_opts_used; counter++) {
+        if (menu_entries[counter].controller == controller_number) {
+            menu_entries[counter].enabled = 0;
+        }
+    }
+}
+
+void dialog_set_menu(uint8_t message_number) {
+    uint8_t __far *src_string = logic_locate_message(255, message_number);
+    memmanage_strcpy_far_far(main_menus[menu_bar_used].text, src_string);
+    uint8_t len = 0;
+    while (src_string[len] != 0) {
+        len++;
+    }
+    main_menus[menu_bar_used].max_length = 0;
+    main_menus[menu_bar_used].menu_entries_ptr = menu_opts_used;
+    main_menus[menu_bar_used].drop_start_x = menu_opt_start;
+    main_menus[menu_bar_used].drop_height = 0;
+    menu_bar_current = menu_bar_used;
+    menu_opt_current = menu_opts_used;
+    menu_opt_start += (len + 1);
+    menu_bar_used++;
+}
+
+void dialog_set_menu_item(uint8_t message_number, uint8_t controller) {
+    uint8_t __far *src_string = logic_locate_message(255, message_number);
+    memmanage_strcpy_far_far(menu_entries[menu_opts_used].text, src_string);
+    menu_entries[menu_opts_used].enabled = 1;
+    menu_entries[menu_opts_used].controller = controller;
+    menu_entries[menu_opt_current].end = 0;
+    menu_entries[menu_opts_used].end = 1;
+    main_menus[menu_bar_current].drop_height++;
+    uint8_t len = 0;
+    while (src_string[len] != 0) {
+        len++;
+    }
+    if (len > main_menus[menu_bar_current].max_length) {
+        main_menus[menu_bar_current].max_length = len;
+        if ((main_menus[menu_bar_current].drop_start_x + main_menus[menu_bar_current].max_length + 2) > 39) {
+            main_menus[menu_bar_current].drop_start_x = 40 - main_menus[menu_bar_current].max_length - 2;
+        }
+    }
+    menu_opt_current = menu_opts_used;
+    menu_opts_used++;
+}
+
+bool dialog_handlemenuinput(void) {
+    uint8_t ascii_key = ASCIIKEY;
+    if (ascii_key != 0) {
+        ASCIIKEY = 0;
+        select_gui_mem();
+        return dialog_handlemenuinput_internal(ascii_key);
+    }
+    return false;
+}
+
 bool dialog_handleinput(bool force_accept, bool mapkeys, bool *cancelled) {
     if (!input_ok && !force_accept) {
         return false;
@@ -532,11 +800,11 @@ void dialog_recall(void) {
 void dialog_gamesave_begin(bool save) {
     if (save) {
         active_dialog = dtSave;
-        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n\n");
+        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n");
         dialog_show(true, false, print_string_buffer);
     } else {
         active_dialog = dtRestore;
-        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n\n");
+        memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n");
         dialog_show(true, false, print_string_buffer);
     }
 }
@@ -548,7 +816,7 @@ bool dialog_show(bool accept_input, bool ok_cancel, uint8_t __far *message_strin
     va_end(ap);
 
     select_gui_mem();
-    return dialog_show_internal(accept_input, ok_cancel);
+    return dialog_show_internal(accept_input, ok_cancel, false);
 }
 
 void dialog_close(void) {
@@ -592,6 +860,11 @@ void dialog_clear_keyboard(void) {
 }
 
 void dialog_init(void) {
+    menu_bar_used = 0;
+    menu_opts_used = 0;
+    menu_opt_start = 0;
+    main_menus[0].menu_entries_ptr = 0;
+    menu_entries[0].enabled = 0;
     prev_command_buffer[0] = 0;
     used_keymaps = 0;
     dialog_first = 0;

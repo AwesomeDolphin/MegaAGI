@@ -25,6 +25,7 @@
 #include <mega65.h>
 
 #include "textscr.h"
+#include "engine.h"
 #include "gfx.h"
 #include "logic.h"
 #include "main.h"
@@ -184,6 +185,7 @@ void textscr_set_textmode(bool enable_text) {
     for (uint8_t i = 0; i < 25; i++) {
       textscr_clear_line(i);
     }
+    engine_update_status_line(true);
   }
 }
 

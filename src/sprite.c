@@ -24,6 +24,7 @@
 #include <calypsi/intrinsics6502.h>
 #include <mega65.h>
 
+#include "dialog.h"
 #include "engine.h"
 #include "irq.h"
 #include "logic.h"
@@ -42,18 +43,29 @@ void sprite_erase_animated(void);
 #pragma clang section bss="banked_bss" data="hs_spritedata" rodata="hs_spriterodata" text="hs_spritetext"
 
 view_info_t object_view;
-bool show_object_view;
-bool object_view_drawn;
  
-void sprite_draw_to_pic(void) {
+void sprite_draw_to_pic(bool force_draw) {
     bool old_hold = gfx_hold_flip(true);
-    if (drawing_screen == 0) { 
+    if (drawing_screen == force_draw) { 
         select_graphics0_mem();
     } else {
         select_graphics1_mem();
     }
     
     draw_cel(&object_view, object_view.cel_index);
+    gfx_hold_flip(old_hold);
+    select_sprite_mem();
+}
+
+void sprite_erase_from_pic(bool force_draw) {
+    bool old_hold = gfx_hold_flip(true);
+    if (drawing_screen == force_draw) { 
+        select_graphics0_mem();
+    } else {
+        select_graphics1_mem();
+    }
+    
+    erase_view(&object_view);
     gfx_hold_flip(old_hold);
     select_sprite_mem();
 }
@@ -80,11 +92,6 @@ bool sprite_draw_animated(void) {
         }
     }
 
-    if (show_object_view) {
-        draw_cel(&object_view, 0);
-        object_view_drawn = true;
-    }
-
     gfx_hold_flip(old_hold);
 
     select_sprite_mem();
@@ -100,11 +107,6 @@ void sprite_erase_animated(void) {
         select_graphics1_mem();
     }
 
-    if (object_view_drawn) {
-        erase_view(&object_view);
-        object_view_drawn = false;
-    }
-    
     for (int i = animated_sprite_count; i > 0; i--) {
         agisprite_t sprite = sprites[animated_sprites[i-1]];
         if (sprite.drawable) {
@@ -635,12 +637,28 @@ void sprite_updateanddraw(void) {
 
 }
 
+void sprite_show_object(uint8_t view_num) {
+    view_load(view_num);
+    view_set(&object_view, view_num);
+    select_loop(&object_view, 0);
+    object_view.x_pos = 80 - (object_view.width / 2);
+    object_view.y_pos = 155;
+    object_view.priority_override = true;
+    object_view.priority = 0x0f;
+    uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
+    select_sprite_mem();
+    sprite_draw_to_pic(true);
+    select_engine_logichigh_mem();
+    dialog_show(false, false, desc_data);
+    select_sprite_mem();
+    sprite_erase_from_pic(true);
+    select_engine_logichigh_mem();
+}
+
 void sprite_init(void) {
     setup_priorities();
     animated_sprite_count = 0;
     free_point = 0;
-    show_object_view = false;
-    object_view_drawn = false;
     sprite_clearall();
     sprite_unanimate_all();
 }

@@ -27,9 +27,11 @@
 #include "dialog.h"
 #include "engine.h"
 #include "gfx.h"
+#include "logic.h"
 #include "main.h"
 #include "mapper.h"
 #include "memmanage.h" 
+#include "mouse.h"
 #include "parser.h"
 #include "pic.h"
 #include "ports.h"
@@ -37,9 +39,11 @@
 
 typedef struct menu_bar_entry {
     uint8_t text[25];
+    uint8_t entry_width;
+
     uint8_t drop_start_x;
     uint8_t drop_height;
-    uint8_t max_length;
+    uint8_t drop_width;
     uint8_t menu_entries_ptr;
 } menu_bar_entry_t;
 
@@ -56,8 +60,11 @@ uint8_t __far menu_opt_start;
 uint8_t __far menu_opt_current;
 uint8_t __far menu_bar_used;
 uint8_t __far menu_opts_used;
+int16_t __far item_select_listsize;
+int16_t __far item_select_pointer;
 menu_bar_entry_t __far main_menus[10];
 menu_entry_t __far menu_entries[40];
+uint8_t __far item_indexes[50];
 
 #pragma clang section bss="banked_bss" data="gui_data" rodata="gui_rodata" text="gui_text"
 
@@ -65,6 +72,7 @@ typedef enum input_mode {
     imParser,
     imDialogField,
     imDialogMenu,
+    imDialogMenuMouseTrigger,
 } input_mode_t;
 
 typedef enum dialog_type {
@@ -169,6 +177,102 @@ const keycode_conv_t pckeycodes[] = {
 
 static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_only);
 static bool dialog_handlemenuinput(void);
+static bool dialog_handlemenuinput_mousetrigger(void);
+
+void dialog_draw_itemlist_item_internal(uint8_t objnum, uint8_t index) {
+    uint8_t __huge *object_ptr = attic_memory + object_data_offset;
+
+    bool highlight = logic_flag_isset(13) && (index == item_select_pointer);
+    uint16_t object_sdesc_offset = object_ptr[((objnum + 1) * 3) + 0] + 3;
+    object_sdesc_offset |= (object_ptr[((objnum + 1) * 3) + 1] << 8);
+    uint8_t __huge *object_sdesc_ptr = object_ptr + object_sdesc_offset;
+    uint8_t column = (index % 2) ? 20 : 0;
+    uint8_t row = (index / 2) + 1;
+    textscr_print_ascii(column, row, highlight, (uint8_t *)"%H", object_sdesc_ptr);
+}
+
+static bool dialog_handleitemselect_input_internal(uint8_t ascii_key) {
+    switch(ascii_key) {
+        case 0x0d: {
+            if (item_select_listsize > 0) {
+                logic_vars[25] = item_indexes[item_select_pointer];
+            }
+            return true;
+        }
+        case 0x11: {
+            if (item_select_pointer < (item_select_listsize - 2)) {
+                uint8_t old_sel = item_select_pointer;
+                item_select_pointer+=2;
+                dialog_draw_itemlist_item_internal(item_indexes[old_sel], old_sel);
+                dialog_draw_itemlist_item_internal(item_indexes[item_select_pointer], item_select_pointer);
+            }
+            break;
+        }
+        case 0x1b:
+            return true;
+        case 0x1d: {
+            if (((item_select_pointer % 2) == 0) && (item_select_pointer < (item_select_listsize - 1))) {
+                uint8_t old_sel = item_select_pointer;
+                item_select_pointer++;
+                dialog_draw_itemlist_item_internal(item_indexes[old_sel], old_sel);
+                dialog_draw_itemlist_item_internal(item_indexes[item_select_pointer], item_select_pointer);
+            }
+            break;
+        }
+        case 0x91: {
+            if (item_select_pointer > 1) {
+                uint8_t old_sel = item_select_pointer;
+                item_select_pointer-=2;
+                dialog_draw_itemlist_item_internal(item_indexes[old_sel], old_sel);
+                dialog_draw_itemlist_item_internal(item_indexes[item_select_pointer], item_select_pointer);
+            }
+            break;
+        }
+        case 0x9d: {
+            if (((item_select_pointer % 2) == 1) && (item_select_pointer > 0)) {
+                uint8_t old_sel = item_select_pointer;
+                item_select_pointer--;
+                dialog_draw_itemlist_item_internal(item_indexes[old_sel], old_sel);
+                dialog_draw_itemlist_item_internal(item_indexes[item_select_pointer], item_select_pointer);
+            }
+            break;
+        }
+    }
+    return false;
+}
+
+void dialog_draw_itemlist_internal(void) {
+    engine_allowinput(false);
+    textscr_set_textmode(true);
+    textscr_print_ascii(0,0,false,(uint8_t *)"You are carrying...");
+    item_select_listsize = 0;
+    logic_vars[25] = 0xff;
+    item_select_pointer = 0;
+    for (int counter = 0; counter < 256; counter++) {
+        if (object_locations[counter] == 255) {
+            item_indexes[item_select_listsize] = counter;
+            dialog_draw_itemlist_item_internal(counter, item_select_listsize);
+            item_select_listsize++;
+        }
+    }
+    if (item_select_listsize == 0) {
+        bool highlight = logic_flag_isset(13);
+        textscr_print_ascii(0, 1, highlight, (uint8_t *)"nothing");
+    }
+    bool exit = false;
+    while(!exit) {
+        while(ASCIIKEY == 0);
+        uint8_t keypress = ASCIIKEY;
+        ASCIIKEY = 0;
+        if (logic_flag_isset(13)) {
+            exit = dialog_handleitemselect_input_internal(keypress);
+        } else if ((keypress == 0x1b) || (keypress == 0x0d)) {
+            exit = true;
+        }
+    }
+    textscr_set_textmode(false);
+    engine_allowinput(true);
+}
 
 void dialog_draw_menudrop_item_internal(uint8_t item_num) {
     textscr_set_printpos(2, item_num + 2);
@@ -179,14 +283,14 @@ void dialog_draw_menudrop_item_internal(uint8_t item_num) {
         textscr_print_asciichar(menu_entries[menu_item_num].text[ptr], highlight);
         ptr++;
     }
-    while (ptr < main_menus[menu_bar_current].max_length) {
+    while (ptr < main_menus[menu_bar_current].drop_width) {
         textscr_print_asciichar(' ', highlight);
         ptr++;
     }
 }
 
 void dialog_draw_menudrop_internal(void) {
-    box_width = main_menus[menu_bar_current].max_length;
+    box_width = main_menus[menu_bar_current].drop_width;
     box_height = main_menus[menu_bar_current].drop_height;
     x_start = main_menus[menu_bar_current].drop_start_x;
     y_start = 1;
@@ -289,6 +393,47 @@ static bool dialog_handlemappedkey_internal(uint8_t ascii_key, bool alt_flag) {
     return false;
 }
 
+static bool dialog_handlemenuinput_mouse_internal(void) {
+    uint8_t mouse_xtile;
+    uint8_t mouse_ytile;
+    uint8_t start_x = 0;
+
+    mouse_xtile = mouse_xpos / 8;
+    mouse_ytile = mouse_ypos / 8;
+    if (mouse_ytile == 0) {
+        for (uint8_t menu = 0; menu < menu_bar_used; menu++) {
+            if ((mouse_xtile > start_x) && (mouse_xtile <= (start_x + main_menus[menu].entry_width))) {
+                if (menu_bar_current != menu) {
+                    dialog_close();
+                    menu_bar_current = menu;
+                    dialog_draw_menubar_internal();
+                }
+                return false;
+            } else {
+                start_x += (main_menus[menu].entry_width + 1);
+            }
+        }
+    } else {
+        if ((mouse_ytile > 1) && (mouse_ytile <= (main_menus[menu_bar_current].drop_height + 1))) {
+            if ((mouse_xtile > main_menus[menu_bar_current].drop_start_x) &&
+                (mouse_xtile <= (main_menus[menu_bar_current].drop_start_x + main_menus[menu_bar_current].drop_width))) {
+                    uint8_t candidate_option = mouse_ytile - 2;
+                    uint8_t menu_item_num = (menu_opt_start + candidate_option);
+                    if (menu_entries[menu_item_num].enabled) {
+                        if (menu_opt_current != candidate_option) {
+                            uint8_t old_sel = menu_opt_current;
+                            menu_opt_current = candidate_option;
+                            dialog_draw_menudrop_item_internal(old_sel);
+                            dialog_draw_menudrop_item_internal(menu_opt_current);
+                        }
+                        return true;
+                    }
+            }
+        }
+    }
+
+    return false;
+}
 static bool dialog_handlemenuinput_internal(uint8_t ascii_key) {
     switch(ascii_key) {
         case 0x0d: {
@@ -545,12 +690,12 @@ static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_on
 
         joyports_poll();
         uint8_t prev_joybutton = joystick_fire;
-        uint8_t prev_mousebutton = mouse_leftclick;
 
         while (1) {
             joyports_poll();
             uint8_t joypress = !prev_joybutton && joystick_fire;
-            uint8_t mousepress = !prev_mousebutton && mouse_leftclick;
+            uint8_t mousepress = !mouse_down && mouse_leftclick;
+            mouse_down = mouse_leftclick;
             uint8_t asciival = ASCIIKEY;
             if (asciival != 0) {
                 ASCIIKEY = 0;
@@ -573,7 +718,6 @@ static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_on
                 return true;
             } else {
                 prev_joybutton = joystick_fire;
-                prev_mousebutton = mouse_leftclick;
             }
 
             if (run_engine) {
@@ -672,16 +816,34 @@ bool dialog_proc(void) {
             } else {
                 retval = true;
             }
+        case imDialogMenuMouseTrigger:
+            select_gui_mem();
+            if (dialog_handlemenuinput_mousetrigger()) {
+                dialog_close();
+                dialog_input_mode = imParser;
+                dialog_clear_keyboard();
+                status_line_score = 255;
+                while (!dialog_nokeys_internal()) {
+                    ASCIIKEY = 0;
+                }
+            } else {
+                retval = true;
+            }
         break;
     }
     return retval;
 }
 
 #pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
-void dialog_draw_menubar(void) {
+void dialog_draw_itemlist(void) {
+    select_gui_mem();
+    dialog_draw_itemlist_internal();
+}
+
+void dialog_draw_menubar(bool mouse_trigger) {
     textscr_print_ascii(0, 0, true, (uint8_t *)"%p40");
     menu_bar_current = 0;
-    dialog_input_mode = imDialogMenu;
+    dialog_input_mode = mouse_trigger ? imDialogMenuMouseTrigger : imDialogMenu;
     select_gui_mem();
     dialog_draw_menubar_internal();
     while (!dialog_nokeys_internal()) {
@@ -712,7 +874,8 @@ void dialog_set_menu(uint8_t message_number) {
     while (src_string[len] != 0) {
         len++;
     }
-    main_menus[menu_bar_used].max_length = 0;
+    main_menus[menu_bar_used].entry_width = len;
+    main_menus[menu_bar_used].drop_width = 0;
     main_menus[menu_bar_used].menu_entries_ptr = menu_opts_used;
     main_menus[menu_bar_used].drop_start_x = menu_opt_start;
     main_menus[menu_bar_used].drop_height = 0;
@@ -734,17 +897,51 @@ void dialog_set_menu_item(uint8_t message_number, uint8_t controller) {
     while (src_string[len] != 0) {
         len++;
     }
-    if (len > main_menus[menu_bar_current].max_length) {
-        main_menus[menu_bar_current].max_length = len;
-        if ((main_menus[menu_bar_current].drop_start_x + main_menus[menu_bar_current].max_length + 2) > 39) {
-            main_menus[menu_bar_current].drop_start_x = 40 - main_menus[menu_bar_current].max_length - 2;
+    if (len > main_menus[menu_bar_current].drop_width) {
+        main_menus[menu_bar_current].drop_width = len;
+        if ((main_menus[menu_bar_current].drop_start_x + main_menus[menu_bar_current].drop_width + 2) > 39) {
+            main_menus[menu_bar_current].drop_start_x = 40 - main_menus[menu_bar_current].drop_width - 2;
         }
     }
     menu_opt_current = menu_opts_used;
     menu_opts_used++;
 }
 
+bool dialog_handlemenuinput_mousetrigger(void) {
+    joyports_poll();
+
+    if (mouse_leftclick == 1) {
+        mouse_down = true;
+        dialog_handlemenuinput_mouse_internal();
+        return false;
+    } else if (mouse_down) {
+        if (mouse_leftclick == 0) {
+            mouse_down = false;
+            if (dialog_handlemenuinput_mouse_internal()) {
+                uint8_t menu_item_num = (menu_opt_start + menu_opt_current);
+                logic_set_controller(menu_entries[menu_item_num].controller);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 bool dialog_handlemenuinput(void) {
+    joyports_poll();
+
+    if (mouse_leftclick == 1) {
+        if (mouse_down == false) {
+            mouse_down = true;
+            if (dialog_handlemenuinput_mouse_internal()) {
+                uint8_t menu_item_num = (menu_opt_start + menu_opt_current);
+                logic_set_controller(menu_entries[menu_item_num].controller);
+                return true;
+            }
+        }
+    } else {
+        mouse_down = false;
+    }
     uint8_t ascii_key = ASCIIKEY;
     if (ascii_key != 0) {
         ASCIIKEY = 0;
@@ -826,7 +1023,6 @@ void dialog_close(void) {
     }
     dialog_first = 0;
     dialog_last = 0;
-    show_object_view = false;
 }
 
 void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uint8_t column, uint8_t max) {

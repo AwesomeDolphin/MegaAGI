@@ -1077,7 +1077,6 @@ bool logic_run_high(void) {
             // graphics 
             textscr_set_textmode(false);
             engine_allowinput(true);
-            status_line_score=255;
             program_counter += 1;
             break;
         }
@@ -1196,26 +1195,7 @@ bool logic_run_high(void) {
         }
         case 0x7C: {
             // status
-            engine_allowinput(false);
-            textscr_set_textmode(true);
-            textscr_print_ascii(0,0,false,(uint8_t *)"You are carrying...");
-            uint8_t __huge *object_ptr = attic_memory + object_data_offset;
-            uint8_t number_of_carried = 0;
-            for (int counter = 0; counter < 256; counter++) {
-                if (object_locations[counter] == 255) {
-                    uint16_t object_sdesc_offset = object_ptr[((counter + 1) * 3) + 0] + 3;
-                    object_sdesc_offset |= (object_ptr[((counter + 1) * 3) + 1] << 8);
-                    uint8_t __huge *object_sdesc_ptr = object_ptr + object_sdesc_offset;
-                    uint8_t column = (number_of_carried % 2) ? 20 : 0;
-                    uint8_t row = (number_of_carried / 2) + 1;
-                    textscr_print_ascii(column, row, false, (uint8_t *)"%H", object_sdesc_ptr);
-                    number_of_carried++;
-                }
-            }
-            while(ASCIIKEY == 0);
-            ASCIIKEY = 0;
-            textscr_set_textmode(false);
-            engine_allowinput(true);
+            dialog_draw_itemlist();
             program_counter += 1;
             break;
         }
@@ -1233,37 +1213,40 @@ bool logic_run_high(void) {
         }
         case 0x80: {
             // restart.game
-            sprite_stop_all();
-            sprite_unanimate_all();
-            chipmem_free_unlocked();
-            engine_allowinput(false);
-            player_control = true;
-            dialog_close();
-            block_active = 0;
-            horizon_line = 36;
-            status_line_score = 255;
-            for (int counter = 0; counter < 256; counter++) {
-                logic_vars[counter] = 0;
+            memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Restart game?\nPress Return to restart.\nPress ESC to cancel.");
+            if (dialog_show(false, true, print_string_buffer)) {
+                sprite_stop_all();
+                sprite_unanimate_all();
+                chipmem_free_unlocked();
+                engine_allowinput(false);
+                player_control = true;
+                dialog_close();
+                block_active = 0;
+                horizon_line = 36;
+                status_line_score = 255;
+                for (int counter = 0; counter < 256; counter++) {
+                    logic_vars[counter] = 0;
+                }
+                for (int counter = 0; counter < 32; counter++) {
+                    logic_flags[counter] = 0;
+                }
+                logic_set_flag(9);
+                logic_set_flag(11);
+                logic_vars[20] = 128;
+                logic_vars[22] = 3;
+                logic_vars[23] = 0x0f;
+                logic_vars[24] = 37;
+                logic_vars[25] = 3;
+                logic_set_flag(5);
+                logic_set_flag(6);
+                sprite_clearall();
+                engine_clear_keyboard();
             }
-            for (int counter = 0; counter < 32; counter++) {
-                logic_flags[counter] = 0;
-            }
-            logic_set_flag(9);
-            logic_set_flag(11);
-            logic_vars[20] = 128;
-            logic_vars[22] = 3;
-            logic_vars[23] = 0x0f;
-            logic_vars[24] = 37;
-            logic_vars[25] = 3;
-            logic_set_flag(5);
-            logic_set_flag(6);
-            sprite_clearall();
-            engine_clear_keyboard();
             return false;
         }
         case 0x81: {
             // show.obj
-            engine_show_object(program_counter[1]);
+            sprite_show_object(program_counter[1]);
             program_counter += 2;
             break;
         }
@@ -1399,8 +1382,14 @@ bool logic_run_high(void) {
         }
         case 0xA1: {
             // menu.input
-            dialog_draw_menubar();
+            dialog_draw_menubar(false);
             program_counter += 1;
+            break;
+        }
+        case 0xA2: {
+            // show.obj.v
+            sprite_show_object(logic_vars[program_counter[1]]);
+            program_counter += 2;
             break;
         }
         case 0xA3: {

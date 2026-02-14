@@ -70,9 +70,9 @@ typedef struct {
 extern uint8_t priority_bands[11];
 extern uint8_t priorities[169];
 extern view_info_t object_view;
-extern bool show_object_view;
 
-void sprite_draw_to_pic(void);
+void sprite_draw_to_pic(bool force_draw);
+void sprite_erase_from_pic(bool force_draw);
 void autoselect_loop(agisprite_t *sprite);
 uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed);
 void sprite_erase(uint8_t sprite_num);
@@ -86,6 +86,7 @@ void sprite_setedge(uint8_t sprite_num, uint8_t edgenum);
 void sprite_clearall(void);
 void sprite_undraw(void);
 void sprite_updateanddraw(void);
+void sprite_show_object(uint8_t view_num);
 void sprite_init(void);
 
 #endif

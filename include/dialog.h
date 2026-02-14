@@ -21,7 +21,8 @@
 
 #include "main.h"
 
-void dialog_draw_menubar(void);
+void dialog_draw_itemlist(void);
+void dialog_draw_menubar(bool mouse_trigger);
 void dialog_handle_setkey(uint8_t ascii, uint8_t keycode, uint8_t controller);
 void dialog_recall(void);
 void dialog_gamesave_handler(char *filename);

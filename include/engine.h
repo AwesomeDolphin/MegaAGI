@@ -23,9 +23,10 @@
 
 extern uint8_t status_line_score;
 extern bool quit_flag;
+extern bool mouse_down;
 
+void engine_update_status_line(bool force);
 void run_loop(void);
-void engine_show_object(uint8_t view_num);
 void engine_interrupt_handler(void);
 void engine_clear_keyboard(void);
 void engine_allowinput(bool allowed);

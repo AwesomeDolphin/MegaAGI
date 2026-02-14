@@ -266,7 +266,7 @@ void pic_add_to_pic(uint8_t pic_command) {
     object_view.priority_set = true;
 
     select_sprite_mem();
-    sprite_draw_to_pic();
+    sprite_draw_to_pic(false);
     select_engine_logichigh_mem();
     if (add_to_pic_commands[pic_command].margin < 4) {
         uint8_t y2 = 0;

@@ -53,6 +53,7 @@ volatile bool engine_running;
 bool status_line_enabled;
 uint8_t status_line_score;
 bool status_line_sound;
+bool mouse_down = false;
 
 static const uint8_t joystick_direction_to_agi[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
@@ -77,10 +78,10 @@ void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
     select_gamesave_mem();
 }
 
-void engine_update_status_line(void) {
+void engine_update_status_line(bool force) {
     if (!game_text) {
         if (status_line_enabled) {
-            if ((logic_vars[3] != status_line_score) || (logic_flag_isset(9) != status_line_sound)) {
+            if ((logic_vars[3] != status_line_score) || (logic_flag_isset(9) != status_line_sound) || force) {
                 status_line_score = logic_vars[3];
                 status_line_sound = logic_flag_isset(9);
                 if (status_line_sound) {
@@ -91,20 +92,6 @@ void engine_update_status_line(void) {
             }
         }
     }
-}
-
-void engine_show_object(uint8_t view_num) {
-    view_load(view_num);
-    view_set(&object_view, view_num);
-    select_loop(&object_view, 0);
-    object_view.x_pos = 80 - (object_view.width / 2);
-    object_view.y_pos = 155;
-    object_view.priority_override = true;
-    object_view.priority = 0x0f;
-    show_object_view = true;
-    uint8_t __far *desc_data = chipmem_base + object_view.desc_offset;
-    dialog_show(false, false, desc_data);
-    select_engine_logichigh_mem();
 }
 
 /*
@@ -154,19 +141,22 @@ void handle_movement_joystick(void) {
 }
 
 void handle_movement_mouse(void) {
-    static bool mouse_down = false;
     if (!player_control) {
         return;
     }
 
     if (mouse_leftclick == 1) {
-        if ((mouse_ypos > 8) && (mouse_down == false)) {
-            sprites[0].prg_movetype = pmmMoveTo;
-            sprites[0].prg_x_destination = (mouse_xpos >> 1) - (sprites[0].view_info.width >> 1);
-            sprites[0].prg_y_destination = mouse_ypos - 8;
-            sprites[0].prg_speed = sprites[0].step_size;
-            sprites[0].prg_distance = sprites[0].prg_speed * sprites[0].prg_speed;
-            sprites[0].prg_complete_flag = 0;
+        if (mouse_down == false) {
+            if (mouse_ypos > 8) {
+                sprites[0].prg_movetype = pmmMoveTo;
+                sprites[0].prg_x_destination = (mouse_xpos >> 1) - (sprites[0].view_info.width >> 1);
+                sprites[0].prg_y_destination = mouse_ypos - 8;
+                sprites[0].prg_speed = sprites[0].step_size;
+                sprites[0].prg_distance = sprites[0].prg_speed * sprites[0].prg_speed;
+                sprites[0].prg_complete_flag = 0;
+            } else {
+                dialog_draw_menubar(true);
+            } 
         }
         mouse_down = true;
     } else {
@@ -236,7 +226,7 @@ void run_loop(void) {
                     sound_flag_needs_set = false;
                     logic_set_flag(sound_flag_end);
                 }
-                engine_update_status_line();
+                engine_update_status_line(false);
                 sprite_undraw();
                 joyports_poll();
                 handle_movement_joystick();

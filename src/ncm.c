@@ -38,11 +38,11 @@ static uint8_t highcolor[16] = {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 
 bool game_text;
 
 #pragma clang section bss="screenmem0"
-__far uint16_t screen_memory_0[1525];
+__far grafix_mem_line_t screen_memory_0[25];
 #pragma clang section bss="screenmem1"
-__far uint16_t screen_memory_1[1525];
+__far grafix_mem_line_t screen_memory_1[25];
 #pragma clang section bss="colorram"
-__far uint16_t color_memory[1024];
+__far grafix_mem_line_t color_memory[25];
 #pragma clang section bss="prioritydata"
 __far uint8_t priority_screen[16384];
 #pragma clang section bss=""
@@ -217,18 +217,35 @@ void gfx_cleargfx(bool preserve_text) {
     DMA.etrig = (uint8_t)(((uint16_t)clrscreen1cmd) & 0xff);
   }
 
-  for (int y = 0; y < 20; y++) {
-    int x=20;
-    screen_memory_0[(y * 61) + x] = 0x0140;        
-    screen_memory_1[(y * 61) + x] = 0x0140;
-    color_memory[(y * 61) + x] = 0x0010;       
+  for (int y = 1; y < 21; y++) {
+    for (int x = 0; x < 40; x++) {
+      screen_memory_0[y].backtiles_chars[x] = 0x0020;        
+      screen_memory_1[y].backtiles_chars[x] = 0x0020;
+      screen_memory_0[y].foretiles_chars[x] = 0x0020;        
+      screen_memory_1[y].foretiles_chars[x] = 0x0020;
+      color_memory[y].foretiles_chars[x] = 0x0100;       
+      color_memory[y].backtiles_chars[x] = 0x0000;       
+    }
   }
-if (!preserve_text) {
+
+  if (!preserve_text) {
     for (int y = 21; y < 25; y++) {
-      int x=20;
-      screen_memory_0[(y * 61) + x] = 0x0140;        
-      screen_memory_1[(y * 61) + x] = 0x0140;
-      color_memory[(y * 61) + x] = 0x0010;       
+      for (int x = 0; x < 40; x++) {
+        color_memory[y].backtiles_chars[x] = 0x0000;       
+        screen_memory_0[y].backtiles_chars[x] = 0x00a0;        
+        screen_memory_1[y].backtiles_chars[x] = 0x00a0;
+        screen_memory_0[y].foretiles_chars[x] = 0x0020;        
+        screen_memory_1[y].foretiles_chars[x] = 0x0020;
+        color_memory[y].foretiles_chars[x] = 0x0100;
+      }
+    }
+    for (int x = 0; x < 40; x++) {
+      color_memory[0].backtiles_chars[x] = 0x0000;       
+      screen_memory_0[0].backtiles_chars[x] = 0x00a0;        
+      screen_memory_1[0].backtiles_chars[x] = 0x00a0;
+      screen_memory_0[0].foretiles_chars[x] = 0x0020;        
+      screen_memory_1[0].foretiles_chars[x] = 0x0020;
+      color_memory[0].foretiles_chars[x] = 0x0100;
     }
   }
 
@@ -267,7 +284,7 @@ bool gfx_flippage(void) {
   
     //VICIV.bordercol = viewing_screen ? COLOR_RED : COLOR_GREEN;
   
-    VICIV.scrnptr = 0x00012000 + (viewing_screen * 0xC00);
+    VICIV.scrnptr = 0x0002d000 + (viewing_screen * 0x1800);
     gfx_copygfx(viewing_screen);
     return true;
   }
@@ -326,36 +343,38 @@ void gfx_setupmem(void) {
         // to the screen.
         // Character 0x1400 points to 0x50000, which is the first bitmap screen
         // Character 0x1600 points to 0x58000, which is the second bitmap screen
-        // We set up memory for a 320x200 screen, but only use 20 of the rows
-        // But since memory is arranged that way, each vertical strip starts 25 characters apart
-        screen_memory_0[(y * 61) + x] = 0x1400 + (0x200 * 0) + (x * 25) + (y - 1);        
-        screen_memory_1[(y * 61) + x] = 0x1400 + (0x200 * 1) + (x * 25) + (y - 1);
+        screen_memory_0[y].graphics_chars[x] = 0x1400 + (0x200 * 0) + (x * 25) + (y - 1);        
+        screen_memory_1[y].graphics_chars[x] = 0x1400 + (0x200 * 1) + (x * 25) + (y - 1);
         // Color memory is set as 0x1f = Select palette 1, where the PC palette is loaded, and color 0x0f is the foreground color
         // The foreground color is important, because this is the color that will be used when the NCM screen has 0xf as a color
         // The 0x08 selects NCM mode, with no other flags
-        color_memory[(y * 61) + x] = 0x1f08;       
+        color_memory[y].graphics_chars[x]  = 0x1f08;       
       } else {
         // Point all characters on lines that do not have game graphics to the same character, which is a blank character
-        screen_memory_0[(y * 61) + x] = 0x1400 + 21;        
-        screen_memory_1[(y * 61) + x] = 0x1400 + 21;
+        screen_memory_0[y].graphics_chars[x] = 0x1400 + 21;        
+        screen_memory_1[y].graphics_chars[x] = 0x1400 + 21;
         // Color memory is set as 0x1f = Select palette 1, where the PC palette is loaded, and color 0x0f is the foreground color
         // The foreground color is important, because this is the color that will be used when the NCM screen has 0xf as a color
         // The 0x08 selects NCM mode, with no other flags
-        color_memory[(y * 61) + x] = 0x1f08;       
+        color_memory[y].graphics_chars[x] = 0x1f08;       
       }
     }
-    int x=20;
-    // This is the GOTOX flag character, at character 20, so after the graphics pointers
-    // We reposition the buffer writing to pixel 320, which is pointless, except that it keeps the text OFF the screen
-    screen_memory_0[(y * 61) + x] = 0x0140;        
-    screen_memory_1[(y * 61) + x] = 0x0140;
-    color_memory[(y * 61) + x] = 0x0010;       
-    for (int x = 21; x < 61; x++) {
+    // These are the GOTOX flag characters
+    screen_memory_0[y].gotox_backtiles = 0x0000;
+    screen_memory_1[y].gotox_backtiles = 0x0000;
+    color_memory[y].gotox_backtiles = 0x0090;       
+    screen_memory_0[y].gotox_foretiles = 0x0000;
+    screen_memory_1[y].gotox_foretiles = 0x0000;
+    color_memory[y].gotox_foretiles = 0x0090;       
+    for (int x = 0; x < 40; x++) {
       // Set the characters to < 255, because want to use the ROM character set for these
       // Color memory simply sets the foreground color to palette 0 (Commodore colors), color 1, (white).
-      screen_memory_0[(y * 61) + x] = 0x0041;        
-      screen_memory_1[(y * 61) + x] = 0x0041;
-      color_memory[(y * 61) + x] = 0x0100;       
+      screen_memory_0[y].backtiles_chars[x] = 0x0020; 
+      screen_memory_1[y].backtiles_chars[x] = 0x0020;
+      color_memory[y].backtiles_chars[x] = 0x0000;       
+      screen_memory_0[y].foretiles_chars[x] = 0x0020; 
+      screen_memory_1[y].foretiles_chars[x] = 0x0020;
+      color_memory[y].foretiles_chars[x] = 0x0000;       
     }
   }
 
@@ -394,8 +413,9 @@ void gfx_switchto(void) {
     VICIV.ctrlb = VICIV.ctrlb & ~(VIC3_H640_MASK | VIC3_V400_MASK);
     VICIV.ctrlc = (VICIV.ctrlc & ~(VIC4_FCLRLO_MASK)) | (VIC4_FCLRHI_MASK | VIC4_CHR16_MASK);
 
-    VICIV.scrnptr = 0x00012000;
+    VICIV.scrnptr = 0x0002d000;
     VICIV.colptr = 0x1000;
-    VICIV.chrcount = 61;
-    VICIV.linestep = 122;
+    VICIV.chrcount = 102;
+    VICIV.linestep = 204;
+    VICIV.xpos_msb = VICIV.xpos_msb & 0x7f;
 }

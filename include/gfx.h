@@ -21,13 +21,21 @@
 
 #include <stdbool.h>
 
+typedef struct grafix_mem_line {
+  uint16_t graphics_chars[20];
+  uint16_t gotox_backtiles;
+  uint16_t backtiles_chars[40];
+  uint16_t gotox_foretiles;
+  uint16_t foretiles_chars[40];
+} grafix_mem_line_t;
+
 extern volatile uint8_t __far *drawing_xpointer[2][160];
 extern uint8_t *fastdrawing_xpointer[160];
 extern volatile uint8_t drawing_screen;
 extern volatile uint8_t viewing_screen;
-extern __far uint16_t screen_memory_0[1525];
-extern __far uint16_t screen_memory_1[1525];
-extern __far uint16_t color_memory[1024];
+extern __far grafix_mem_line_t screen_memory_0[25];
+extern __far grafix_mem_line_t screen_memory_1[25];
+extern __far grafix_mem_line_t color_memory[25];
 extern __far uint8_t priority_screen[16384];
 extern __far uint8_t priority_screen[16384];
 extern bool game_text;

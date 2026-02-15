@@ -32,7 +32,7 @@ uint32_t __attribute__((zpage)) my_quad;
 
 #pragma clang section bss = "banked_bss" data = "initsdata" rodata = "initsrodata" text = "initstext"
 
-static uint8_t __far * const initscrmem_base = (uint8_t __far *)0x12000;
+static uint8_t __far * const initscrmem_base = (uint8_t __far *)0x2d000;
 static uint8_t __far * const initcolmem_base = (uint8_t __far *)0xff80000;
 static uint16_t cursorpos;
 
@@ -165,7 +165,7 @@ void init_system(void)
   VICIV.linestep = 80;
   VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
 
-  VICIV.scrnptr = 0x00012000;
+  VICIV.scrnptr = 0x0002d000;
   VICIV.colptr = 0x0000;
   VICIV.charptr = 0x29800;
 
@@ -192,8 +192,8 @@ void init_system(void)
   DMA.dmahigh = (uint8_t)(((uint16_t)copybankable) >> 8);
   DMA.etrig = (uint8_t)(((uint16_t)copybankable) & 0xff);
 
-  uint8_t __far *chardst = (uint8_t __far *)0x29ee0;
-  uint8_t charsrc[] = {0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xe7, 0xff, 0xff, 0xff, 0x00, 0x00, 0xff, 0xff, 0xff};
+  uint8_t __far *chardst = (uint8_t __far *)0x29ae0;
+  uint8_t charsrc[] = {0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00};
   for (uint8_t ctr = 0; ctr < 16; ctr++) {
     *chardst = charsrc[ctr];
     chardst++;

@@ -280,7 +280,6 @@ bool logic_run_low(void) {
             // draw.pic
             select_picdraw_mem();
             gfx_hold_flip(true);
-            VICIV.bordercol = COLOR_GREEN;
             views_in_pic = 0;
             draw_pic(logic_vars[program_counter[1]], true);
             status_line_score = 255;
@@ -648,7 +647,7 @@ bool logic_run_low(void) {
             break;
         }
         default: {
-            textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKLINS=%x:%X", *program_counter,(uint32_t)program_counter);
+            textscr_print_ascii(0, 0, (uint8_t *)"FAULT: UNKLINS=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }
@@ -803,7 +802,7 @@ bool logic_test_commands(void) {
             break;
         }
         default:
-            textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
+            textscr_print_ascii(0, 0, (uint8_t *)"FAULT: UNKTEST=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
     }
     return result;
@@ -816,8 +815,8 @@ bool logic_test(void) {
     bool or_result;
     while(1) {
         if (debug) {
-            textscr_print_ascii(0,1,false,(uint8_t *)"C:%x %X", logic_num, (uint32_t)program_counter);
-            textscr_print_ascii(0,2,false,(uint8_t *)"D:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
+            textscr_print_ascii(0,1,(uint8_t *)"C:%x %X", logic_num, (uint32_t)program_counter);
+            textscr_print_ascii(0,2,(uint8_t *)"D:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
             while(ASCIIKEY==0) {
     
             }
@@ -1046,14 +1045,16 @@ bool logic_run_high(void) {
         case 0x67: {
             // display
             uint8_t __far *src_string = logic_locate_message(logic_num, program_counter[3]);
-            textscr_print_ascii(program_counter[2], program_counter[1], false, (uint8_t *)"%S", src_string);
+            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+            textscr_print_ascii(program_counter[2], program_counter[1], (uint8_t *)"%S", src_string);
             program_counter += 4;
             break;
         }
         case 0x68: {
             // display.v
             uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[3]]);
-            textscr_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], false, (uint8_t *)"%S", src_string);
+            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+            textscr_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], (uint8_t *)"%S", src_string);
             program_counter += 4;
             break;
         }
@@ -1420,7 +1421,7 @@ bool logic_run_high(void) {
             break;
         }
         default: {
-            textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: UNKHINS=%x:%X", *program_counter,(uint32_t)program_counter);
+            textscr_print_ascii(0, 0, (uint8_t *)"FAULT: UNKHINS=%x:%X", *program_counter,(uint32_t)program_counter);
             while(1);
         }
     }
@@ -1434,12 +1435,12 @@ void logic_run(void) {
     logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
-        //if (logic_num == 92) {
+        //if (logic_num == 2) {
         //    debug = 1;
         //}
         if (debug) {
-            textscr_print_ascii(0,1,false,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
-            textscr_print_ascii(0,2,false,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
+            textscr_print_ascii(0,1,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
+            textscr_print_ascii(0,2,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
             while(ASCIIKEY==0) {
     
             }
@@ -1469,7 +1470,7 @@ void logic_load(uint8_t logic_num) {
 
     logic_infos[logic_num].offset = load_volume_object(voLogic, logic_num, &length);
     if (logic_infos[logic_num].offset == 0) {
-        textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
+        textscr_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
         return;
     }
 

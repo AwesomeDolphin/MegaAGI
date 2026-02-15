@@ -132,10 +132,10 @@
         )
 
         (memory screenmem0
-            (address (#x12000 . #x12bff)) (type bss) (qualifier far)
+            (address (#x2d000 . #x2e7ff)) (type bss) (qualifier far)
             (section screenmem0))
         (memory screenmem1
-            (address (#x12C00 . #x137ff)) (type bss) (qualifier far)
+            (address (#x2e800 . #x2ffff)) (type bss) (qualifier far)
             (section screenmem1))
         (memory prioritydata
             (address (#x14000 . #x17fff)) (type bss) (qualifier far)
@@ -147,7 +147,7 @@
             (address (#xff86000 . #xff87fff)) (type bss) (qualifier far)
             (section chipram2))
         (memory colorram
-            (address (#xff81000 . #xff81bff)) (type bss) (qualifier far)
+            (address (#xff81000 . #xff827ff)) (type bss) (qualifier far)
             (section colorram))
         (block heap (size #x0))
         (block cstack (size #x800))

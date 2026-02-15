@@ -36,12 +36,14 @@
 __far uint8_t formatted_string_buffer[1024];
 __far uint8_t print_string_buffer[1024];
 
-#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+#pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
 
-static uint16_t printpos = 0;
-static uint16_t endpos;
+static uint16_t printpos_x = 0;
+static uint16_t printpos_y = 0;
+static uint16_t forecolor;
+static uint16_t backcolor;
 
-static  void textscr_print_asciistr(uint8_t x, uint8_t y, bool reverse, uint8_t __far *output);
+static  void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output);
 
 uint8_t my_ultoa_invert(unsigned long val, char *str, int base)
 {
@@ -100,84 +102,68 @@ static const unsigned char ascii_to_c64_screen[128] = {
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
 };
 
-void textscr_print_asciichar(uint8_t character, bool reverse) {
-  character = ascii_to_c64_screen[character];
-  if (reverse) {
-    character = character ^ 0x80;
-  }
-  screen_memory_0[printpos] = character;
-  screen_memory_1[printpos] = character;
-  color_memory[printpos] = 0x0100;
-  printpos++;
+void textscr_set_color(uint8_t foreground, uint8_t background) {
+  forecolor = foreground << 8;
+  backcolor = background << 8;
 }
 
 void textscr_print_scncode(uint8_t scncode) {
-  screen_memory_0[printpos] = scncode;
-  screen_memory_1[printpos] = scncode;
-  color_memory[printpos] = 0x0100;
-  printpos++;
+  screen_memory_0[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
+  screen_memory_1[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
+  color_memory[printpos_y].backtiles_chars[printpos_x] = backcolor;
+  screen_memory_0[printpos_y].foretiles_chars[printpos_x] = scncode;
+  screen_memory_1[printpos_y].foretiles_chars[printpos_x] = scncode;
+  color_memory[printpos_y].foretiles_chars[printpos_x] = forecolor;
+  printpos_x++;
+}
+
+void textscr_print_asciichar(uint8_t character) {
+  character = ascii_to_c64_screen[character];
+  textscr_print_scncode(character);
 }
 
 void textscr_set_printpos(uint8_t x, uint8_t y) {
-  if (game_text) {
-    printpos = (y * 61) + 21 + x; 
-  } else {
-    printpos = (y * 61) + 20 + x; 
-  }
+  printpos_x = x;
+  printpos_y = y; 
 }
 
-void textscr_begin_print(uint8_t x, uint8_t y) {
-  if (game_text) {
-    printpos = (y * 61) + 21 + x;
-  } else {
-    printpos = (y * 61) + 20;
-    endpos = printpos+40;
-    screen_memory_0[printpos] = x * 8;
-    screen_memory_1[printpos] = x * 8;
-    printpos++;
-  }
-}
-
-void textscr_end_print(void) {
-  if (!game_text) {
-    if (printpos < endpos) {
-      screen_memory_0[printpos] = 0x140;
-      screen_memory_1[printpos] = 0x140;
-      color_memory[printpos] = 0x0010;       
-    } else if (printpos == endpos) {
-      screen_memory_0[printpos] = 0x0020;
-      screen_memory_1[printpos] = 0x0020;
-      color_memory[printpos] = 0x0100;       
-    }
-  }
-}
-
-void textscr_print_asciistr(uint8_t x, uint8_t y, bool reverse, uint8_t __far *output) {
-  textscr_begin_print(x,y);
+void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output) {
+  textscr_set_printpos(x,y);
 
   uint8_t __far *ascii_string = output;
   while (*ascii_string != 0) {
-    textscr_print_asciichar(*ascii_string, reverse);
+    textscr_print_asciichar(*ascii_string);
     ascii_string++;
   }
-  textscr_end_print();
 }
 
 void textscr_clear_line(uint8_t y) {
-  if (game_text) {
-    textscr_print_ascii(0, y, false, (uint8_t *)"%p40");
+  if ((y > 0) && (y < 21)) {
+    for (int x = 0; x < 40; x++) {
+      screen_memory_0[y].backtiles_chars[x] = 0x0020;        
+      screen_memory_1[y].backtiles_chars[x] = 0x0020;
+      screen_memory_0[y].foretiles_chars[x] = 0x0020;        
+      screen_memory_1[y].foretiles_chars[x] = 0x0020;
+      color_memory[y].foretiles_chars[x] = 0x0100;       
+      color_memory[y].backtiles_chars[x] = 0x0000;       
+    }
   } else {
-    printpos = (y * 61) + 20;
-    screen_memory_0[printpos] = 0x140;
-    screen_memory_1[printpos] = 0x140;
-    color_memory[printpos] = 0x0010;       
+    for (int x = 0; x < 40; x++) {
+      color_memory[y].backtiles_chars[x] = 0x0000;       
+      screen_memory_0[y].backtiles_chars[x] = 0x00a0;        
+      screen_memory_1[y].backtiles_chars[x] = 0x00a0;
+      screen_memory_0[y].foretiles_chars[x] = 0x0020;        
+      screen_memory_1[y].foretiles_chars[x] = 0x0020;
+      color_memory[y].foretiles_chars[x] = 0x0100;
+    }
   }
 }
 
 void textscr_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
+    textscr_set_color(COLOR_WHITE, COLOR_BLACK);
     for (uint8_t i = 0; i < 25; i++) {
-      textscr_print_ascii(0, i, false, (uint8_t *)"%p40");
+      textscr_print_ascii(0, i, (uint8_t *)"%p40");
     }
     game_text = true;
   } else {
@@ -319,7 +305,7 @@ uint16_t textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
   return padlen;
 }
 
-uint16_t textscr_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...) {
+uint16_t textscr_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...) {
     va_list ap;
     va_start(ap, formatstring);
 
@@ -327,7 +313,7 @@ uint16_t textscr_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *format
     uint16_t len = textscr_format_string_valist(print_string_buffer, ap);
     va_end(ap);
 
-    textscr_print_asciistr(x, y, reverse, formatted_string_buffer);
+    textscr_print_asciistr(x, y, formatted_string_buffer);
     return len;
 }
 

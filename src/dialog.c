@@ -188,7 +188,12 @@ void dialog_draw_itemlist_item_internal(uint8_t objnum, uint8_t index) {
     uint8_t __huge *object_sdesc_ptr = object_ptr + object_sdesc_offset;
     uint8_t column = (index % 2) ? 20 : 0;
     uint8_t row = (index / 2) + 1;
-    textscr_print_ascii(column, row, highlight, (uint8_t *)"%H", object_sdesc_ptr);
+    if (highlight) {
+        textscr_set_color(COLOR_WHITE, COLOR_RED);
+    } else {
+        textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+    }
+    textscr_print_ascii(column, row, (uint8_t *)"%H", object_sdesc_ptr);
 }
 
 static bool dialog_handleitemselect_input_internal(uint8_t ascii_key) {
@@ -244,7 +249,7 @@ static bool dialog_handleitemselect_input_internal(uint8_t ascii_key) {
 void dialog_draw_itemlist_internal(void) {
     engine_allowinput(false);
     textscr_set_textmode(true);
-    textscr_print_ascii(0,0,false,(uint8_t *)"You are carrying...");
+    textscr_print_ascii(0,0,(uint8_t *)"You are carrying...");
     item_select_listsize = 0;
     logic_vars[25] = 0xff;
     item_select_pointer = 0;
@@ -257,7 +262,12 @@ void dialog_draw_itemlist_internal(void) {
     }
     if (item_select_listsize == 0) {
         bool highlight = logic_flag_isset(13);
-        textscr_print_ascii(0, 1, highlight, (uint8_t *)"nothing");
+        if (highlight) {
+            textscr_set_color(COLOR_WHITE, COLOR_RED);
+        } else {
+            textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+        }
+        textscr_print_ascii(0, 1, (uint8_t *)"nothing");
     }
     bool exit = false;
     while(!exit) {
@@ -275,18 +285,54 @@ void dialog_draw_itemlist_internal(void) {
 }
 
 void dialog_draw_menudrop_item_internal(uint8_t item_num) {
-    textscr_set_printpos(2, item_num + 2);
-    bool highlight = (item_num != menu_opt_current);
+    textscr_set_printpos(main_menus[menu_bar_current].drop_start_x + 1, item_num + 2);
+    bool highlight = (item_num == menu_opt_current);
     uint8_t menu_item_num = (menu_opt_start + item_num);
     uint8_t ptr = 0;
+    if (highlight) {
+        textscr_set_color(COLOR_WHITE, COLOR_RED);
+    } else {
+        if (menu_entries[menu_item_num].enabled) {
+            textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+        } else {
+            textscr_set_color(COLOR_YELLOW, COLOR_WHITE);
+        }
+    }
     while (menu_entries[menu_item_num].text[ptr] != 0) {
-        textscr_print_asciichar(menu_entries[menu_item_num].text[ptr], highlight);
+        textscr_print_asciichar(menu_entries[menu_item_num].text[ptr]);
         ptr++;
     }
     while (ptr < main_menus[menu_bar_current].drop_width) {
-        textscr_print_asciichar(' ', highlight);
+        textscr_print_asciichar(' ');
         ptr++;
     }
+}
+
+void dialog_draw_popupbox_internal(void) {
+    textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+    textscr_set_printpos(x_start, y_start);
+    textscr_print_scncode(0x70);
+    for (uint8_t cnt = 0; cnt < box_width; cnt++) {
+        textscr_print_scncode(0x5d);
+    }
+    textscr_print_scncode(0x6e);
+    
+    for (uint8_t cnt = 0; cnt < box_height; cnt++) {
+        textscr_set_printpos(x_start, y_start + cnt + 1);
+        textscr_print_scncode(0x5c);
+        for (uint8_t cnt = 0; cnt < box_width; cnt++) {
+            textscr_print_scncode(0x20);
+        }
+        textscr_print_scncode(0x5c);
+    }
+
+    textscr_set_printpos(x_start, y_start + box_height + 1);
+    textscr_print_scncode(0x6d);
+    for (uint8_t cnt = 0; cnt < box_width; cnt++) {
+        textscr_print_scncode(0x5d);
+        line_length++;
+    }
+    textscr_print_scncode(0x7d);
 }
 
 void dialog_draw_menudrop_internal(void) {
@@ -294,44 +340,9 @@ void dialog_draw_menudrop_internal(void) {
     box_height = main_menus[menu_bar_current].drop_height;
     x_start = main_menus[menu_bar_current].drop_start_x;
     y_start = 1;
-
-    line_length = 0;
-    textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xF0);
-    while (line_length < box_width) {
-        textscr_print_scncode(0XDD);
-        line_length++;
-    }
-    textscr_print_scncode(0xEE);
-    textscr_end_print();
-
-    for (uint8_t cnt = 0; cnt < box_height; cnt++) {
-        line_length = 0;
-        y_start++;
-        textscr_begin_print(x_start, y_start);
-        textscr_print_scncode(0xDC);
-        while (line_length < box_width) {
-            textscr_print_asciichar(' ', true);
-            line_length++;
-        }
-        textscr_print_scncode(0xDC);
-        textscr_end_print();
-    }
-
-    y_start++;
-    line_length = 0;
-    textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xED);
-    while (line_length < box_width) {
-        textscr_print_scncode(0XDD);
-        line_length++;
-    }
-    textscr_print_scncode(0xFD);
-    textscr_end_print();
-    
-    y_start++;
     dialog_first = 1;
-    dialog_last = y_start;
+    dialog_last = dialog_first + box_height + 1;
+    dialog_draw_popupbox_internal();
     menu_opt_current = 0;
     menu_opt_start = main_menus[menu_bar_current].menu_entries_ptr;
     for (uint8_t cnt = 0; cnt < main_menus[menu_bar_current].drop_height; cnt++) {
@@ -342,11 +353,17 @@ void dialog_draw_menudrop_internal(void) {
 void dialog_draw_menubar_internal(void) {
     textscr_set_printpos(1, 0);
     for (uint8_t menu = 0; menu < menu_bar_used; menu++) {
-        bool highlight = (menu != menu_bar_current);
-        textscr_print_asciichar(' ', true);
+        bool highlight = (menu == menu_bar_current);
+        textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+        textscr_print_asciichar(' ');
         uint8_t ptr = 0;
+        if (highlight) {
+            textscr_set_color(COLOR_WHITE, COLOR_RED);
+        } else {
+            textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+        }
         while (main_menus[menu].text[ptr] != 0) {
-            textscr_print_asciichar(main_menus[menu].text[ptr], highlight);
+            textscr_print_asciichar(main_menus[menu].text[ptr]);
             ptr++;
         }
     }
@@ -509,11 +526,12 @@ static bool dialog_handleinput_internal(uint8_t ascii_key, bool alt_flag, bool *
     switch(ascii_key) {
         case 0x14:
             if (cmd_buf_ptr > 0) {
+                textscr_set_color(COLOR_WHITE, COLOR_BLACK);
                 textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-                textscr_print_asciichar(' ', false);
+                textscr_print_asciichar(' ');
                 cmd_buf_ptr--;
                 textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-                textscr_print_asciichar(' ', false);
+                textscr_print_asciichar(' ');
             }
             break;
         case 0x0d:
@@ -531,7 +549,8 @@ static bool dialog_handleinput_internal(uint8_t ascii_key, bool alt_flag, bool *
                 if (cmd_buf_ptr < input_max_length) {
                     command_buffer[cmd_buf_ptr] = ascii_key;
                     textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-                    textscr_print_asciichar(ascii_key, false);
+                    textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+                    textscr_print_asciichar(ascii_key);
                     cmd_buf_ptr++;
                 }
             }
@@ -546,7 +565,8 @@ void dialog_recall_internal(void) {
     while (prev_command_buffer[cmd_buf_ptr] != 0) {
         command_buffer[cmd_buf_ptr] = prev_command_buffer[cmd_buf_ptr];
         textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-        textscr_print_asciichar(prev_command_buffer[cmd_buf_ptr], false);
+        textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+        textscr_print_asciichar(prev_command_buffer[cmd_buf_ptr]);
         cmd_buf_ptr++;
     }
 }
@@ -606,77 +626,46 @@ static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_on
     x_start = 20 - (box_width / 2) - 1;
     y_start = 10 - (box_height / 2) - 1;
     dialog_first = y_start;
+    dialog_last = y_start + box_height + 1;
 
     msg_ptr = formatted_string_buffer;
     line_length = 0;
 
-    textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xF0);
-    while (line_length < box_width) {
-        textscr_print_scncode(0xDD);
-        line_length++;
-    }
-    textscr_print_scncode(0xEE);
-    textscr_end_print();
+    dialog_draw_popupbox_internal();
 
     line_length = 0;
     y_start++;
-    textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xDC);
+    textscr_set_printpos(x_start + 1, y_start);
     do {
         msg_char = *msg_ptr;
         if (msg_char >= 32) {
-            textscr_print_asciichar(msg_char, true);
+            textscr_print_asciichar(msg_char);
             line_length++;
         } else {
-            while (line_length < box_width) {
-                textscr_print_asciichar(' ', true);
-                line_length++;
-            }
-            textscr_print_scncode(0xDC);
-            textscr_end_print();
             y_start++;
-            textscr_begin_print(x_start, y_start);
-            textscr_print_scncode(0xDC);
+            textscr_set_printpos(x_start + 1, y_start);
             line_length = 0;
         }
         msg_ptr++;
     } while (*msg_ptr != 0);
-    while (line_length < box_width) {
-        textscr_print_asciichar(' ', true);
-        line_length++;
-    }
-    textscr_print_scncode(0xDC);
-    textscr_end_print();
 
     if (accept_input) {
         line_length = 0;
-        textscr_set_printpos(2, y_start);
+        textscr_set_printpos(x_start + 1, y_start);
         while (line_length < box_width) {
-            textscr_print_asciichar(' ', false);
+            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+            textscr_print_asciichar(' ');
             line_length++;
         }
         command_buffer[0] = 0;
         cmd_buf_ptr=0;
         ASCIIKEY = 0;
         input_line = y_start;
-        input_start_column = 2;
+        input_start_column = x_start + 1;
         input_max_length = 12;
         dialog_input_mode = imDialogField;
-        textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
+        textscr_print_ascii(0, 22, (uint8_t *)"%p40");
     }
-
-    y_start++;
-    dialog_last = y_start;
-    line_length = 0;
-    textscr_begin_print(x_start, y_start);
-    textscr_print_scncode(0xED);
-    while (line_length < box_width) {
-        textscr_print_scncode(0XDD);
-        line_length++;
-    }
-    textscr_print_scncode(0xFD);
-    textscr_end_print();
 
     if (accept_input || draw_only) {
         return true;
@@ -841,7 +830,8 @@ void dialog_draw_itemlist(void) {
 }
 
 void dialog_draw_menubar(bool mouse_trigger) {
-    textscr_print_ascii(0, 0, true, (uint8_t *)"%p40");
+    textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+    textscr_print_ascii(0, 0, (uint8_t *)"%p40");
     menu_bar_current = 0;
     dialog_input_mode = mouse_trigger ? imDialogMenuMouseTrigger : imDialogMenu;
     select_gui_mem();
@@ -959,10 +949,12 @@ bool dialog_handleinput(bool force_accept, bool mapkeys, bool *cancelled) {
     if (cursor_delay > 5) {
         if (cursor_flag) {
             textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-            textscr_print_asciichar(' ', false);
+            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+            textscr_print_asciichar(' ');
         } else {
             textscr_set_printpos(cmd_buf_ptr + input_start_column, input_line);
-            textscr_print_asciichar(' ', true);
+            textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+            textscr_print_asciichar(' ');
         }
         cursor_flag = !cursor_flag;
         cursor_delay = 0;
@@ -1032,7 +1024,7 @@ void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uin
     input_line = row;
     input_max_length = max;
 
-    input_start_column = column + textscr_print_ascii(column, row, false, (uint8_t *)"%M", prompt);
+    input_start_column = column + textscr_print_ascii(column, row, (uint8_t *)"%M", prompt);
 
     while(!dialog_handleinput(true, false, NULL)) {
         while(!run_engine);
@@ -1048,10 +1040,11 @@ void dialog_clear_keyboard(void) {
         cmd_buf_ptr=0;
         ASCIIKEY = 0;
         input_line = 22;
-        input_start_column = 3;
+        input_start_column = 2;
         input_max_length = 37;
 
-        textscr_print_ascii(0, 22, false, (uint8_t *)">%p40");
+        textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+        textscr_print_ascii(0, 22, (uint8_t *)"%s0%p40");
     }
 }
 
@@ -1066,7 +1059,7 @@ void dialog_init(void) {
     dialog_first = 0;
     dialog_last = 0;
     input_line = 22;
-    input_start_column = 3;
+    input_start_column = 2;
     input_max_length = 37;
     cursor_flag = false;
     cursor_delay = 0;

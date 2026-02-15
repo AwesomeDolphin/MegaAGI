@@ -24,14 +24,13 @@
 extern __far uint8_t formatted_string_buffer[1024];
 extern __far uint8_t print_string_buffer[1024];
 
+void textscr_set_color(uint8_t foreground, uint8_t background);
 uint16_t textscr_format_string_valist(uint8_t __far *formatstring, va_list ap);
-void textscr_print_asciichar(uint8_t character, bool reverse);
+void textscr_print_asciichar(uint8_t character);
 void textscr_print_scncode(uint8_t scncode);
-void textscr_begin_print(uint8_t x, uint8_t y);
-void textscr_end_print(void);
 void textscr_set_printpos(uint8_t x, uint8_t y);
 void textscr_clear_line(uint8_t y);
-uint16_t textscr_print_ascii(uint8_t x, uint8_t y, bool reverse, uint8_t *formatstring, ...);
+uint16_t textscr_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...);
 void textscr_set_textmode(bool enable_text);
 void textscr_clear_keyboard(void);
 void textscr_init(void);

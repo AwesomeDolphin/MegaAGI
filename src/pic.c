@@ -304,7 +304,7 @@ void pic_load(uint8_t pic_num) {
     pic_descriptors[pic_num].offset = load_volume_object(voPic, pic_num, &length);
     pic_descriptors[pic_num].length = length;
     if (pic_descriptors[pic_num].offset == 0) {
-        textscr_print_ascii(0, 0, false, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
+        textscr_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);
         return;
     }
 }

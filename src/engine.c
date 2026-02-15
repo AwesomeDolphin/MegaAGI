@@ -84,10 +84,11 @@ void engine_update_status_line(bool force) {
             if ((logic_vars[3] != status_line_score) || (logic_flag_isset(9) != status_line_sound) || force) {
                 status_line_score = logic_vars[3];
                 status_line_sound = logic_flag_isset(9);
+                textscr_set_color(COLOR_BLACK, COLOR_WHITE);
                 if (status_line_sound) {
-                    textscr_print_ascii(0, 0, true, (uint8_t  *)"Score: %d of %d%p27Sound: On%p40", logic_vars[3], logic_vars[7]);
+                    textscr_print_ascii(0, 0, (uint8_t  *)"Score: %d of %d%p27Sound: On%p40", logic_vars[3], logic_vars[7]);
                 } else {
-                    textscr_print_ascii(0, 0, true, (uint8_t  *)"Score: %d of %d%p27Sound: Off%p40", logic_vars[3], logic_vars[7]);
+                    textscr_print_ascii(0, 0, (uint8_t  *)"Score: %d of %d%p27Sound: Off%p40", logic_vars[3], logic_vars[7]);
                 }
             }
         }
@@ -167,7 +168,8 @@ void handle_movement_mouse(void) {
 void engine_statusline(bool enable) {
     status_line_enabled = enable;
     if (!enable) {
-        textscr_print_ascii(0, 0, false, (uint8_t *)"%p40");
+        textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+        textscr_print_ascii(0, 0, (uint8_t *)"%p40");
     }
 }
 
@@ -180,7 +182,8 @@ void engine_allowinput(bool allowed) {
     if (input_ok) {
         engine_clear_keyboard();
     } else {
-        textscr_print_ascii(0, 22, false, (uint8_t *)"%p40");
+        textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+        textscr_print_ascii(0, 22, (uint8_t *)"%p40");
     }
 }
 

@@ -299,9 +299,11 @@ void pic_show_priority(void) {
     while(1);
 }
 
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
 void pic_load(uint8_t pic_num) {
     uint16_t length;
-    pic_descriptors[pic_num].offset = load_volume_object(voPic, pic_num, &length);
+    pic_descriptors[pic_num].offset = volume_load_object(voPic, pic_num, &length);
     pic_descriptors[pic_num].length = length;
     if (pic_descriptors[pic_num].offset == 0) {
         textscr_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load pic %d.", pic_num);

@@ -46,6 +46,39 @@ volatile uint8_t frame_counter;
 volatile bool run_engine;
 bool quit_flag;
 
+#pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
+void engine_show_welcome_text(void) {
+    VICIV.bordercol = COLOR_GREEN;
+    textscr_set_color(COLOR_YELLOW, COLOR_BLACK);
+    textscr_print_ascii(0, 16, (uint8_t *)"  In memory of Shadow Fox, dolphins in");
+    textscr_print_ascii(0, 17, (uint8_t *)"   your dreams, too many other foxes,");
+    textscr_print_ascii(0, 18, (uint8_t *)"and those who speak for those who can't.");
+    textscr_set_color(COLOR_WHITE, COLOR_BLACK);
+    textscr_print_ascii(0, 19, (uint8_t *)"   Starting up. Patience is a virtue.");
+    textscr_print_ascii(0, 20, (uint8_t *)"  Green border means game is thinking!");
+    textscr_print_ascii(0, 21, (uint8_t *)" 1351 mouse, port 1.  Joystick, port 2.");
+    textscr_set_color(COLOR_LIGHTGREY, COLOR_BLACK);
+    textscr_print_ascii(0, 23, (uint8_t *)"      Mega-AGI Copyright 2026 by");
+    textscr_print_ascii(0, 24, (uint8_t *)"           Keith Henrickson");
+}
+
+void engine_showload_dialog(void) {
+    memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Loading, please wait!");
+    dialog_show(false, false, true, print_string_buffer);
+    select_volume_mem();
+}
+
+void engine_clearload_dialog(void) {
+    dialog_close();
+    select_volume_mem();
+}
+
+void engine_askdisk_dialog(uint8_t disk_number) {
+    memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Please insert disk %d.");
+    dialog_show(false, false, false, print_string_buffer, disk_number);
+    select_volume_mem();
+}
+
 #pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
 
 volatile uint8_t run_cycles;
@@ -59,12 +92,6 @@ static const uint8_t joystick_direction_to_agi[16] = {
     0, 0, 0, 0, 0, 4, 2, 3,
     0, 6, 8, 7, 0, 5, 1, 0
 };
-
-void engine_bridge_pic_load(uint8_t pic_num) {
-    select_picdraw_mem();
-    pic_load(pic_num);
-    select_gamesave_mem();
-}
 
 void engine_bridge_add_to_pic(uint8_t add_command_num) {
     select_picdraw_mem();
@@ -198,13 +225,17 @@ void run_loop(void) {
     status_line_sound = true;
     quit_flag = false;
 
+    textscr_init();
+    dialog_init();
+
+    select_engine_enginehigh_mem();
+    engine_show_welcome_text();
+
     hook_irq();
     view_init();
     sprite_init();
     logic_init();
     parser_init();
-    textscr_init();
-    dialog_init();
     mouse_init();
     input_ok = false;
     player_control = true;
@@ -216,6 +247,7 @@ void run_loop(void) {
     logic_vars[24] = 37;
     logic_vars[25] = 3;
     logic_set_flag(5);
+    gfx_cleargfx(false);
     while (!quit_flag) {
         while(!run_engine);
         engine_running = true;

@@ -29,3 +29,5 @@ void select_picdraw_mem(void);
 void select_parser_mem(void);
 void select_gui_mem(void);
 void select_gamesave_mem(void);
+void select_volume_mem(void);
+void select_previous_bank(void);

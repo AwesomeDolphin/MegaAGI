@@ -31,7 +31,7 @@ joystick_fire:
 mouse_leftclick:
         .space 1,0
 
-        .section code
+        .section ls_spritetext
         .public joyports_poll
 joyports_poll:
         sei             ;disable IRQ to inhibit kybd

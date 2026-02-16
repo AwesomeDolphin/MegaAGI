@@ -27,8 +27,6 @@
 #include "main.h"
 #include "volume.h"
 
-#define FARSID1 (*(volatile struct __sid __far *)0xffd3400)
-
 volatile uint8_t __huge *sound_file;
 volatile uint16_t voice_offsets[3] = {0};
 volatile uint8_t voice_stopped[3] = {1};
@@ -42,13 +40,15 @@ volatile uint8_t next_sound_flag_end;
 volatile uint8_t __huge * next_sound_file;
 volatile bool sound_queued;
 
+#pragma clang section bss="banked_bss" data="ls_spritedata" rodata="ls_spriterodata" text="ls_spritetext"
+
 void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     uint16_t length;
     if (sound_running) {
         sound_stop();
     }
 
-    next_sound_file = locate_volume_object(voSound, sound_num, &length);
+    next_sound_file = volume_locate_object(voSound, sound_num, &length);
     if (next_sound_file == NULL) {
         return;
     }
@@ -56,6 +56,15 @@ void sound_play(uint8_t sound_num, uint8_t flag_at_end) {
     next_sound_flag_end = flag_at_end;
     sound_queued = true;
 }
+
+void sound_stop(void) {
+    if (sound_running) {
+        request_stop = true;
+    }
+}
+
+
+#pragma clang section bss="banked_bss" data="data" rodata="data" text="code"
 
 static void sound_play_queued(void) {
     sound_queued = false;
@@ -89,12 +98,6 @@ static void sound_play_queued(void) {
     voice_stopped[2] = 0;
 }
 
-void sound_stop(void) {
-    if (sound_running) {
-        request_stop = true;
-    }
-}
-
 void sound_interrupt_handler(void) {
     uint8_t acted = 0;
     for (uint8_t voice=0; voice < 3; voice++) {
@@ -102,16 +105,16 @@ void sound_interrupt_handler(void) {
         if (!voice_stopped[voice] && logic_flag_isset(9)) {
             acted = 1;
             uint16_t voice_offset = voice_offsets[voice];
-            volatile struct __sid_voice __far *sid;
+            volatile struct __sid_voice *sid;
             switch(voice) {
                 case 0:
-                    sid = &FARSID1.v1;
+                    sid = &SID1.v1;
                     break;
                 case 1:
-                    sid = &FARSID1.v2;
+                    sid = &SID1.v2;
                     break;
                 case 2:
-                    sid = &FARSID1.v3;
+                    sid = &SID1.v3;
                     break;
             }
             if (durations[voice] < voice_holds[voice]) {
@@ -153,10 +156,10 @@ void sound_interrupt_handler(void) {
         voice_stopped[2] = 1;
     }
     if (sound_running && !acted) {
-        FARSID1.v1.ctrl = 0x00;
-        FARSID1.v2.ctrl = 0x00;
-        FARSID1.v3.ctrl = 0x00;
-        FARSID1.amp = 0x00;
+        SID1.v1.ctrl = 0x00;
+        SID1.v2.ctrl = 0x00;
+        SID1.v3.ctrl = 0x00;
+        SID1.amp = 0x00;
         sound_flag_needs_set = true;
         sound_running = 0;
     }

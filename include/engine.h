@@ -25,13 +25,16 @@ extern uint8_t status_line_score;
 extern bool quit_flag;
 extern bool mouse_down;
 
+void engine_showload_dialog(void);
+void engine_clearload_dialog(void);
+void engine_askdisk_dialog(uint8_t disk_number);
+
 void engine_update_status_line(bool force);
 void run_loop(void);
 void engine_interrupt_handler(void);
 void engine_clear_keyboard(void);
 void engine_allowinput(bool allowed);
 void engine_statusline(bool enable);
-void engine_bridge_pic_load(uint8_t pic_num);
 void engine_bridge_draw_pic(uint8_t pic_num, bool clear);
 void engine_bridge_add_to_pic(uint8_t add_command_num);
 

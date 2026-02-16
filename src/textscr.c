@@ -172,6 +172,7 @@ void textscr_set_textmode(bool enable_text) {
       textscr_clear_line(i);
     }
     engine_update_status_line(true);
+    engine_clear_keyboard();
   }
 }
 

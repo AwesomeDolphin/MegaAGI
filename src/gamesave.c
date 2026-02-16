@@ -196,7 +196,7 @@ uint8_t gamesave_load_from_attic(void) {
     logic_set_flag(12);
 
     gfx_hold_flip(true);
-    engine_bridge_pic_load(logic_vars[0]);
+    pic_load(logic_vars[0]);
     engine_bridge_draw_pic(logic_vars[0], true);
     chipmem_free(pic_descriptors[logic_vars[0]].offset);
     for (int i = 0; i < views_in_pic; i++) {

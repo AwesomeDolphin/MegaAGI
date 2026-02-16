@@ -51,7 +51,7 @@
         )
 
         (memory gamecode
-            (address (#x8004000 . #x801ffff)) (type any)
+            (address (#x8004000 . #x8021fff)) (type any)
             (section
                 (gamecode_sprhs #x8004000)
                 (gamecode_sprls #x8006000)
@@ -63,6 +63,7 @@
                 (gamecode_gamsv #x8018000)
                 (gamecode_guidl #x801A000)
                 (gamecode_enghi #x801C000)
+                (gamecode_volmgr #x8020000)
             )
         )
 
@@ -131,6 +132,12 @@
             (section eh_text eh_data eh_rodata)
         )
 
+        (memory volume_manager
+            (address (#xe000 . #xfff0))
+            (scatter-to gamecode_volmgr)
+            (section vm_text vm_data vm_rodata)
+        )
+
         (memory screenmem0
             (address (#x2d000 . #x2e7ff)) (type bss) (qualifier far)
             (section screenmem0))
@@ -138,10 +145,10 @@
             (address (#x2e800 . #x2ffff)) (type bss) (qualifier far)
             (section screenmem1))
         (memory prioritydata
-            (address (#x14000 . #x17fff)) (type bss) (qualifier far)
+            (address (#x12000 . #x15fff)) (type bss) (qualifier far)
             (section prioritydata))
         (memory extradata
-            (address (#x18000 . #x1f6ff)) (type bss) (qualifier far)
+            (address (#x16000 . #x1f6ff)) (type bss) (qualifier far)
             (section extradata))
         (memory chipram2
             (address (#xff86000 . #xff87fff)) (type bss) (qualifier far)

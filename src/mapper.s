@@ -27,10 +27,21 @@ hmem_picdraw:   .equ 0x01
 hmem_parser:    .equ 0x02
 hmem_gui:       .equ 0x03
 hmem_gamesave:  .equ 0x04
+hmem_volume:    .equ 0x05
+
+bank_ell:       .equ 0x01
+bank_elh:       .equ 0x02
+bank_eeh:       .equ 0x03
+bank_sprite:    .equ 0x04
+bank_edd:       .equ 0x05
 
         .section banked_bss,bss
         .public himem_mapbank
 himem_mapbank:
+        .space 1,0
+bank_current:
+        .space 1,0
+bank_previous:
         .space 1,0
 
         .section code
@@ -56,7 +67,12 @@ select_graphics1_mem:
 
 
         .public select_engine_logiclow_mem
-select_engine_logiclow_mem:  
+select_engine_logiclow_mem:
+        lda bank_current
+        sta bank_previous
+        lda #bank_ell
+        sta bank_current
+
 		lda #0x60
 		ldx #0x23
 		ldy #0x80
@@ -67,6 +83,11 @@ select_engine_logiclow_mem:
 
         .public select_engine_logichigh_mem
 select_engine_logichigh_mem:  
+        lda bank_current
+        sta bank_previous
+        lda #bank_elh
+        sta bank_current
+        
 		lda #0x60
 		ldx #0x23
 		ldy #0xC0
@@ -77,6 +98,11 @@ select_engine_logichigh_mem:
 
         .public select_engine_enginehigh_mem
 select_engine_enginehigh_mem:  
+        lda bank_current
+        sta bank_previous
+        lda #bank_eeh
+        sta bank_current
+        
 		lda #0x60
 		ldx #0x23
 		ldy #0x20
@@ -87,6 +113,11 @@ select_engine_enginehigh_mem:
 
         .public select_sprite_mem
 select_sprite_mem:  
+        lda bank_current
+        sta bank_previous
+        lda #bank_sprite
+        sta bank_current
+        
 		lda #0x00
 		ldx #0x00
 		ldy #0xC0
@@ -97,6 +128,11 @@ select_sprite_mem:
 
         .public select_engine_diskdriver_mem
 select_engine_diskdriver_mem:  
+        lda bank_current
+        sta bank_previous
+        lda #bank_edd
+        sta bank_current
+        
 		lda #0x60
 		ldx #0x23
 		ldy #0x00
@@ -128,6 +164,26 @@ select_kernel_mem:
         lda #0x20
         tsb 0xd030
 		rts
+
+        .public select_previous_bank
+select_previous_bank:
+        lda bank_previous
+        cmp #bank_ell
+        bne +
+        jmp select_engine_logiclow_mem
++       cmp #bank_elh
+        bne +
+        jmp select_engine_logichigh_mem
++       cmp #bank_eeh
+        bne +
+        jmp select_engine_enginehigh_mem
++       cmp #bank_sprite
+        bne +
+        jmp select_sprite_mem
++       cmp #bank_edd
+        bne +
+        jmp select_engine_diskdriver_mem
++       rts
 
 		.public select_picdraw_mem
 select_picdraw_mem:
@@ -228,5 +284,30 @@ select_gamesave_mem:
         .byte 0x00
 
         lda #hmem_gamesave
+        sta himem_mapbank
++:		rts
+
+		.public select_volume_mem
+select_volume_mem:
+        lda himem_mapbank
+        cmp #hmem_volume
+        beq +
+		sta 0xd707
+        
+        .byte 0x80
+        .byte 0x80
+        .byte 0x81
+        .byte 0x00
+        .byte 0x00
+        .byte 0x00
+        .word 0x1ff0
+        .word 0x0000
+        .byte 0x02
+        .word 0xe000
+        .byte 0x00
+        .byte 0x00
+        .byte 0x00
+
+        lda #hmem_volume
         sta himem_mapbank
 +:		rts

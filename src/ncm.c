@@ -70,7 +70,7 @@ uint8_t clrscreen0cmd[] =  {0x00,               // End of token list
                             0x03,               // Fill command
                             0xff, 0x3f,         // count $3fff bytes
                             0x44, 0x00, 0x00,   // fill value $44
-                            0x00, 0x40, 0x01,   // destination start $014000
+                            0x00, 0x20, 0x01,   // destination start $012000
                             0x00,               // command high byte
                             0x00,               // modulo
                            };
@@ -86,7 +86,7 @@ uint8_t clrscreen1cmd[] =  {0x00,               // End of token list
                             0x03,               // Fill command
                             0xff, 0x3f,         // count $3fff bytes
                             0x44, 0x00, 0x00,   // fill value $44
-                            0x00, 0x40, 0x01,   // destination start $014000
+                            0x00, 0x20, 0x01,   // destination start $012000
                             0x00,               // command high byte
                             0x00,               // modulo
                            };
@@ -348,7 +348,7 @@ void gfx_setupmem(void) {
         // Color memory is set as 0x1f = Select palette 1, where the PC palette is loaded, and color 0x0f is the foreground color
         // The foreground color is important, because this is the color that will be used when the NCM screen has 0xf as a color
         // The 0x08 selects NCM mode, with no other flags
-        color_memory[y].graphics_chars[x]  = 0x1f08;       
+        color_memory[y].graphics_chars[x]  = 0x6f08;       
       } else {
         // Point all characters on lines that do not have game graphics to the same character, which is a blank character
         screen_memory_0[y].graphics_chars[x] = 0x1400 + 21;        
@@ -356,7 +356,7 @@ void gfx_setupmem(void) {
         // Color memory is set as 0x1f = Select palette 1, where the PC palette is loaded, and color 0x0f is the foreground color
         // The foreground color is important, because this is the color that will be used when the NCM screen has 0xf as a color
         // The 0x08 selects NCM mode, with no other flags
-        color_memory[y].graphics_chars[x] = 0x1f08;       
+        color_memory[y].graphics_chars[x] = 0x6f08;       
       }
     }
     // These are the GOTOX flag characters
@@ -407,8 +407,6 @@ void gfx_switchto(void) {
 
     game_text = 0;
 
-    VICIV.ctrl1 = 0x1b;
-    VICIV.ctrl2 = VICIV.ctrl2 | 0x10;
     VICIV.ctrla = VICIV.ctrla | VIC3_PAL_MASK;
     VICIV.ctrlb = VICIV.ctrlb & ~(VIC3_H640_MASK | VIC3_V400_MASK);
     VICIV.ctrlc = (VICIV.ctrlc & ~(VIC4_FCLRLO_MASK)) | (VIC4_FCLRHI_MASK | VIC4_CHR16_MASK);
@@ -418,4 +416,6 @@ void gfx_switchto(void) {
     VICIV.chrcount = 102;
     VICIV.linestep = 204;
     VICIV.xpos_msb = VICIV.xpos_msb & 0x7f;
+
+    VICIV.ctrl1 = 0x1b;
 }

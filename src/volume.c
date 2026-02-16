@@ -22,8 +22,10 @@
 #include <mega65.h>
 
 #include "disk.h"
+#include "engine.h"
 #include "gfx.h"
 #include "main.h"
+#include "mapper.h"
 #include "memmanage.h"
 #include "disk.h"
 #include "volume.h"
@@ -34,7 +36,7 @@ typedef struct voldir_entry
     uint32_t offset;
 } voldir_entry_t;
 
-static uint8_t __huge *volume_files[16] = {0};
+static uint8_t __huge *volume_files[10] = {0};
 #pragma clang section bss = "extradata"
 __far static voldir_entry_t logic_directory[256];
 __far static voldir_entry_t pic_directory[256];
@@ -42,15 +44,46 @@ __far static voldir_entry_t sound_directory[256];
 __far static voldir_entry_t view_directory[256];
 #pragma clang section bss = ""
 
-static uint8_t volumes;
 static uint8_t logic_files;
 static uint8_t pic_files;
 static uint8_t sound_files;
 static uint8_t view_files;
 
-#pragma clang section bss = "banked_bss" data = "enginedata" rodata = "enginerodata" text = "enginetext"
+#pragma clang section bss = "banked_bss" data = "vm_data" rodata = "vm_rodata" text = "vm_text"
+void load_volume_file_internal(uint8_t vol_number)
+{
+    while (1) {
+        select_engine_enginehigh_mem();
+        engine_showload_dialog();
+        select_previous_bank();
+        char vol_name[32];
+        strcpy(vol_name, "VOL.0");
+        vol_name[4] = 0x30 + vol_number;
+        uint8_t __huge *volume_cache = attic_memory + atticmem_allocoffset;
 
-uint8_t __huge *locate_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length)
+        uint32_t volume_size = 0;
+
+        volume_files[vol_number] = volume_cache;
+        select_engine_diskdriver_mem();
+        disk_load_attic(vol_name, &volume_size, 8);
+        select_previous_bank();
+        select_engine_enginehigh_mem();
+        engine_clearload_dialog();
+        select_previous_bank();
+        if (volume_size == 0)
+        {
+            volume_files[vol_number] = 0;
+            select_engine_enginehigh_mem();
+            engine_askdisk_dialog(vol_number);
+            engine_clearload_dialog();
+            select_previous_bank();
+        } else {
+            break;
+        }
+    }
+}
+
+uint8_t __huge *locate_volume_object_internal(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length)
 {
     voldir_entry_t __far *volobj_entry = NULL;
     switch (kind)
@@ -83,6 +116,9 @@ uint8_t __huge *locate_volume_object(volobj_kind_t kind, uint8_t volobj_num, uin
 
     if (volobj_entry != NULL)
     {
+        if (volume_files[volobj_entry->volume_number] == 0) {
+            load_volume_file_internal(volobj_entry->volume_number);
+        }
         uint8_t __huge *object_cache_memory = volume_files[volobj_entry->volume_number] + volobj_entry->offset;
         if ((object_cache_memory[0] == 0x12) && (object_cache_memory[1] == 0x34))
         {
@@ -119,12 +155,12 @@ uint8_t copyattogamcmd[] = {
     0x00, // modulo
 };
 
-uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length)
+uint16_t load_volume_object_internal(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length)
 {
     uint8_t __huge *volobj_file;
     uint16_t length;
 
-    volobj_file = locate_volume_object(kind, volobj_num, &length);
+    volobj_file = locate_volume_object_internal(kind, volobj_num, &length);
     if (volobj_file == NULL)
     {
         return 0;
@@ -140,10 +176,21 @@ uint16_t load_volume_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *ob
     uint16_t target_offset = chipmem_alloc(length);
     copyattogamcmd[12] = (target_offset & 0xff00) >> 8;
     copyattogamcmd[11] = (target_offset & 0xff);
-    DMA.dmabank = 0x03;
-    DMA.dmahigh = ((uint8_t)(((uint16_t)copyattogamcmd) >> 8)) + 0x60;
+    DMA.dmahigh = ((uint8_t)(((uint16_t)copyattogamcmd) >> 8));
     DMA.etrig = (uint8_t)(((uint16_t)copyattogamcmd) & 0xff);
     return target_offset;
+}
+ 
+#pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
+
+uint8_t __huge *volume_locate_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length) {
+    select_volume_mem();
+    return locate_volume_object_internal(kind, volobj_num, object_length);
+}
+
+uint16_t volume_load_object(volobj_kind_t kind, uint8_t volobj_num, uint16_t *object_length) {
+    select_volume_mem();
+    return load_volume_object_internal(kind, volobj_num, object_length);
 }
 
 #pragma clang section bss = "banked_bss" data = "initsdata" rodata = "initsrodata" text = "initstext"
@@ -170,27 +217,4 @@ void load_directory_files(void)
     pic_files = load_directory_file("PICDIR", pic_directory);
     sound_files = load_directory_file("SNDDIR", sound_directory);
     view_files = load_directory_file("VIEWDIR", view_directory);
-}
-
-void load_volume_files(void)
-{
-    char vol_name[32];
-    strcpy(vol_name, "VOL.0");
-    uint8_t __huge *volume_cache = attic_memory + atticmem_allocoffset;
-
-    uint32_t volume_size = 0;
-    uint8_t vol_number;
-    for (vol_number = 0; vol_number < 15; vol_number++)
-    {
-        volume_files[vol_number] = volume_cache;
-        disk_load_attic(vol_name, &volume_size, 8);
-        vol_name[4]++;
-        if (volume_size == 0)
-        {
-            volume_files[vol_number] = 0;
-            break;
-        }
-        volume_cache = attic_memory + atticmem_allocoffset;
-    }
-    volumes = vol_number - 1;
 }

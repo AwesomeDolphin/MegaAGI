@@ -1031,14 +1031,14 @@ bool logic_run_high(void) {
         case 0x65: {
             // print
             uint8_t __far *src_string =  logic_locate_message(logic_num, program_counter[1]);
-            dialog_show(false, false, src_string);
+            dialog_show(false, false, false, src_string);
             program_counter += 2;
             break;
         }
         case 0x66: {
             // print.v
             uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[1]]);
-            dialog_show(false, false, src_string);
+            dialog_show(false, false, false, src_string);
             program_counter += 2;
             break;
         }
@@ -1077,7 +1077,6 @@ bool logic_run_high(void) {
         case 0x6B: {
             // graphics 
             textscr_set_textmode(false);
-            engine_allowinput(true);
             program_counter += 1;
             break;
         }
@@ -1215,7 +1214,7 @@ bool logic_run_high(void) {
         case 0x80: {
             // restart.game
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Restart game?\nPress Return to restart.\nPress ESC to cancel.");
-            if (dialog_show(false, true, print_string_buffer)) {
+            if (dialog_show(false, true, false, print_string_buffer)) {
                 sprite_stop_all();
                 sprite_unanimate_all();
                 chipmem_free_unlocked();
@@ -1275,7 +1274,7 @@ bool logic_run_high(void) {
         case 0x86: {
             // quit
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Quit game?\nPress Return to reboot.\nPress ESC to cancel.");
-            if (dialog_show(false, true, print_string_buffer)) {
+            if (dialog_show(false, true, false, print_string_buffer)) {
                 quit_flag = true;
             }
             program_counter += 2;
@@ -1284,7 +1283,7 @@ bool logic_run_high(void) {
         case 0x88: {
             // pause
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game paused. Press Return to continue.");
-            dialog_show(false, false, print_string_buffer);
+            dialog_show(false, false, false, print_string_buffer);
             program_counter += 1;
             break;
         }
@@ -1303,7 +1302,7 @@ bool logic_run_high(void) {
         case 0x8b: {
             // init.joy
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Use mouse in port 1.\nUse joystick in port 2.");
-            dialog_show(false, false, print_string_buffer);
+            dialog_show(false, false, false, print_string_buffer);
             program_counter += 1;
             break;
         }
@@ -1468,7 +1467,7 @@ void logic_load(uint8_t logic_num) {
         return;
     }
 
-    logic_infos[logic_num].offset = load_volume_object(voLogic, logic_num, &length);
+    logic_infos[logic_num].offset = volume_load_object(voLogic, logic_num, &length);
     if (logic_infos[logic_num].offset == 0) {
         textscr_print_ascii(0, 0, (uint8_t *)"FAULT: Failed to load logic %d.", logic_num);
         return;
@@ -1497,6 +1496,8 @@ void logic_purge(uint16_t freed_offset) {
         }
     }
 }
+
+#pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
 
 void logic_init(void) {
     for (int counter = 0; counter < 0xffff; counter++) {

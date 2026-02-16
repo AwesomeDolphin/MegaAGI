@@ -1520,10 +1520,6 @@ void logic_init(void) {
         global_strings[counter] = 0x99;
     }
 
-    for (int counter = 0; counter < (24 * 40); counter++) {
-        global_strings[counter] = 0x99;
-    }
-
     uint8_t __huge *object_ptr = attic_memory + object_data_offset;
     uint8_t number_of_objects = object_ptr[0];
     number_of_objects |= object_ptr[1] << 8;

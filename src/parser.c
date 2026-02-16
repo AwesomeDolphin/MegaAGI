@@ -27,6 +27,7 @@
 #include "mapper.h"
 #include "memmanage.h"
 #include "parser.h"
+#include "textscr.h"
 
 #define MAX_WORD_LENGTH 24
 #define ALPHABET_SIZE 26
@@ -121,7 +122,7 @@ const char * parser_find_word(const char* target) {
 
         int comp_result = strncmp(current_word, target, current_word_len);
         // Compare with target
-        if (comp_result == 0) {
+        if (comp_result == 0 && (target[current_word_len] == '\0' || target[current_word_len] == ' ')) {
             // Match found, store word number if not 0
             if (word_number > 0) {
                 if (current_word_len > longest_word_len) {
@@ -172,7 +173,12 @@ void parser_cook_string(char *target) {
 
 bool parser_decode_string_internal(char *target) {
     const char *cur_parse = target;
+    logic_reset_flag(4);
+    logic_reset_flag(2);
     parser_cook_string(target);
+    if (*cur_parse == '\0') {
+        return false;
+    }
     uint8_t index = 0;
     parser_word_index = 0;
     logic_vars[9] = 0;
@@ -185,7 +191,6 @@ bool parser_decode_string_internal(char *target) {
         index++;
     }
     logic_set_flag(2);
-    logic_reset_flag(4);
     return true;
 }
 

@@ -1068,7 +1068,6 @@ bool logic_run_high(void) {
         }
         case 0x6A: {
             // text.screen
-            engine_allowinput(false);
             textscr_set_textmode(true);
             VICIV.bordercol = COLOR_BLACK;
             program_counter += 1;

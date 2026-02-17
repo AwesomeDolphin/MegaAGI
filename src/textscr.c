@@ -221,6 +221,7 @@ static uint16_t printpos_x = 0;
 static uint16_t printpos_y = 0;
 static uint16_t forecolor;
 static uint16_t backcolor;
+static bool graphics_mode_input_ok = false;
 
 static  void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output);
 
@@ -271,7 +272,7 @@ void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output) {
 }
 
 void textscr_clear_line(uint8_t y) {
-  if ((y > 0) && (y < 21)) {
+  if ((y > 0) && (y <= 21)) {
     for (int x = 0; x < 40; x++) {
       screen_memory_0[y].backtiles_chars[x] = 0x0020;        
       screen_memory_1[y].backtiles_chars[x] = 0x0020;
@@ -294,17 +295,21 @@ void textscr_clear_line(uint8_t y) {
 
 void textscr_set_textmode(bool enable_text) {
   if (enable_text && !game_text) {
+    graphics_mode_input_ok = input_ok;
+    engine_allowinput(false);
+
     textscr_set_color(COLOR_WHITE, COLOR_BLACK);
     for (uint8_t i = 0; i < 25; i++) {
       textscr_print_ascii(0, i, (uint8_t *)"%p40");
     }
     game_text = true;
-  } else {
+  } else if (!enable_text && game_text) {
     game_text = false;
     for (uint8_t i = 0; i < 25; i++) {
       textscr_clear_line(i);
     }
     engine_update_status_line(true);
+    engine_allowinput(graphics_mode_input_ok);
     engine_clear_keyboard();
   }
 }

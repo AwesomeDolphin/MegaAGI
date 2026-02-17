@@ -47,18 +47,6 @@ __far grafix_mem_line_t color_memory[25];
 __far uint8_t priority_screen[16384];
 #pragma clang section bss=""
 
-#define Q15_16_INT_TO_Q(QVAR, WHOLE) \
-  QVAR.part.whole = WHOLE;\
-  QVAR.part.fractional = 0;
-
-typedef union q15_16 {
-  int32_t full_value;
-  struct part_tag {
-    uint16_t fractional;
-    int16_t whole;
-  } part;
-} q15_16t;
-
 uint8_t clrscreen0cmd[] =  {0x00,               // End of token list
                             0x07,               // Fill command
                             0x00, 0x7d,         // count $7d00 bytes
@@ -109,18 +97,6 @@ uint8_t copys1d0cmd[] =    {0x00,               // End of token list
                             0x00,               // modulo
                            };
 
-int agi_q15round(q15_16t aNumber, int16_t dirn)
-{
-  int16_t floornum = aNumber.part.whole;
-  int16_t ceilnum = aNumber.part.whole+1;
-
-   if (dirn < 0)
-      return ((aNumber.part.fractional <= 0x8042) ?
-        floornum : ceilnum);
-   return ((aNumber.part.fractional < 0x7fbe) ?
-        floornum : ceilnum);
-}
-
 void gfx_plotput(uint8_t x, uint8_t y, uint8_t color) {
   if (y > 167) {POKE(0xD020,7); while(1);}
   if (color & 0x80) {
@@ -157,53 +133,6 @@ uint8_t gfx_getprio(uint8_t x, uint8_t y) {
   } else {
     return (curpix & 0x0f);
   }
-}
-
-void gfx_drawslowline(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t colour) {
-   int16_t height, width;
-   q15_16t x, y, dependent;
-   int8_t increment;
-
-   height = ((int16_t)y2 - y1);
-   width = ((int16_t)x2 - x1);
-   uint8_t absheight = abs(height);
-   uint8_t abswidth = abs(width);
-   if (abs(width) > abs(height)) {
-      Q15_16_INT_TO_Q(x, x1);
-      Q15_16_INT_TO_Q(y, y1);
-      if (width > 0) {
-        increment = 1;
-      } else {
-        increment = -1;
-      }
-      Q15_16_INT_TO_Q(dependent, height);
-      dependent.full_value = (width  == 0 ? 0:(dependent.full_value/abswidth));
-      for (; x.part.whole != x2; x.part.whole += increment) {
-        int roundx = agi_q15round(x, increment);
-        int roundy = agi_q15round(y, dependent.part.whole);
-         gfx_plotput(roundx, roundy, colour);
-         y.full_value += dependent.full_value;
-      }
-      gfx_plotput(x2, y2, colour);
-   }
-   else {
-      Q15_16_INT_TO_Q(x, x1);
-      Q15_16_INT_TO_Q(y, y1);
-      if (height > 0) {
-        increment = 1;
-      } else {
-        increment = -1;
-      }
-      Q15_16_INT_TO_Q(dependent, width);
-      dependent.full_value = (height == 0 ? 0:(dependent.full_value/absheight));
-      for (; y.part.whole!=y2; y.part.whole += increment) {
-        uint8_t roundx = agi_q15round(x, dependent.part.whole);
-        uint8_t roundy = agi_q15round(y, increment);
-         gfx_plotput(roundx, roundy, colour);
-         x.full_value += dependent.full_value;
-      }
-      gfx_plotput(x2,y2, colour);
-   }
 }
 
 void gfx_cleargfx(bool preserve_text) {

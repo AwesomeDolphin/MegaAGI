@@ -64,7 +64,7 @@ void engine_show_welcome_text(void) {
 
 void engine_showload_dialog(void) {
     memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Loading, please wait!");
-    dialog_show(false, false, true, print_string_buffer);
+    dialog_show_enginehigh(false, false, true, print_string_buffer);
     select_volume_mem();
 }
 
@@ -75,7 +75,7 @@ void engine_clearload_dialog(void) {
 
 void engine_askdisk_dialog(uint8_t disk_number) {
     memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Please insert disk %d.");
-    dialog_show(false, false, false, print_string_buffer, disk_number);
+    dialog_show_enginehigh(false, false, false, print_string_buffer, disk_number);
     select_volume_mem();
 }
 
@@ -103,6 +103,19 @@ void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
     select_picdraw_mem();
     draw_pic(pic_num, clear);
     select_gamesave_mem();
+}
+
+bool engine_bridge_dialog_show(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...) {
+    bool result;
+    va_list ap;
+    va_start(ap, message_string);
+
+    select_engine_enginehigh_mem();
+    result = dialog_show_valist(accept_input, ok_cancel, draw_only, message_string, ap);
+    select_previous_bank();
+    va_end(ap);
+
+    return result;
 }
 
 void engine_update_status_line(bool force) {

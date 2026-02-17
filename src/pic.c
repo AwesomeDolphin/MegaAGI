@@ -34,12 +34,24 @@
 #include "memmanage.h"
 #include "mapper.h"
 
+#define Q15_16_INT_TO_Q(QVAR, WHOLE) \
+  QVAR.part.whole = WHOLE;\
+  QVAR.part.fractional = 0;
+
 typedef struct fill_info {
     int16_t x1;
     int16_t x2;
     int16_t y;
     int16_t dy;
 } fill_info_t;
+
+typedef union q15_16 {
+  int32_t full_value;
+  struct part_tag {
+    uint16_t fractional;
+    int16_t whole;
+  } part;
+} q15_16t;
 
 #pragma clang section bss="extradata"
 __far static fill_info_t fills[128];
@@ -64,12 +76,71 @@ void pset(uint8_t x, uint8_t y) {
     }
 }
 
+int agi_q15round(q15_16t aNumber, int16_t dirn)
+{
+  int16_t floornum = aNumber.part.whole;
+  int16_t ceilnum = aNumber.part.whole+1;
+
+   if (dirn < 0)
+      return ((aNumber.part.fractional <= 0x8042) ?
+        floornum : ceilnum);
+   return ((aNumber.part.fractional < 0x7fbe) ?
+        floornum : ceilnum);
+}
+
+void pic_drawslowline(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t colour) {
+   int16_t height, width;
+   q15_16t x, y, dependent;
+   int8_t increment;
+
+   height = ((int16_t)y2 - y1);
+   width = ((int16_t)x2 - x1);
+   uint8_t absheight = abs(height);
+   uint8_t abswidth = abs(width);
+   if (abs(width) > abs(height)) {
+      Q15_16_INT_TO_Q(x, x1);
+      Q15_16_INT_TO_Q(y, y1);
+      if (width > 0) {
+        increment = 1;
+      } else {
+        increment = -1;
+      }
+      Q15_16_INT_TO_Q(dependent, height);
+      dependent.full_value = (width  == 0 ? 0:(dependent.full_value/abswidth));
+      for (; x.part.whole != x2; x.part.whole += increment) {
+        int roundx = agi_q15round(x, increment);
+        int roundy = agi_q15round(y, dependent.part.whole);
+         gfx_plotput(roundx, roundy, colour);
+         y.full_value += dependent.full_value;
+      }
+      gfx_plotput(x2, y2, colour);
+   }
+   else {
+      Q15_16_INT_TO_Q(x, x1);
+      Q15_16_INT_TO_Q(y, y1);
+      if (height > 0) {
+        increment = 1;
+      } else {
+        increment = -1;
+      }
+      Q15_16_INT_TO_Q(dependent, width);
+      dependent.full_value = (height == 0 ? 0:(dependent.full_value/absheight));
+      for (; y.part.whole!=y2; y.part.whole += increment) {
+        uint8_t roundx = agi_q15round(x, dependent.part.whole);
+        uint8_t roundy = agi_q15round(y, increment);
+         gfx_plotput(roundx, roundy, colour);
+         x.full_value += dependent.full_value;
+      }
+      gfx_plotput(x2,y2, colour);
+   }
+}
+
 void draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
     if (pic_on) {
-        gfx_drawslowline(x1, y1, x2, y2, pic_color);
+        pic_drawslowline(x1, y1, x2, y2, pic_color);
     }
     if (priority_on) {
-        gfx_drawslowline(x1, y1, x2, y2, priority_color | 0x80);
+        pic_drawslowline(x1, y1, x2, y2, priority_color | 0x80);
     }
 }
 
@@ -279,10 +350,10 @@ void pic_add_to_pic(uint8_t pic_command) {
         if (y2 < (object_view.y_pos - object_view.height + 1)) {
             y2 = (object_view.y_pos - object_view.height + 1);
         }
-        gfx_drawslowline(object_view.x_pos, object_view.y_pos, object_view.x_pos, y2, add_to_pic_commands[pic_command].margin | 0x80);
-        gfx_drawslowline(object_view.x_pos + object_view.width - 1, object_view.y_pos, object_view.x_pos + object_view.width - 1, y2, add_to_pic_commands[pic_command].margin | 0x80);
-        gfx_drawslowline(object_view.x_pos, object_view.y_pos, object_view.x_pos + object_view.width - 1,  object_view.y_pos, add_to_pic_commands[pic_command].margin | 0x80);
-        gfx_drawslowline(object_view.x_pos, y2, object_view.x_pos + object_view.width - 1,  y2, add_to_pic_commands[pic_command].margin | 0x80);
+        pic_drawslowline(object_view.x_pos, object_view.y_pos, object_view.x_pos, y2, add_to_pic_commands[pic_command].margin | 0x80);
+        pic_drawslowline(object_view.x_pos + object_view.width - 1, object_view.y_pos, object_view.x_pos + object_view.width - 1, y2, add_to_pic_commands[pic_command].margin | 0x80);
+        pic_drawslowline(object_view.x_pos, object_view.y_pos, object_view.x_pos + object_view.width - 1,  object_view.y_pos, add_to_pic_commands[pic_command].margin | 0x80);
+        pic_drawslowline(object_view.x_pos, y2, object_view.x_pos + object_view.width - 1,  y2, add_to_pic_commands[pic_command].margin | 0x80);
     }
 }
 

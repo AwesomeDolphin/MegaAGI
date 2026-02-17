@@ -43,7 +43,6 @@ extern bool game_text;
 void gfx_plotput(uint8_t x, uint8_t y, uint8_t color);
 uint8_t gfx_getprio(uint8_t x, uint8_t y);
 uint8_t gfx_get(uint8_t x, uint8_t y);
-void gfx_drawslowline(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, unsigned char colour);
 void gfx_setupmem(void);
 void gfx_cleargfx(bool preserve_text);
 bool gfx_flippage(void);

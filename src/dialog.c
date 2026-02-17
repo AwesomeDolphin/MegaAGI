@@ -191,7 +191,7 @@ void dialog_draw_itemlist_item_internal(uint8_t objnum, uint8_t index) {
     if (highlight) {
         textscr_set_color(COLOR_WHITE, COLOR_RED);
     } else {
-        textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+        textscr_set_color(COLOR_WHITE, COLOR_BLACK);
     }
     textscr_print_ascii(column, row, (uint8_t *)"%H", object_sdesc_ptr);
 }
@@ -265,7 +265,7 @@ void dialog_draw_itemlist_internal(void) {
         if (highlight) {
             textscr_set_color(COLOR_WHITE, COLOR_RED);
         } else {
-            textscr_set_color(COLOR_BLACK, COLOR_WHITE);
+            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
         }
         textscr_print_ascii(0, 1, (uint8_t *)"nothing");
     }
@@ -737,26 +737,26 @@ void dialog_gamesave_handler(char *filename) {
         errcode = gamesave_save_to_disk(filename);
         if (errcode != 0) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d saving game.");
-            dialog_show(false, false, false, print_string_buffer, errcode);
+            dialog_show_enginehigh(false, false, false, print_string_buffer, errcode);
         } else {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game saved.");
-            dialog_show(false, false, false, print_string_buffer);
+            dialog_show_enginehigh(false, false, false, print_string_buffer);
         }
     } else {
         select_gamesave_mem();
         errcode = gamesave_load_from_disk(filename);
         if (errcode == 255) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this game.");
-            dialog_show(false, false, false, print_string_buffer);
+            dialog_show_enginehigh(false, false, false, print_string_buffer);
         } else if (errcode == 254) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game save is not for this version of MegaAGI.");
-            dialog_show(false, false, false, print_string_buffer);
+            dialog_show_enginehigh(false, false, false, print_string_buffer);
         } else if (errcode != 0) {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Disk error %d restoring game.");
-            dialog_show(false, false, false, print_string_buffer, errcode);
+            dialog_show_enginehigh(false, false, false, print_string_buffer, errcode);
         } else {
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game restored.");
-            dialog_show(false, false, false, print_string_buffer);
+            dialog_show_enginehigh(false, false, false, print_string_buffer);
         }
     }
     status_line_score = 255;
@@ -992,22 +992,27 @@ void dialog_gamesave_begin(bool save) {
     if (save) {
         active_dialog = dtSave;
         memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n");
-        dialog_show(true, false, false, print_string_buffer);
+        engine_bridge_dialog_show(true, false, false, print_string_buffer);
     } else {
         active_dialog = dtRestore;
         memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n");
-        dialog_show(true, false, false, print_string_buffer);
+        engine_bridge_dialog_show(true, false, false, print_string_buffer);
     }
 }
 
-bool dialog_show(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...) {
-    va_list ap;
-    va_start(ap, message_string);
+bool dialog_show_valist(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, va_list ap) {
     textscr_format_string_valist(message_string, ap);
-    va_end(ap);
-
     select_gui_mem();
     return dialog_show_internal(accept_input, ok_cancel, draw_only);
+}
+
+bool dialog_show_enginehigh(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...) {
+    bool result;
+    va_list ap;
+    va_start(ap, message_string);
+    result = dialog_show_valist(accept_input, ok_cancel, draw_only, message_string, ap);
+    va_end(ap);
+    return result;
 }
 
 void dialog_close(void) {

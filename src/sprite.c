@@ -244,8 +244,8 @@ void autoselect_loop(agisprite_t *sprite) {
         new_loop = loop_indexes[sprite->object_dir];
     }
     if (new_loop != 255) {
-        if (new_loop != sprite->loop_index) {
-            sprite->loop_index = new_loop;
+        if (new_loop != sprite->view_info.loop_index) {
+            sprite->view_info.loop_index = new_loop;
             select_loop(&sprite->view_info, new_loop);
         }
     }
@@ -480,16 +480,15 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
     sprite.view_number = view_number;
     sprite.object_dir = 0;
     sprite.view_info.cel_index = 0;
-    sprite.loop_index = 0;
     sprite.cycle_time = 1;
     sprite.cycle_count = 1;
     sprite.end_of_loop = 0;
     sprite.reverse = false;
     view_set(&sprite.view_info, view_number);
-    if (sprite.view_info.loop_number >= sprite.view_info.number_of_loops) {
-        sprite.view_info.loop_number = 0;
+    if (sprite.view_info.loop_index >= sprite.view_info.number_of_loops) {
+        sprite.view_info.loop_index = 0;
     }
-    select_loop(&sprite.view_info, sprite.view_info.loop_number);
+    select_loop(&sprite.view_info, sprite.view_info.loop_index);
     if (sprite.view_info.x_pos > 160 - sprite.view_info.width) {
         sprite.view_info.x_pos = 160 - sprite.view_info.width;
     }

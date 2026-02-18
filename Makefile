@@ -58,15 +58,15 @@ agi.d81: agi.prg
 	$(C1541) -attach agi.d81 -write agi.prg agi.c65
 	$(C1541) -attach agi.d81 -write COPYING copying,s
 	$(C1541) -attach agi.d81 -write gamecode.raw gamecode,s
-	$(C1541) -attach agi.d81 -write sq1/LOGDIR logdir,s
-	$(C1541) -attach agi.d81 -write sq1/PICDIR picdir,s
-	$(C1541) -attach agi.d81 -write sq1/SNDDIR snddir,s
-	$(C1541) -attach agi.d81 -write sq1/VIEWDIR viewdir,s
-	$(C1541) -attach agi.d81 -write sq1/VOL.0 vol.0,s
-	$(C1541) -attach agi.d81 -write sq1/VOL.1 vol.1,s
-	$(C1541) -attach agi.d81 -write sq1/VOL.2 vol.2,s
-	$(C1541) -attach agi.d81 -write sq1/WORDS.TOK words.tok,s
-	$(C1541) -attach agi.d81 -write sq1/OBJECT object,s
+	$(C1541) -attach agi.d81 -write kq1/LOGDIR logdir,s
+	$(C1541) -attach agi.d81 -write kq1/PICDIR picdir,s
+	$(C1541) -attach agi.d81 -write kq1/SNDDIR snddir,s
+	$(C1541) -attach agi.d81 -write kq1/VIEWDIR viewdir,s
+	$(C1541) -attach agi.d81 -write kq1/VOL.0 vol.0,s
+	$(C1541) -attach agi.d81 -write kq1/VOL.1 vol.1,s
+	$(C1541) -attach agi.d81 -write kq1/VOL.2 vol.2,s
+	$(C1541) -attach agi.d81 -write kq1/WORDS.TOK words.tok,s
+	$(C1541) -attach agi.d81 -write kq1/OBJECT object,s
 
 agisystem: agi.d81
 

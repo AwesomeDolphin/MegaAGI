@@ -255,7 +255,7 @@ bool draw_cel(view_info_t *info, uint8_t cel) {
 
     uint8_t mirrored = cel_data[2] & 0x80;
     uint8_t normal_loop = high_nibble[cel_data[2] & 0x70];
-    if (mirrored && (normal_loop != info->loop_number)) {
+    if (mirrored && (normal_loop != info->loop_index)) {
         return draw_cel_backwards(info, cel);
     } else {
         return draw_cel_forwards(info, cel);
@@ -424,7 +424,7 @@ bool select_loop(view_info_t *info, uint8_t loop_num) {
         uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
         uint8_t __far *loop_data = chipmem_base + loop_offset;
         info->loop_offset = loop_offset;
-        info->loop_number = loop_num;
+        info->loop_index = loop_num;
         info->number_of_cels = loop_data[0];
         if (info->cel_index >= info->number_of_cels) {
             info->cel_index = 0;
@@ -444,7 +444,7 @@ void view_set(view_info_t *info, uint8_t view_num) {
     info->view_offset = views[view_num];
     uint8_t __far *view_data = chipmem_base + info->view_offset;
     info->number_of_loops = view_data[0];
-    uint8_t __far *loop_ptr = view_data + (info->loop_number * 2) + 1;
+    uint8_t __far *loop_ptr = view_data + (info->loop_index * 2) + 1;
     uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
     uint8_t __far *loop_data = chipmem_base + loop_offset;
     info->number_of_cels = loop_data[0];

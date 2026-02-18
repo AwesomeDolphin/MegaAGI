@@ -416,12 +416,11 @@ bool logic_run_low(void) {
             // set.view.v
             sprite_set_view(program_counter[1], logic_vars[program_counter[2]]);
             program_counter += 3;
-            break;
+            break; 
         }
         case 0x2B: {
             // set.loop
             agisprite_t sprite = sprites[program_counter[1]];
-            sprite.loop_index = program_counter[2];
             select_loop(&sprite.view_info, program_counter[2]);
             sprites[program_counter[1]] = sprite;
             program_counter += 3;
@@ -430,7 +429,6 @@ bool logic_run_low(void) {
         case 0x2C: {
             // set.loop.v
             agisprite_t sprite = sprites[program_counter[1]];
-            sprite.loop_index = logic_vars[program_counter[2]];
             select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
             sprites[program_counter[1]] = sprite;
             program_counter += 3;
@@ -462,7 +460,7 @@ bool logic_run_low(void) {
         }
         case 0x33: {
             // current.loop
-            logic_vars[program_counter[2]] = sprites[program_counter[1]].loop_index;
+            logic_vars[program_counter[2]] = sprites[program_counter[1]].view_info.loop_index;
             program_counter += 3;
             break;
         }

@@ -419,12 +419,12 @@ void unpack_view(uint8_t view_num, uint8_t __huge *view_location) {
 
 bool select_loop(view_info_t *info, uint8_t loop_num) {
     uint8_t __far *view_data = chipmem_base + info->view_offset;
+    info->loop_index = loop_num;
     if (loop_num < info->number_of_loops) {
         uint8_t __far *loop_ptr = view_data + (loop_num * 2) + 1;
         uint16_t loop_offset = *loop_ptr | ((*(loop_ptr + 1)) << 8);
         uint8_t __far *loop_data = chipmem_base + loop_offset;
         info->loop_offset = loop_offset;
-        info->loop_index = loop_num;
         info->number_of_cels = loop_data[0];
         if (info->cel_index >= info->number_of_cels) {
             info->cel_index = 0;

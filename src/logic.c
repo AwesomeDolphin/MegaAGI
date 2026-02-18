@@ -587,7 +587,7 @@ bool logic_run_low(void) {
         }
         case 0x49: { 
             // end.of.loop
-            sprites[program_counter[1]].cycling = false;
+            sprites[program_counter[1]].cycling = true;
             sprites[program_counter[1]].end_of_loop = program_counter[2];
             logic_reset_flag(program_counter[2]);
             sprites[program_counter[1]].reverse = false;
@@ -603,7 +603,7 @@ bool logic_run_low(void) {
         }
         case 0x4B: { 
             // reverse.loop
-            sprites[program_counter[1]].cycling = false;
+            sprites[program_counter[1]].cycling = true;
             sprites[program_counter[1]].end_of_loop = program_counter[2];
             logic_reset_flag(program_counter[2]);
             sprites[program_counter[1]].reverse = true;

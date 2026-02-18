@@ -32,6 +32,7 @@
 #include "mapper.h"
 #include "memmanage.h"
 #include "sprite.h"
+#include "textscr.h"
 #include "view.h"
 #include "gfx.h"
 
@@ -581,15 +582,13 @@ void sprite_update_sprite(uint8_t sprite_num) {
                 if (sprite.view_info.cel_index == 0) {
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;
-                } else {
-                    sprite.view_info.cel_index--;
+                    sprite.cycling = false;
                 }
             } else {
-                sprite.view_info.cel_index++;
-                if (sprite.view_info.cel_index > (sprite.view_info.number_of_cels - 1)) {
-                    sprite.view_info.cel_index = (sprite.view_info.number_of_cels - 1);
+                if (sprite.view_info.cel_index == (sprite.view_info.number_of_cels - 1)) {
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;
+                    sprite.cycling = false;
                 }
             }
         }

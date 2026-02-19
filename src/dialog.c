@@ -1037,6 +1037,8 @@ void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uin
         while(!run_engine);
         run_engine = false;
     }
+    command_buffer[cmd_buf_ptr] = 0;
+    cmd_buf_ptr = 0;
     uint8_t __far *dest_string = global_strings + (40 * destination_str);
     memmanage_strcpy_near_far(dest_string, (uint8_t *)command_buffer);
 }

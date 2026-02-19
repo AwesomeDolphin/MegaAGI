@@ -77,6 +77,7 @@ const char * parser_find_word(const char* target) {
     bool first = true;
     // Iterate through words in this section
     uint8_t longest_word_len = 0;
+    bool stored_something = false;
     while (1) {
         // Read prefix length
         uint8_t prefix_len = *current_pos++;
@@ -117,25 +118,28 @@ const char * parser_find_word(const char* target) {
         
         // Read the word number (2 bytes)
         uint16_t word_number = *current_pos << 8;
-        word_number = *(current_pos + 1);
+        word_number |= *(current_pos + 1);
         current_pos += 2;
 
         int comp_result = strncmp(current_word, target, current_word_len);
         // Compare with target
         if (comp_result == 0 && (target[current_word_len] == '\0' || target[current_word_len] == ' ')) {
             // Match found, store word number if not 0
-            if (word_number > 0) {
-                if (current_word_len > longest_word_len) {
-                    longest_word_len = current_word_len;
+            if (current_word_len > longest_word_len) {
+                longest_word_len = current_word_len;
+                if (word_number > 0) {
                     parser_word_numbers[parser_word_index] = word_number;
                     parser_word_pointers[parser_word_index] = target;
+                    stored_something++;
                 }
             }
         }
     }
 
     if (longest_word_len > 0) {
-        parser_word_index++;
+        if (stored_something) {
+            parser_word_index++;
+        }
         target += longest_word_len;
         if (*target == ' ') {
             target++;
@@ -169,6 +173,7 @@ void parser_cook_string(char *target) {
             }
         }
     }
+    *destination = '\0';
 }
 
 bool parser_decode_string_internal(char *target) {

@@ -239,6 +239,14 @@ bool logic_run_low(void) {
             program_counter += 2;
             break;
         }
+
+        case 0x15: {
+            // load.logics.v
+            logic_load(logic_vars[program_counter[1]]);
+            program_counter += 2;
+            break;
+        }
+
         case 0x16: {
             // call
             logic_stack_ptr--;
@@ -1431,9 +1439,6 @@ void logic_run(void) {
     logic_stack_ptr = 16;
     program_counter = chipmem_base + (logic_infos[logic_num].offset + 2);
     while(1) {
-        //if (logic_num == 2) {
-        //    debug = 1;
-        //}
         if (debug) {
             textscr_print_ascii(0,1,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
             textscr_print_ascii(0,2,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
@@ -1514,7 +1519,7 @@ void logic_init(void) {
 
     global_strings = chipmem_base + chipmem_alloc(24 * 40);
     for (int counter = 0; counter < (24 * 40); counter++) {
-        global_strings[counter] = 0x99;
+        global_strings[counter] = 0x00;
     }
 
     uint8_t __huge *object_ptr = attic_memory + object_data_offset;

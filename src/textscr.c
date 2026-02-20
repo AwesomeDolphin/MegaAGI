@@ -33,6 +33,8 @@
 #include "memmanage.h" 
 #include "parser.h"
 
+static void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output);
+
 #pragma clang section bss="extradata"
 __far uint8_t formatted_string_buffer[1024];
 __far uint8_t print_string_buffer[1024];
@@ -214,6 +216,17 @@ uint16_t textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
   return padlen;
 }
 
+uint16_t textscr_print_ascii_himem(uint8_t x, uint8_t y, uint8_t *formatstring, ...) {
+    va_list ap;
+    va_start(ap, formatstring);
+
+    memmanage_strcpy_near_far(print_string_buffer, formatstring);
+    uint16_t len = textscr_format_string_valist(print_string_buffer, ap);
+    va_end(ap);
+
+    textscr_print_asciistr(x, y, formatted_string_buffer);
+    return len;
+}
 
 #pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
 

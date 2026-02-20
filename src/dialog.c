@@ -664,7 +664,7 @@ static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_on
         input_start_column = x_start + 1;
         input_max_length = 12;
         dialog_input_mode = imDialogField;
-        textscr_print_ascii(0, 22, (uint8_t *)"%p40");
+        textscr_print_ascii_himem(0, 22, (uint8_t *)"%p40");
     }
 
     if (accept_input || draw_only) {

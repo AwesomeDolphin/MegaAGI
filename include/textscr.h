@@ -30,6 +30,7 @@ void textscr_print_asciichar(uint8_t character);
 void textscr_print_scncode(uint8_t scncode);
 void textscr_set_printpos(uint8_t x, uint8_t y);
 void textscr_clear_line(uint8_t y);
+uint16_t textscr_print_ascii_himem(uint8_t x, uint8_t y, uint8_t *formatstring, ...);
 uint16_t textscr_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...);
 void textscr_set_textmode(bool enable_text);
 void textscr_clear_keyboard(void);

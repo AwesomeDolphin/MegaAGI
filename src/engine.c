@@ -99,6 +99,12 @@ void engine_bridge_add_to_pic(uint8_t add_command_num) {
     select_gamesave_mem();
 }
 
+void engine_bridge_pic_load(uint8_t pic_num) {
+    select_picdraw_mem();
+    pic_load(pic_num);
+    select_gamesave_mem();
+}
+
 void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
     select_picdraw_mem();
     draw_pic(pic_num, clear);
@@ -114,7 +120,6 @@ bool engine_bridge_dialog_show(bool accept_input, bool ok_cancel, bool draw_only
     result = dialog_show_valist(accept_input, ok_cancel, draw_only, message_string, ap);
     select_previous_bank();
     va_end(ap);
-
     return result;
 }
 

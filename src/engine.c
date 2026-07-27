@@ -116,13 +116,13 @@ void engine_bridge_draw_pic(uint8_t pic_num, bool clear) {
     select_gamesave_mem();
 }
 
-bool engine_bridge_dialog_show(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...) {
+bool engine_bridge_dialog_show(uint8_t x, uint8_t y, bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...) {
     bool result;
     va_list ap;
     va_start(ap, message_string);
 
     select_engine_enginehigh_mem();
-    result = dialog_show_valist(accept_input, ok_cancel, draw_only, message_string, ap);
+    result = dialog_show_valist(x, y, accept_input, ok_cancel, draw_only, message_string, ap);
     select_previous_bank();
     va_end(ap);
     return result;

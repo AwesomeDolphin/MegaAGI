@@ -168,7 +168,7 @@ const keycode_conv_t pckeycodes[] = {
     {0x86, 0xfc, false},
 };
 
-static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_only);
+static bool dialog_show_internal(uint8_t x, uint8_t y, bool accept_input, bool ok_cancel, bool draw_only);
 static bool dialog_handlemenuinput(void);
 static bool dialog_handlemenuinput_mousetrigger(void);
 
@@ -572,7 +572,7 @@ void dialog_recall_internal(void) {
     }
 }
 
-static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_only) {
+static bool dialog_show_internal(uint8_t x, uint8_t y, bool accept_input, bool ok_cancel, bool draw_only) {
     msg_ptr = formatted_string_buffer;
     last_word = msg_ptr;
     word_length = 0;
@@ -624,8 +624,13 @@ static bool dialog_show_internal(bool accept_input, bool ok_cancel, bool draw_on
         msg_ptr++;
     } while (msg_char != 0);
 
-    x_start = 20 - (box_width / 2) - 1;
-    y_start = 10 - (box_height / 2) - 1;
+    if ((x != 0xff) && (y != 0xff)) {
+        x_start = x;
+        y_start = y;
+    } else {
+        x_start = 20 - (box_width / 2) - 1;
+        y_start = 10 - (box_height / 2) - 1;
+    }
     dialog_first = y_start;
     dialog_last = y_start + box_height + 1;
 
@@ -1022,25 +1027,25 @@ void dialog_gamesave_begin(bool save) {
     if (save) {
         active_dialog = dtSave;
         memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe new save file.\n(Uses device 9.)\n");
-        engine_bridge_dialog_show(true, false, false, print_string_buffer);
+        engine_bridge_dialog_show(0xff, 0xff, true, false, false, print_string_buffer);
     } else {
         active_dialog = dtRestore;
         memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Enter the name of\nthe saved game to load.\n(Uses device 9.)\n");
-        engine_bridge_dialog_show(true, false, false, print_string_buffer);
+        engine_bridge_dialog_show(0xff, 0xff, true, false, false, print_string_buffer);
     }
 }
 
-bool dialog_show_valist(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, va_list ap) {
+bool dialog_show_valist(uint8_t x, uint8_t y, bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, va_list ap) {
     textscr_format_string_valist(message_string, ap);
     select_gui_mem();
-    return dialog_show_internal(accept_input, ok_cancel, draw_only);
+    return dialog_show_internal(x, y, accept_input, ok_cancel, draw_only);
 }
 
 bool dialog_show_enginehigh(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...) {
     bool result;
     va_list ap;
     va_start(ap, message_string);
-    result = dialog_show_valist(accept_input, ok_cancel, draw_only, message_string, ap);
+    result = dialog_show_valist(0xff, 0xff, accept_input, ok_cancel, draw_only, message_string, ap);
     va_end(ap);
     return result;
 }

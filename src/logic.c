@@ -459,14 +459,16 @@ bool logic_run_low(void) {
             sprite.loop_override = 1;
             select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
             sprites[program_counter[1]] = sprite;
-            program_counter += 3;
+            program_counter += 2;
+            break;
         }
         case 0x2e: {
             // release.loop
             agisprite_t sprite = sprites[program_counter[1]];
             sprite.loop_override = 0;
             sprites[program_counter[1]] = sprite;
-            program_counter += 3;
+            program_counter += 2;
+            break;
         }
         case 0x2F: {
             // set.cel
@@ -1010,6 +1012,7 @@ bool logic_run_high(void) {
             break;
         }
         case 0x58: {
+            // ignore.blocks
             sprites[program_counter[1]].observe_blocks = false;
             program_counter += 2;
             break;
@@ -1091,14 +1094,14 @@ bool logic_run_high(void) {
         case 0x65: {
             // print
             uint8_t __far *src_string =  logic_locate_message(logic_num, program_counter[1]);
-            engine_bridge_dialog_show(false, false, false, src_string);
+            engine_bridge_dialog_show(0xff, 0xff, false, false, false, src_string);
             program_counter += 2;
             break;
         }
         case 0x66: {
             // print.v
             uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[1]]);
-            engine_bridge_dialog_show(false, false, false, src_string);
+            engine_bridge_dialog_show(0xff, 0xff, false, false, false, src_string);
             program_counter += 2;
             break;
         }
@@ -1273,7 +1276,7 @@ bool logic_run_high(void) {
         case 0x80: {
             // restart.game
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Restart game?\nPress Return to restart.\nPress ESC to cancel.");
-            if (engine_bridge_dialog_show(false, true, false, print_string_buffer)) {
+            if (engine_bridge_dialog_show(0xff, 0xff, false, true, false, print_string_buffer)) {
                 sprite_stop_all();
                 sprite_unanimate_all();
                 chipmem_free_unlocked();
@@ -1351,7 +1354,7 @@ bool logic_run_high(void) {
         case 0x86: {
             // quit
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Quit game?\nPress Return to reboot.\nPress ESC to cancel.");
-            if (engine_bridge_dialog_show(false, true, false, print_string_buffer)) {
+            if (engine_bridge_dialog_show(0xff, 0xff, false, true, false, print_string_buffer)) {
                 quit_flag = true;
             }
             program_counter += 2;
@@ -1360,7 +1363,7 @@ bool logic_run_high(void) {
         case 0x88: {
             // pause
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Game paused. Press Return to continue.");
-            engine_bridge_dialog_show(false, false, false, print_string_buffer);
+            engine_bridge_dialog_show(0xff, 0xff, false, false, false, print_string_buffer);
             program_counter += 1;
             break;
         }
@@ -1379,7 +1382,7 @@ bool logic_run_high(void) {
         case 0x8b: {
             // init.joy
             memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Use mouse in port 1.\nUse joystick in port 2.");
-            engine_bridge_dialog_show(false, false, false, print_string_buffer);
+            engine_bridge_dialog_show(0xff, 0xff, false, false, false, print_string_buffer);
             program_counter += 1;
             break;
         }
@@ -1441,6 +1444,20 @@ bool logic_run_high(void) {
         case 0x96: {
             // trace.info
             program_counter += 4;
+            break;
+        }
+        case 0x97: {
+            // print.at
+            uint8_t __far *src_string =  logic_locate_message(logic_num, program_counter[1]);
+            engine_bridge_dialog_show(program_counter[3], program_counter[2], false, false, false, src_string);
+            program_counter += 5;
+            break;
+        }
+        case 0x98: {
+            // print.at.v
+            uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[1]]);
+            engine_bridge_dialog_show(program_counter[3], program_counter[2], false, false, false, src_string);
+            program_counter += 5;
             break;
         }
         case 0x9C:

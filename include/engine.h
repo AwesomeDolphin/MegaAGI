@@ -38,6 +38,6 @@ void engine_statusline(bool enable);
 void engine_bridge_pic_load(uint8_t pic_num);
 void engine_bridge_draw_pic(uint8_t pic_num, bool clear);
 void engine_bridge_add_to_pic(uint8_t add_command_num);
-bool engine_bridge_dialog_show(bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...);
+bool engine_bridge_dialog_show(uint8_t x, uint8_t y, bool accept_input, bool ok_cancel, bool draw_only, uint8_t __far *message_string, ...);
 
 #endif

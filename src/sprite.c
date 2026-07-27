@@ -546,7 +546,6 @@ void sprite_mark_drawable(uint8_t sprite_num) {
 		default:
 			break;
 		}
-
 		count = size;
     }
     sprite.view_info.x_pos = xpos;
@@ -773,7 +772,7 @@ void sprite_show_object(uint8_t view_num) {
     select_sprite_mem();
     sprite_draw_to_pic(true);
     select_engine_logichigh_mem();
-    engine_bridge_dialog_show(false, false, false, desc_data);
+    engine_bridge_dialog_show(0xff, 0xff, false, false, false, desc_data);
     select_sprite_mem();
     sprite_erase_from_pic(true);
     select_engine_logichigh_mem();

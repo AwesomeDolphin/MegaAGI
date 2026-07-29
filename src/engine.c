@@ -288,6 +288,13 @@ void run_loop(void) {
 
         run_cycles++;
         select_engine_enginehigh_mem();
+        uint8_t ascii = ASCIIKEY;
+        if (ascii == 0xfd) {
+            debug = true;
+        }
+        if (ascii == 0xfe) {
+            debug = false;
+        }
         if (!dialog_proc()) {
             if (run_cycles >= logic_vars[10]) {
                 if (sound_flag_needs_set) {

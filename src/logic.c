@@ -178,7 +178,20 @@ bool logic_run_low(void) {
             program_counter += 3;
             break;
         }
+        case 0x09: {
+            // lindirectv
+            logic_vars[logic_vars[program_counter[1]]] = logic_vars[program_counter[2]];
+            program_counter += 3;
+            break;
+        }
+        case 0x0A: {
+            // rindirect
+            logic_vars[program_counter[1]] = logic_vars[logic_vars[program_counter[2]]];
+            program_counter += 3;
+            break;
+        }
         case 0x0B: {
+            // lindirectn
             logic_vars[logic_vars[program_counter[1]]] = program_counter[2];
             program_counter += 3;
             break;
@@ -624,6 +637,7 @@ bool logic_run_low(void) {
         case 0x47: {
             // start.cycling
             sprites[program_counter[1]].cycling = true;
+            sprites[program_counter[1]].updatable = true;
             program_counter += 2;
             break;
         }
@@ -1108,16 +1122,16 @@ bool logic_run_high(void) {
         case 0x67: {
             // display
             uint8_t __far *src_string = logic_locate_message(logic_num, program_counter[3]);
-            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
-            textscr_print_ascii(program_counter[2], program_counter[1], (uint8_t *)"%S", src_string);
+            textscr_set_color(COLOR_WHITE | 0x80, COLOR_BLACK);
+            textscr_print_ascii_far(program_counter[2], program_counter[1], src_string);
             program_counter += 4;
             break;
         }
         case 0x68: {
             // display.v
             uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[3]]);
-            textscr_set_color(COLOR_WHITE, COLOR_BLACK);
-            textscr_print_ascii(logic_vars[program_counter[2]], logic_vars[program_counter[1]], (uint8_t *)"%S", src_string);
+            textscr_set_color(COLOR_WHITE | 0x80, COLOR_BLACK);
+            textscr_print_ascii_far(logic_vars[program_counter[2]], logic_vars[program_counter[1]], src_string);
             program_counter += 4;
             break;
         }
@@ -1220,6 +1234,12 @@ bool logic_run_high(void) {
             memmanage_strcpy_far_near(parse_buffer, src_string);
             parser_decode_string((char *)parse_buffer);
             program_counter += 2;
+            break;
+        }
+        case 0x76: {
+            // get.num
+            dialog_get_num(program_counter[1], program_counter[2]);
+            program_counter += 3;
             break;
         }
         case 0x77: {

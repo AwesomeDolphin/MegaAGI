@@ -1079,6 +1079,44 @@ void dialog_get_string(uint8_t destination_str, uint8_t prompt, uint8_t row, uin
     memmanage_strcpy_near_far(dest_string, (uint8_t *)command_buffer);
 }
 
+uint8_t dialog_atoi(uint8_t *str, uint8_t **endptr)
+{
+  uint8_t val = 0;
+  uint8_t digit;
+  while (*str != 0) {
+    if (*str >= '0' && *str <= '9') {
+      digit = *str - '0';
+    } else {
+      break;
+    }
+    val = (val * 10) + digit;
+    str++;
+  }
+  if (endptr) {
+    *endptr = str;
+  }
+  return val;
+}
+
+void dialog_get_num(uint8_t prompt, uint8_t destination_var) {
+    command_buffer[0] = 0;
+    cmd_buf_ptr=0;
+    ASCIIKEY = 0;
+    logic_vars[19] = 0;
+    input_line = 22;
+    input_max_length = 3;
+
+    input_start_column = 1 + textscr_print_ascii(1, 22, (uint8_t *)"%M", prompt);
+
+    while(!dialog_handleinput(true, false, NULL)) {
+        while(!game_timeslot_ready);
+        game_timeslot_ready = false;
+    }
+    command_buffer[cmd_buf_ptr] = 0;
+    cmd_buf_ptr = 0;
+    logic_vars[destination_var] = dialog_atoi((uint8_t *)command_buffer, NULL);
+}
+
 void dialog_clear_keyboard(void) {
     if (input_ok && (dialog_input_mode != imDialogField)) {
         command_buffer[0] = 0;

@@ -198,6 +198,16 @@ uint16_t textscr_format_string_valist(uint8_t __far *formatstring, va_list ap) {
           ascii_string++;
           break;
         }
+        case 'v': {
+          uint32_t param = my_atoi(ascii_string + 1, &ascii_string);
+          uint32_t value = logic_vars[param];
+          uint8_t len = my_ultoa_invert(value, (char *)buffer,  10);
+          for (; len > 0; len--) {
+            formatted_string_buffer[padlen] = buffer[len-1];
+            padlen++;
+          }
+          break;
+        }
       }
       continue;
     } else if (*ascii_string == '\\') {
@@ -234,6 +244,7 @@ static uint16_t printpos_x = 0;
 static uint16_t printpos_y = 0;
 static uint16_t forecolor;
 static uint16_t backcolor;
+static bool seethrough;
 
 static  void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output);
 
@@ -249,17 +260,27 @@ static const unsigned char ascii_to_c64_screen[128] = {
 };
 
 void textscr_set_color(uint8_t foreground, uint8_t background) {
-  forecolor = foreground << 8;
+  forecolor = (foreground & 0x7f) << 8;
   backcolor = background << 8;
+  seethrough = foreground & 0x80;
 }
 
 void textscr_print_scncode(uint8_t scncode) {
-  screen_memory_0[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
-  screen_memory_1[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
-  color_memory[printpos_y].backtiles_chars[printpos_x] = backcolor;
-  screen_memory_0[printpos_y].foretiles_chars[printpos_x] = scncode;
-  screen_memory_1[printpos_y].foretiles_chars[printpos_x] = scncode;
-  color_memory[printpos_y].foretiles_chars[printpos_x] = forecolor;
+  if (!game_text && seethrough && (scncode == 0x20) && (printpos_y <= 21)) {
+    screen_memory_0[printpos_y].backtiles_chars[printpos_x] = 0x0020;        
+    screen_memory_1[printpos_y].backtiles_chars[printpos_x] = 0x0020;
+    screen_memory_0[printpos_y].foretiles_chars[printpos_x] = 0x0020;        
+    screen_memory_1[printpos_y].foretiles_chars[printpos_x] = 0x0020;
+    color_memory[printpos_y].foretiles_chars[printpos_x] = 0x0100;       
+    color_memory[printpos_y].backtiles_chars[printpos_x] = 0x0000;       
+  } else {
+    screen_memory_0[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
+    screen_memory_1[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
+    color_memory[printpos_y].backtiles_chars[printpos_x] = backcolor;
+    screen_memory_0[printpos_y].foretiles_chars[printpos_x] = scncode;
+    screen_memory_1[printpos_y].foretiles_chars[printpos_x] = scncode;
+    color_memory[printpos_y].foretiles_chars[printpos_x] = forecolor;
+  }
   printpos_x++;
 }
 
@@ -347,6 +368,19 @@ uint16_t textscr_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...) {
     return len;
 }
 
+uint16_t textscr_print_ascii_far(uint8_t x, uint8_t y, uint8_t __far *formatstring, ...) {
+    va_list ap;
+    va_start(ap, formatstring);
+
+    select_engine_enginehigh_mem();
+    uint16_t len = textscr_format_string_valist(formatstring, ap);
+    select_previous_bank();
+    va_end(ap);
+
+    textscr_print_asciistr(x, y, formatted_string_buffer);
+    return len;
+}
+
 void textscr_init(void) {
-  
+    seethrough = false;
 }

@@ -32,6 +32,7 @@ void textscr_set_printpos(uint8_t x, uint8_t y);
 void textscr_clear_line(uint8_t y);
 uint16_t textscr_print_ascii_himem(uint8_t x, uint8_t y, uint8_t *formatstring, ...);
 uint16_t textscr_print_ascii(uint8_t x, uint8_t y, uint8_t *formatstring, ...);
+uint16_t textscr_print_ascii_far(uint8_t x, uint8_t y, uint8_t __far *formatstring, ...);
 void textscr_set_textmode(bool enable_text);
 void textscr_clear_keyboard(void);
 void textscr_init(void);

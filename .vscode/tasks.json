@@ -15,12 +15,30 @@
             ]
         },
         {
-            "label": "senddisk",
+            "label": "senddiskkq1",
             "command": "mega65_ftp",
             "args": [
                 "-e",
                 "-c",
-                "put agi.d81"
+                "put kq1.d81"
+            ]
+        },
+        {
+            "label": "senddisksq1",
+            "command": "mega65_ftp",
+            "args": [
+                "-e",
+                "-c",
+                "put sq1.d81"
+            ]
+        },
+        {
+            "label": "senddiskxmas",
+            "command": "mega65_ftp",
+            "args": [
+                "-e",
+                "-c",
+                "put xmas.d81"
             ]
         },
         {
@@ -44,7 +62,7 @@
             "args": [
                 "-r",
                 "-m",
-                "agi.d81",
+                "xmas.d81",
                 "-5",
                 "--ntsc",
                 "agi.exo"
@@ -52,8 +70,11 @@
             "options": {
                 "cwd": "${workspaceRoot}"
             },
+            "dependsOrder": "sequence",
             "dependsOn": [
-                "senddisk"
+                "senddiskkq1",
+                "senddisksq1",
+                "senddiskxmas"
             ],
             "problemMatcher": []
         },

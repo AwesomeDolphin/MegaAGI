@@ -86,7 +86,7 @@ bool sprite_draw_animated(void) {
     bool ego_drawn = false;
     for (int i = 0; i < animated_sprite_count; i++) {
         agisprite_t sprite = sprites[animated_sprites[i]];
-        if (sprite.drawable) {
+        if (sprite.flags1 & sprFlag1Drawable) {
             bool drew_something = draw_cel(&sprite.view_info, sprite.view_info.cel_index);
             if (sprite.ego) {
                 ego_drawn = drew_something;
@@ -112,7 +112,7 @@ void sprite_erase_animated(void) {
 
     for (int i = animated_sprite_count; i > 0; i--) {
         agisprite_t sprite = sprites[animated_sprites[i-1]];
-        if (sprite.drawable) {
+        if (sprite.flags1 & sprFlag1Drawable) {
             erase_view(&sprite.view_info);
         }
     } 
@@ -189,6 +189,20 @@ void setup_priorities(void) {
     }
 }
 
+void sprite_finish_move(agisprite_t *sprite) {
+    if (sprite->prg_complete_flag > 0) {
+        logic_set_flag(sprite->prg_complete_flag);
+        sprite->prg_complete_flag = 0;
+    }
+    if (sprite->ego) {
+        player_control = true;
+    }
+    sprite->prg_speed = 0;
+    sprite->object_dir = 0;
+
+    sprite->prg_movetype = pmmNone;
+}
+
 bool sprite_move_at_speed(agisprite_t *sprite) {
 
     int16_t x1 = sprite->view_info.x_pos;
@@ -208,15 +222,7 @@ bool sprite_move_at_speed(agisprite_t *sprite) {
     // Check if z exceeds the distance
     if (dist >= distance_squared) {
         // We are within the target distance, so finish the move
-        if (sprite->prg_complete_flag > 0) {
-            logic_set_flag(sprite->prg_complete_flag);
-        }
-        if (sprite->ego) {
-            player_control = true;
-        }
-        sprite->prg_speed = 0;
-        sprite->object_dir = 0;
-        sprite->prg_movetype = pmmNone;
+        sprite_finish_move(sprite);
         return true;
     }
 
@@ -264,7 +270,7 @@ uint8_t sprite_checkpos(agisprite_t *sprite, int16_t new_xpos, int16_t new_ypos)
     
     if ((new_ypos - sprite->view_info.height) <= -1) {
         object_border = 1;
-    } else if (sprite->observe_horizon && (new_ypos <= horizon_line)) {
+    } else if ((sprite->flags1 & sprFlag1ObserveHorizon) && (new_ypos <= horizon_line)) {
         object_border = 1;
     } else if (new_ypos > 167) {
         object_border = 3;
@@ -283,7 +289,7 @@ bool sprite_checkpri(agisprite_t *sprite, int16_t new_xpos, int16_t new_ypos) {
                     sprite->object_dir = 0;
                     control_line = true;
                 } else if (control_prio == 1) {
-                    if (sprite->observe_blocks) {
+                    if (sprite->flags1 & sprFlag1ObserveBlocks) {
                         sprite->object_dir = 0;
                         control_line = true;
                     }
@@ -299,15 +305,15 @@ bool sprite_checkpri(agisprite_t *sprite, int16_t new_xpos, int16_t new_ypos) {
         }
 
         if (!control_line) {
-            if (!water_prio && sprite->on_water) {
+            if (!water_prio && (sprite->flags2 & sprFlag2OnWater)) {
                 control_line = true;
-            } else if (water_prio && sprite->on_land) {
+            } else if (water_prio && (sprite->flags2 & sprFlag2OnLand)) {
                 control_line = true;
             }
         }
 
         if (block_active) {
-            if (sprite->observe_blocks) {
+            if (sprite->flags1 & sprFlag1ObserveBlocks) {
                 bool sprite_entered = ((new_xpos < block_x2) && (new_xpos > block_x1) && (new_ypos >= block_y1) && (new_ypos <= block_y2));
                 if (sprite_entered) {
                     control_line = true;
@@ -323,11 +329,13 @@ bool sprite_checkpri(agisprite_t *sprite, int16_t new_xpos, int16_t new_ypos) {
 
 bool sprite_checkcol(agisprite_t *sprite, uint8_t spr_num, int16_t new_xpos, int16_t new_ypos) {
     bool collided = false;
-    if (sprite->observe_object_collisions) {
+    if (sprite->flags1 & sprFlag1ObserveObjectCol) {
         for (int i = 0; i < animated_sprite_count; i++) {
             if (animated_sprites[i] == spr_num) continue;
-            if (!sprites[animated_sprites[i]].drawable) continue;
-            if (!sprites[animated_sprites[i]].updatable) continue;
+            if ((sprites[animated_sprites[i]].flags1 & (sprFlag1Drawable | sprFlag1Updatable | sprFlag1ObserveObjectCol)) !=
+                ((sprFlag1Drawable | sprFlag1Updatable | sprFlag1ObserveObjectCol))) {
+                    continue;
+                }
             int16_t other_x = sprites[animated_sprites[i]].view_info.x_pos;
             if ((new_xpos > (other_x+sprites[animated_sprites[i]].view_info.width)) || (new_xpos + sprite->view_info.width < other_x)) {
                 continue;
@@ -347,7 +355,7 @@ bool sprite_checkcol(agisprite_t *sprite, uint8_t spr_num, int16_t new_xpos, int
 uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
     int16_t view_dx;
     int16_t view_dy;
-    if (sprite->frozen) {
+    if (sprite->flags1 & sprFlag1Frozen) {
         if (sprite->ego) {
             logic_vars[6] = 0;
         }
@@ -410,6 +418,9 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
     }
     if ((view_dx == 0) && (view_dy == 0)) {
         sprite->object_dir = 0;
+        if (sprite->prg_movetype == pmmMoveTo) {
+            sprite_finish_move(sprite);
+        }
     }
 
     sprite_alarm = false;
@@ -432,14 +443,14 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
         if (sprite->ego) {
             logic_reset_flag(0);
         } 
-        if (sprite->on_water) {
+        if (sprite->flags2 & sprFlag2OnWater) {
             sprite->object_dir = 0;
         }
     } else {
         if (sprite->ego) {
             logic_set_flag(0);
         } 
-        if (sprite->on_land) {
+        if (sprite->flags2 & sprFlag2OnLand) {
             sprite->object_dir = 0;
         }
     } 
@@ -461,6 +472,7 @@ uint8_t sprite_move(uint8_t spr_num, agisprite_t *sprite, uint8_t speed) {
     }
 
     sprite->object_dir = 0;
+
     return false;
 }
 
@@ -470,24 +482,19 @@ void sprite_stop_all(void) {
 
 void sprite_unanimate_all(void) {
     for (uint16_t sprite_num = 0; sprite_num < 256; sprite_num++) {
-        sprites[sprite_num].drawable = false;
+        sprites[sprite_num].flags1 |= sprFlag1Cycling | sprFlag1ObserveHorizon | sprFlag1ObserveBlocks | sprFlag1Updatable;
+        sprites[sprite_num].flags1 &= ~sprFlag1Drawable;
         sprites[sprite_num].view_info.priority_override = false;
-        sprites[sprite_num].cycling = true;
-        sprites[sprite_num].observe_horizon = true;
-        sprites[sprite_num].observe_blocks = true;
-        sprites[sprite_num].updatable = true;
         sprites[sprite_num].step_size = 1;
         sprites[sprite_num].step_time = 1;
         sprites[sprite_num].step_count = 0;
-        sprites[sprite_num].loop_override = false;
+        sprites[sprite_num].flags2 = 0;
         if (sprite_num == 0) {
             sprites[sprite_num].ego = true;
         } else {
             sprites[sprite_num].ego = false;
         }
         sprites[sprite_num].prg_movetype = pmmNone;
-        sprites[sprite_num].on_water = false;
-        sprites[sprite_num].on_land = false;
         sprites[sprite_num].object_dir = 0;
         animated_sprites[sprite_num] = 0;
     }
@@ -497,14 +504,13 @@ void sprite_unanimate_all(void) {
 void sprite_mark_drawable(uint8_t sprite_num) {
     agisprite_t sprite = sprites[sprite_num];
     agisprite_t *testspr = &sprite;
-    sprite.drawable = true;
-    sprite.updatable = true;
+    sprite.flags1 |= sprFlag1Drawable | sprFlag1Updatable;
     if (sprite_num == 0) {
         logic_reset_flag(0);
         logic_reset_flag(1);
         logic_reset_flag(3);
     }
-    if (sprite.observe_horizon) {
+    if (sprite.flags1 & sprFlag1ObserveHorizon) {
         if (sprite.view_info.y_pos <= horizon_line) {
                 sprite.view_info.y_pos = horizon_line + 1;
         }
@@ -576,7 +582,7 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
     sprite.cycle_time = 1;
     sprite.cycle_count = 1;
     sprite.end_of_loop = 0;
-    sprite.reverse = false;
+    sprite.flags1 &= ~sprFlag1CycleReverse;
     view_set(&sprite.view_info, view_number);
     if (sprite.view_info.loop_index >= sprite.view_info.number_of_loops) {
         sprite.view_info.loop_index = 0;
@@ -588,7 +594,7 @@ void sprite_set_view(uint8_t sprite_num, uint8_t view_number) {
 
 void sprite_set_cel(agisprite_t *sprite, uint8_t cel_number) {
     sprite->view_info.cel_index = cel_number;
-    if (sprite->observe_horizon) {
+    if (sprite->flags1 & sprFlag1ObserveHorizon) {
         if (sprite->view_info.y_pos <= horizon_line) {
                 sprite->view_info.y_pos = horizon_line + 1;
         }
@@ -678,7 +684,7 @@ void sprite_update_sprite(uint8_t sprite_num) {
             sprite.view_info.priority = priorities[sprite.view_info.y_pos];
         }
 
-        if (!sprite.loop_override) {
+        if (!(sprite.flags2 & sprFlag2LoopOverride)) {
             autoselect_loop(&sprite);
         }
     }
@@ -686,8 +692,8 @@ void sprite_update_sprite(uint8_t sprite_num) {
     sprite.cycle_count--;
     if (sprite.cycle_count == 0) {
         sprite.cycle_count  = sprite.cycle_time;
-        if (sprite.cycling) {
-            if (sprite.reverse) {
+        if (sprite.flags1 & sprFlag1Cycling) {
+            if (sprite.flags1 & sprFlag1CycleReverse) {
                 if (sprite.view_info.cel_index == 0) {
                     sprite_set_cel(&sprite, sprite.view_info.number_of_cels);
                 } else {
@@ -703,17 +709,17 @@ void sprite_update_sprite(uint8_t sprite_num) {
             }
         }
         if (sprite.end_of_loop > 0) {
-            if (sprite.reverse) {
+            if (sprite.flags1 & sprFlag1CycleReverse) {
                 if (sprite.view_info.cel_index == 0) {
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;
-                    sprite.cycling = false;
+                    sprite.flags1 &= ~sprFlag1Cycling;
                 }
             } else {
                 if (sprite.view_info.cel_index == (sprite.view_info.number_of_cels - 1)) {
                     logic_set_flag(sprite.end_of_loop);
                     sprite.end_of_loop = 0;
-                    sprite.cycling = false;
+                    sprite.flags1 &= ~sprFlag1Cycling;
                 }
             }
         }
@@ -739,7 +745,7 @@ void sprite_undraw(void) {
 
 void sprite_updateanddraw(void) {
     for (int i = 0; i < animated_sprite_count; i++) {
-        if (sprites[animated_sprites[i]].updatable) {
+        if (sprites[animated_sprites[i]].flags1 & sprFlag1Updatable) {
             sprite_update_sprite(animated_sprites[i]);
         }
     }

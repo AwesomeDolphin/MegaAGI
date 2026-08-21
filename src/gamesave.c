@@ -61,7 +61,7 @@ __far add_to_pic_command_t add_to_pic_commands[16];
 #pragma clang section bss=""
 
 uint8_t __huge *gamesave_cache;
-char *gamesaveid = "MASFV111";
+char *gamesaveid = "MASFV112";
 
 #pragma clang section bss="banked_bss" data="gamesave_data" rodata="gamesave_rodata" text="gamesave_text"
 
@@ -232,8 +232,13 @@ uint8_t gamesave_load_from_disk(char *filename) {
     if (load_errcode != 0) {
         return load_errcode;
     } else {
+        uint32_t end_of_attic = atticmem_allocoffset;
         uint8_t result = gamesave_load_from_attic();
-        atticmem_free(gamesave_offset);
+        if (atticmem_allocoffset == end_of_attic) {
+            // If nothing was loaded during the decoding process, it's safe to free the gamesave.
+            // There's 8mb of attic, and the largest games are < 1mb. There's room for a spare gamesave to just toodle around
+            atticmem_free(gamesave_offset);
+        }
         return result;
     }
 }

@@ -211,7 +211,7 @@ void init_system(void)
 
   cursorpos = 0;
 
-  init_print("MEGA65 AGI -- Sierra AGI parser for the MEGA65! KQ1 version.\n");
+  init_print("MEGA65 AGI -- Sierra AGI parser for the MEGA65!\n");
 
   init_print("MEGA65-AGI Copyright (C) 2026 Keith Henrickson\n"
               "This program comes with ABSOLUTELY NO WARRANTY\n"

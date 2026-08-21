@@ -21,7 +21,7 @@
             "request": "launch",
             "preLaunchTask": "senddisk",
             "program": "/app/bin/host-spawn",
-            "args": ["etherload", "-r", "-m", "agi.d81", "-5", "--ntsc", ""],
+            "args": ["etherload", "-r", "-m", "xmas.d81", "-5", "--ntsc", ""],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],

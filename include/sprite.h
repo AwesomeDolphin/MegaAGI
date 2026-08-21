@@ -21,6 +21,19 @@
 
 #include "view.h"
 
+static const uint8_t sprFlag1Drawable = 0x01;
+static const uint8_t sprFlag1Updatable = 0x02;
+static const uint8_t sprFlag1ObserveObjectCol = 0x04;
+static const uint8_t sprFlag1ObserveHorizon = 0x08;
+static const uint8_t sprFlag1ObserveBlocks = 0x10;
+static const uint8_t sprFlag1Frozen = 0x20;
+static const uint8_t sprFlag1Cycling = 0x40;
+static const uint8_t sprFlag1CycleReverse = 0x80;
+
+static const uint8_t sprFlag2LoopOverride = 0x01;
+static const uint8_t sprFlag2OnWater = 0x02;
+static const uint8_t sprFlag2OnLand = 0x04;
+
 typedef enum {
     pmmNone,
     pmmWander,
@@ -34,18 +47,11 @@ typedef struct {
     view_info_t view_info;
 
     uint8_t object_dir;
-    bool drawable;
-    bool updatable;
-    bool observe_object_collisions;
-    bool observe_horizon;
-    bool observe_blocks;
+    uint8_t flags1;
+    uint8_t flags2;
     uint8_t step_size;
     uint8_t step_time;
     uint8_t step_count;
-    bool loop_override;
-    bool on_water;
-    bool on_land;
-    bool frozen;
 
     prg_move_mode_t prg_movetype;
     int16_t prg_x_destination;
@@ -58,10 +64,8 @@ typedef struct {
 
     uint8_t end_of_loop;
 
-    bool cycling;
     uint8_t cycle_time;
     uint8_t cycle_count;
-    bool reverse;
 
     bool ego;
 } agisprite_t;

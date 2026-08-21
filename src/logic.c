@@ -60,7 +60,7 @@ uint8_t __far *global_strings;
 static uint8_t logic_stack_ptr;
 
 uint32_t object_data_offset;
-bool debug;
+bool debug = false;
 
 void logic_set_flag(uint8_t flag) {
     uint8_t flag_reg = (flag >> 3);
@@ -230,7 +230,7 @@ bool logic_run_low(void) {
             sprite_unanimate_all();
             chipmem_free_unlocked();
             player_control = true;
-            sprites[0].frozen = false;
+            sprites[0].flags1 &= ~sprFlag1Frozen;
             block_active = 0;
             horizon_line = 36;
             logic_vars[1] = logic_vars[0];
@@ -369,7 +369,7 @@ bool logic_run_low(void) {
                 animated_sprite_count++;
                 sprites[program_counter[1]].prg_movetype = pmmNone;
                 sprites[program_counter[1]].object_dir = 0;
-                sprites[program_counter[1]].cycling = true;
+                sprites[program_counter[1]].flags1 |= sprFlag1Cycling;
             }
 
             program_counter += 2;
@@ -389,7 +389,7 @@ bool logic_run_low(void) {
         }
         case 0x24: {
             // erase
-            sprites[program_counter[1]].drawable = false;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Drawable;
             program_counter += 2;
             break;
         }
@@ -469,7 +469,7 @@ bool logic_run_low(void) {
         case 0x2d: {
             // fix.loop
             agisprite_t sprite = sprites[program_counter[1]];
-            sprite.loop_override = 1;
+            sprite.flags2 |= sprFlag2LoopOverride;
             select_loop(&sprite.view_info, logic_vars[program_counter[2]]);
             sprites[program_counter[1]] = sprite;
             program_counter += 2;
@@ -478,7 +478,7 @@ bool logic_run_low(void) {
         case 0x2e: {
             // release.loop
             agisprite_t sprite = sprites[program_counter[1]];
-            sprite.loop_override = 0;
+            sprite.flags2 &= ~sprFlag2LoopOverride;
             sprites[program_counter[1]] = sprite;
             program_counter += 2;
             break;
@@ -487,7 +487,6 @@ bool logic_run_low(void) {
             // set.cel
             agisprite_t sprite = sprites[program_counter[1]];
             sprite_set_cel(&sprite, program_counter[2]);
-            sprite.updatable = false;
             sprites[program_counter[1]] = sprite;
             program_counter += 3;
             break;
@@ -496,7 +495,6 @@ bool logic_run_low(void) {
             // set.cel.v
             agisprite_t sprite = sprites[program_counter[1]];
             sprite_set_cel(&sprite, logic_vars[program_counter[2]]);
-            sprite.updatable = false;
             sprites[program_counter[1]] = sprite;
             program_counter += 3;
             break;
@@ -553,12 +551,12 @@ bool logic_run_low(void) {
             break;
         }
         case 0x3A: {
-            sprites[program_counter[1]].updatable = false;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Updatable;
             program_counter += 2;
             break;
         }
         case 0x3B: {
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1Updatable;
             program_counter += 2;
             break;
         }
@@ -568,12 +566,12 @@ bool logic_run_low(void) {
             break;
         }
         case 0x3D: {
-            sprites[program_counter[1]].observe_horizon = false;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1ObserveHorizon;
             program_counter += 2;
             break;
         }
         case 0x3E: {
-            sprites[program_counter[1]].observe_horizon = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1ObserveHorizon;
             program_counter += 2;
             break;
         }
@@ -584,39 +582,38 @@ bool logic_run_low(void) {
         }
         case 0x40: {
             // object.on.water
-            sprites[program_counter[1]].on_water = true;
-            sprites[program_counter[1]].on_land = false;
+            sprites[program_counter[1]].flags2 |= sprFlag2OnWater;
+            sprites[program_counter[1]].flags2 &= ~sprFlag2OnLand;
             program_counter += 2;
             break;
         }
         case 0x41: {
             // object.on.land
-            sprites[program_counter[1]].on_water = false;
-            sprites[program_counter[1]].on_land = true;
+            sprites[program_counter[1]].flags2 &= ~sprFlag2OnWater;
+            sprites[program_counter[1]].flags2 |= sprFlag2OnLand;
             program_counter += 2;
             break;
         }
         case 0x42: {
             // object.on.anything
-            sprites[program_counter[1]].on_water = false;
-            sprites[program_counter[1]].on_land = false;
+            sprites[program_counter[1]].flags2 &= ~(sprFlag2OnWater | sprFlag2OnLand);
             program_counter += 2;
             break;
         }
         case 0x43: {
             // ignore.objs
-            sprites[program_counter[1]].observe_object_collisions = false;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1ObserveObjectCol;
             program_counter += 2;
             break;
         }
         case 0x44: {
-            sprites[program_counter[1]].observe_object_collisions = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1ObserveObjectCol;
             program_counter += 2;
             break;
         }
         case 0x45: {
             // distance
-            if (sprites[program_counter[1]].drawable && sprites[program_counter[2]].drawable) {
+            if ((sprites[program_counter[1]].flags1 & sprFlag1Drawable) && (sprites[program_counter[2]].flags1 & sprFlag1Drawable)) {
                 int16_t x1_center = sprites[program_counter[1]].view_info.x_pos + (sprites[program_counter[1]].view_info.width / 2);
                 int16_t x2_center = sprites[program_counter[2]].view_info.x_pos + (sprites[program_counter[2]].view_info.width / 2);
                 logic_vars[program_counter[3]]  =
@@ -630,47 +627,43 @@ bool logic_run_low(void) {
         }
         case 0x46: {
             // stop.cycling
-            sprites[program_counter[1]].cycling = false;
+            sprites[program_counter[1]].flags1 &= ~(sprFlag1Cycling);
             program_counter += 2;
             break;
         }
         case 0x47: {
             // start.cycling
-            sprites[program_counter[1]].cycling = true;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= (sprFlag1Cycling | sprFlag1Updatable);
             program_counter += 2;
             break;
         }
         case 0x48: {
             // normal.cycle
-            sprites[program_counter[1]].reverse = false;
+            sprites[program_counter[1]].flags1 &= ~(sprFlag1CycleReverse);
             program_counter += 2;
             break;
         }
         case 0x49: { 
             // end.of.loop
-            sprites[program_counter[1]].cycling = true;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= (sprFlag1Cycling | sprFlag1Updatable);
+            sprites[program_counter[1]].flags1 &= ~(sprFlag1CycleReverse);
             sprites[program_counter[1]].end_of_loop = program_counter[2];
             logic_reset_flag(program_counter[2]);
-            sprites[program_counter[1]].reverse = false;
             sprites[program_counter[1]].view_info.cel_index = 0;
             program_counter += 3;
             break;
         }
         case 0x4A: {
             // reverse.cycle
-            sprites[program_counter[1]].reverse = false;
+            sprites[program_counter[1]].flags1 |= sprFlag1CycleReverse;
             program_counter += 2;
             break;
         }
         case 0x4B: { 
             // reverse.loop
-            sprites[program_counter[1]].cycling = true;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= (sprFlag1Cycling | sprFlag1Updatable | sprFlag1CycleReverse);
             sprites[program_counter[1]].end_of_loop = program_counter[2];
             logic_reset_flag(program_counter[2]);
-            sprites[program_counter[1]].reverse = true;
             sprites[program_counter[1]].view_info.cel_index = sprites[program_counter[1]].view_info.number_of_cels - 1;
             program_counter += 3;
             break;
@@ -688,7 +681,7 @@ bool logic_run_low(void) {
                 player_control = false;
             }
             sprites[program_counter[1]].object_dir = 0;
-            sprites[program_counter[1]].frozen = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1Frozen;
             program_counter += 2;
             break;
         }
@@ -698,7 +691,7 @@ bool logic_run_low(void) {
                 player_control = true;
             }
             sprites[program_counter[1]].object_dir = 0;
-            sprites[program_counter[1]].frozen = false;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Frozen;
             program_counter += 2;
             break;
         }
@@ -717,7 +710,7 @@ bool logic_run_low(void) {
 }
 
 #pragma clang section bss="banked_bss" data="lh_data" rodata="lh_rodata" text="lh_text"
-bool logic_test_commands(void) {
+bool logic_test_commands(bool perform_sideeffects) {
     bool result;
     switch (*program_counter) {
         case 0x01:
@@ -782,8 +775,10 @@ bool logic_test_commands(void) {
             if (logic_vars[19] != 0) {
                 result = true;
             } else {
-                logic_vars[19] = ASCIIKEY;
-                ASCIIKEY = 0;
+                if (perform_sideeffects) {
+                    logic_vars[19] = ASCIIKEY;
+                    ASCIIKEY = 0;
+                }
                 result = (logic_vars[19] != 0);
             }
             program_counter += 1;
@@ -825,7 +820,9 @@ bool logic_test_commands(void) {
                     }
                 }
                 if (result) {
-                    logic_set_flag(4);
+                    if (perform_sideeffects) {
+                        logic_set_flag(4);
+                    }
                 }
             }
             program_counter += 2 + (numwords * 2);
@@ -911,7 +908,7 @@ bool logic_test(void) {
                 program_counter += 1;
                 return truth;
             default: {
-                bool result = logic_test_commands();
+                bool result = logic_test_commands(truth);
                 if (invert_test) {
                     result = !result;
                 }
@@ -947,8 +944,8 @@ bool logic_run_high(void) {
             sprites[program_counter[1]].prg_distance = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
             sprites[program_counter[1]].prg_complete_flag = program_counter[5];
             logic_reset_flag(program_counter[5]);
-            sprites[program_counter[1]].frozen = false;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1Updatable;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Frozen;
             if (program_counter[1] == 0) {
                 player_control = false;
             }
@@ -969,8 +966,8 @@ bool logic_run_high(void) {
             sprites[program_counter[1]].prg_distance = sprites[program_counter[1]].prg_speed * sprites[program_counter[1]].prg_speed;
             sprites[program_counter[1]].prg_complete_flag = program_counter[5];
             logic_reset_flag(program_counter[5]);
-            sprites[program_counter[1]].frozen = false;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1Updatable;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Frozen;
             if (program_counter[1] == 0) {
                 player_control = false;
             }
@@ -988,8 +985,8 @@ bool logic_run_high(void) {
             }
             sprites[program_counter[1]].prg_distance *= sprites[program_counter[1]].prg_distance;
             sprites[program_counter[1]].prg_complete_flag = program_counter[3];
-            sprites[program_counter[1]].frozen = false;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1Updatable;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Frozen;
             program_counter += 4;
             break;
         }
@@ -999,8 +996,8 @@ bool logic_run_high(void) {
             if (program_counter[1] == 0) {
                 player_control = false;
             }
-            sprites[program_counter[1]].frozen = false;
-            sprites[program_counter[1]].updatable = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1Updatable;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1Frozen;
             program_counter += 2;
             break;
         }
@@ -1027,12 +1024,12 @@ bool logic_run_high(void) {
         }
         case 0x58: {
             // ignore.blocks
-            sprites[program_counter[1]].observe_blocks = false;
+            sprites[program_counter[1]].flags1 &= ~sprFlag1ObserveBlocks;
             program_counter += 2;
             break;
         }
         case 0x59: {
-            sprites[program_counter[1]].observe_blocks = true;
+            sprites[program_counter[1]].flags1 |= sprFlag1ObserveBlocks;
             program_counter += 2;
             break;
         }
@@ -1367,7 +1364,7 @@ bool logic_run_high(void) {
         case 0x84: {
             // player.control
             player_control = true;
-            sprites[0].frozen = false;
+            sprites[0].flags1 &= ~sprFlag1Frozen;
             program_counter += 1;
             break;
         }
@@ -1585,8 +1582,8 @@ void logic_run(void) {
     program_counter = chipmem_base + (logic_infos[logic_num].scan_start);
     while(1) {
         if (debug) {
-            textscr_print_ascii(0,1,(uint8_t *)"A:%x %X", logic_num, (uint32_t)program_counter);
-            textscr_print_ascii(0,2,(uint8_t *)"B:%x %x %x %x", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
+            textscr_print_ascii(0,1,(uint8_t *)"A:%x %X                 ", logic_num, (uint32_t)program_counter);
+            textscr_print_ascii(0,2,(uint8_t *)"B:%x %x %x %x           ", *program_counter, *(program_counter+1), *(program_counter+2), *(program_counter+3));
             while(ASCIIKEY==0) {
     
             }

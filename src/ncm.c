@@ -146,7 +146,7 @@ void gfx_cleargfx(bool preserve_text) {
     DMA.etrig = (uint8_t)(((uint16_t)clrscreen1cmd) & 0xff);
   }
 
-  for (int y = 1; y < 21; y++) {
+  for (int y = 1; y <= 21; y++) {
     for (int x = 0; x < 40; x++) {
       screen_memory_0[y].backtiles_chars[x] = 0x0020;        
       screen_memory_1[y].backtiles_chars[x] = 0x0020;
@@ -158,7 +158,7 @@ void gfx_cleargfx(bool preserve_text) {
   }
 
   if (!preserve_text) {
-    for (int y = 21; y < 25; y++) {
+    for (int y = 22; y < 25; y++) {
       for (int x = 0; x < 40; x++) {
         color_memory[y].backtiles_chars[x] = 0x0000;       
         screen_memory_0[y].backtiles_chars[x] = 0x00a0;        

@@ -1,10 +1,9 @@
-This version can play KQ1 (AGI 2 version from GOG), at least to the point of
-beating the game by some path. Not all paths to success may be fully debugged.
-I'm not even testing other AGI games, and KQ1 was originally an AGI 1 game.
-It is likely not as demanding as some of the later AGI 2 releases.
+This version can play KQ1 and SQ1 (AGI 2 version from GOG), at least to the 
+point of beating the games by some path. Not all paths to success may be
+fully debugged. It also seems to handle the xmas demo from 1986.
 
 To build the D81 from scratch, you will need to do the following:
-```
+```s
 	c1541 -format "agi,a1" d81 agi.d81
 	c1541 -attach agi.d81 -write agi.prg agi.c65
 	c1541 -attach agi.d81 -write COPYING copying,s

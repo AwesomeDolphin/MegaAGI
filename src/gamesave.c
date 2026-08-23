@@ -82,10 +82,10 @@ uint32_t gamesave_save_to_attic(void) {
     gamesave_cache[19] = (chipmem_lockoffset >> 8) & 0xff;
     gamesave_cache[20] = 0;
     gamesave_cache[21] = 0;
-    gamesave_cache[22] = atticmem_allocoffset & 0xff;
-    gamesave_cache[23] = (atticmem_allocoffset >> 8) & 0xff;
-    gamesave_cache[24] = (atticmem_allocoffset >> 16) & 0xff;
-    gamesave_cache[25] = (atticmem_allocoffset >> 24) & 0xff;
+    gamesave_cache[22] = 0;
+    gamesave_cache[23] = 0;
+    gamesave_cache[24] = 0;
+    gamesave_cache[25] = 0;
     gamesave_cache[26] = input_ok;
     gamesave_cache[27] = player_control;
     gamesave_cache[28] = horizon_line;
@@ -156,16 +156,6 @@ uint8_t gamesave_load_from_attic(void) {
 
     chipmem_lockoffset = gamesave_cache[18];
     chipmem_lockoffset |= (gamesave_cache[19] << 8);
-
-    uint32_t temp;
-    temp = gamesave_cache[22];
-    atticmem_allocoffset = temp;
-    temp = gamesave_cache[23];
-    atticmem_allocoffset |= (temp << 8);
-    temp = gamesave_cache[24];
-    atticmem_allocoffset |= (temp << 16);
-    temp = gamesave_cache[25];
-    atticmem_allocoffset |= (temp << 24);
 
     input_ok = gamesave_cache[26];
     player_control = gamesave_cache[27];

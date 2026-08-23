@@ -332,8 +332,8 @@ bool sprite_checkcol(agisprite_t *sprite, uint8_t spr_num, int16_t new_xpos, int
     if (sprite->flags1 & sprFlag1ObserveObjectCol) {
         for (int i = 0; i < animated_sprite_count; i++) {
             if (animated_sprites[i] == spr_num) continue;
-            if ((sprites[animated_sprites[i]].flags1 & (sprFlag1Drawable | sprFlag1Updatable | sprFlag1ObserveObjectCol)) !=
-                ((sprFlag1Drawable | sprFlag1Updatable | sprFlag1ObserveObjectCol))) {
+            if ((sprites[animated_sprites[i]].flags1 & (sprFlag1Drawable | sprFlag1ObserveObjectCol)) !=
+                ((sprFlag1Drawable | sprFlag1ObserveObjectCol))) {
                     continue;
                 }
             int16_t other_x = sprites[animated_sprites[i]].view_info.x_pos;
@@ -482,7 +482,7 @@ void sprite_stop_all(void) {
 
 void sprite_unanimate_all(void) {
     for (uint16_t sprite_num = 0; sprite_num < 256; sprite_num++) {
-        sprites[sprite_num].flags1 |= sprFlag1Cycling | sprFlag1ObserveHorizon | sprFlag1ObserveBlocks | sprFlag1Updatable;
+        sprites[sprite_num].flags1 |= sprFlag1Cycling | sprFlag1ObserveHorizon | sprFlag1ObserveBlocks | sprFlag1ObserveObjectCol | sprFlag1Updatable;
         sprites[sprite_num].flags1 &= ~sprFlag1Drawable;
         sprites[sprite_num].view_info.priority_override = false;
         sprites[sprite_num].step_size = 1;
@@ -745,7 +745,7 @@ void sprite_undraw(void) {
 
 void sprite_updateanddraw(void) {
     for (int i = 0; i < animated_sprite_count; i++) {
-        if (sprites[animated_sprites[i]].flags1 & sprFlag1Updatable) {
+        if ((sprites[animated_sprites[i]].flags1 & (sprFlag1Updatable | sprFlag1Drawable)) == (sprFlag1Updatable | sprFlag1Drawable)) {
             sprite_update_sprite(animated_sprites[i]);
         }
     }

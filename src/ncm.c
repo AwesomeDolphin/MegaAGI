@@ -97,18 +97,29 @@ uint8_t copys1d0cmd[] =    {0x00,               // End of token list
                             0x00,               // modulo
                            };
 
-void gfx_plotput(uint8_t x, uint8_t y, uint8_t color) {
-  if (y > 167) {POKE(0xD020,7); while(1);}
-  if (color & 0x80) {
+void gfx_plotput(uint16_t x, uint16_t y, uint8_t color) {
+  if (color & 0xC0) {
     uint8_t highpix = x & 1;
     uint8_t xcolumn = x >> 1;
-    uint8_t curpix = priority_screen[(y * 80) + xcolumn];
+    uint8_t curpix;
+    volatile uint8_t __far *target_pixel = drawing_xpointer[drawing_screen][xcolumn];
+    if (color & 0x80) {
+      curpix = priority_screen[(y * 80) + xcolumn];
+    } else {
+      uint16_t row = y * 8;
+      target_pixel += row;
+      curpix = *target_pixel;
+    }
     if (highpix) {
          curpix = (curpix & 0x0f) | highcolor[color & 0x0f];
     } else {
          curpix = (curpix & 0xf0) | (color & 0x0f);
     }
-    priority_screen[(y * 80) + xcolumn] = curpix;
+    if (color & 0x80) {
+      priority_screen[(y * 80) + xcolumn] = curpix;
+    } else {
+      *target_pixel = curpix;
+    }
   } else {
     uint8_t colorval[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
     uint16_t row = y * 8;

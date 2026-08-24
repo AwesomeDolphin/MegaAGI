@@ -244,7 +244,9 @@ static uint16_t printpos_x = 0;
 static uint16_t printpos_y = 0;
 static uint16_t forecolor;
 static uint16_t backcolor;
-static bool seethrough;
+static uint8_t drawforecolor;
+static uint8_t drawbackcolor;
+static bool drawchars;
 
 static  void textscr_print_asciistr(uint8_t x, uint8_t y, uint8_t __far *output);
 
@@ -260,19 +262,37 @@ static const unsigned char ascii_to_c64_screen[128] = {
 };
 
 void textscr_set_color(uint8_t foreground, uint8_t background) {
-  forecolor = (foreground & 0x7f) << 8;
-  backcolor = background << 8;
-  seethrough = foreground & 0x80;
+  forecolor = (foreground & 0x0f) << 8;
+  drawforecolor = (foreground & 0xf0) >> 4;
+  backcolor = (background & 0x0f) << 8;
+  drawbackcolor = (background & 0xf0) >> 4;
+  drawchars = foreground & 0xf0;
 }
 
 void textscr_print_scncode(uint8_t scncode) {
-  if (!game_text && seethrough && (scncode == 0x20) && (printpos_y <= 21)) {
-    screen_memory_0[printpos_y].backtiles_chars[printpos_x] = 0x0020;        
-    screen_memory_1[printpos_y].backtiles_chars[printpos_x] = 0x0020;
-    screen_memory_0[printpos_y].foretiles_chars[printpos_x] = 0x0020;        
-    screen_memory_1[printpos_y].foretiles_chars[printpos_x] = 0x0020;
-    color_memory[printpos_y].foretiles_chars[printpos_x] = 0x0100;       
-    color_memory[printpos_y].backtiles_chars[printpos_x] = 0x0000;       
+  if (!game_text && drawchars && (printpos_y <= 21)) {
+    static uint16_t xdraw;
+    xdraw = printpos_x;
+    static uint16_t ydraw;
+    ydraw = printpos_y - 1;
+    static uint16_t ccode;
+    ccode = scncode;
+    xdraw = xdraw << 3;
+    ydraw = ydraw << 3;
+    ccode = ccode << 3;
+    static uint8_t __far *charsrc;
+    charsrc = (uint8_t __far *)0x29800 + ccode;
+    for (uint8_t yidx = 0; yidx < 8; yidx++) {
+      static uint8_t cval;
+      cval = *charsrc;
+      for (uint8_t xidx = 0; xidx < 8; xidx++) {
+        static bool drawcol;
+        drawcol = cval & 0x80;
+        cval = cval << 1;
+        gfx_plotput(xdraw + xidx, ydraw + yidx, (drawcol ? drawforecolor : drawbackcolor) | 0x40);
+      }
+      charsrc += 1;
+    }
   } else {
     screen_memory_0[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
     screen_memory_1[printpos_y].backtiles_chars[printpos_x] = 0x00a0;
@@ -382,5 +402,5 @@ uint16_t textscr_print_ascii_far(uint8_t x, uint8_t y, uint8_t __far *formatstri
 }
 
 void textscr_init(void) {
-    seethrough = false;
+    drawchars = false;
 }

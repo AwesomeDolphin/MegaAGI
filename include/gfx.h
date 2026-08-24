@@ -40,7 +40,7 @@ extern __far uint8_t priority_screen[16384];
 extern __far uint8_t priority_screen[16384];
 extern bool game_text;
 
-void gfx_plotput(uint8_t x, uint8_t y, uint8_t color);
+void gfx_plotput(uint16_t x, uint16_t y, uint8_t color);
 uint8_t gfx_getprio(uint8_t x, uint8_t y);
 uint8_t gfx_get(uint8_t x, uint8_t y);
 void gfx_setupmem(void);

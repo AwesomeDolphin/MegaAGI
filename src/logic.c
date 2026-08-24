@@ -1119,7 +1119,7 @@ bool logic_run_high(void) {
         case 0x67: {
             // display
             uint8_t __far *src_string = logic_locate_message(logic_num, program_counter[3]);
-            textscr_set_color(COLOR_WHITE | 0x80, COLOR_BLACK);
+            textscr_set_color(COLOR_WHITE | 0xf0, COLOR_BLACK);
             textscr_print_ascii_far(program_counter[2], program_counter[1], src_string);
             program_counter += 4;
             break;
@@ -1127,7 +1127,7 @@ bool logic_run_high(void) {
         case 0x68: {
             // display.v
             uint8_t __far *src_string = logic_locate_message(logic_num, logic_vars[program_counter[3]]);
-            textscr_set_color(COLOR_WHITE | 0x80, COLOR_BLACK);
+            textscr_set_color(COLOR_WHITE | 0xf0, COLOR_BLACK);
             textscr_print_ascii_far(logic_vars[program_counter[2]], logic_vars[program_counter[1]], src_string);
             program_counter += 4;
             break;

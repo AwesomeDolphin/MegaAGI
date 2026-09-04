@@ -8,8 +8,15 @@ C1541 = flatpak run --command=c1541 net.sf.VICE
 INC = -I./include
 
 # Object files
-OBJS = $(ASM_SRCS:%.s=obj/%.o) $(C_SRCS:%.c=obj/%.o)
+COBJS = $(C_SRCS:%.c=obj/%.o)
+ASMOBJS = $(ASM_SRCS:%.s=obj/%.o) 
+OBJS = $(COBJS) $(ASMOBJS)
 OBJS_DEBUG = $(ASM_SRCS:%.s=obj/%-debug.o) $(C_SRCS:%.c=obj/%-debug.o)
+
+# Deps
+DEPS := $(COBJS:.o=.d)
+$(info DEPS is $(DEPS))
+-include $(DEPS)
 
 # GIT repository information
 ifneq "$(wildcard $(ROOT_DIR)/.git )" "" #check if local repo exist
@@ -27,6 +34,9 @@ obj/%.o: %.s
 	as6502 --target=mega65 --list-file=$(@:%.o=%.clst) -o $@ $<
 
 obj/%.o: %.c
+	cc6502 --target=mega65 -Wall -Werror -O2 $(INC) -MM $(CFLAGS) $< > $(patsubst %.o,%.tmpd,$@)
+	sed 's|^$*\.o:|$@:|' $(@:.o=.tmpd) > $(@:.o=.d)
+	rm -f $(@:.o=.tmpd)
 	cc6502 --target=mega65 -Wall -Werror -O2 $(INC) --list-file=$(@:%.o=%.clst) $(CFLAGS) -o $@ $<
 
 obj/%-debug.o: %.s

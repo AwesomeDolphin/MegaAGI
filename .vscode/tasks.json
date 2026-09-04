@@ -20,6 +20,8 @@
             "args": [
                 "-e",
                 "-c",
+                "cd c65",
+                "-c",
                 "put kq1.d81"
             ]
         },
@@ -29,6 +31,8 @@
             "args": [
                 "-e",
                 "-c",
+                "cd c65",
+                "-c",
                 "put sq1.d81"
             ]
         },
@@ -37,6 +41,8 @@
             "command": "mega65_ftp",
             "args": [
                 "-e",
+                "-c",
+                "cd c65",
                 "-c",
                 "put xmas.d81"
             ]
@@ -62,7 +68,7 @@
             "args": [
                 "-r",
                 "-m",
-                "xmas.d81",
+                "sq1.d81",
                 "-5",
                 "--ntsc",
                 "agi.exo"

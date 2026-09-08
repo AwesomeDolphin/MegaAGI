@@ -23,6 +23,7 @@
 
 extern __far uint8_t formatted_string_buffer[1024];
 extern __far uint8_t print_string_buffer[1024];
+extern const unsigned char ascii_to_c64_screen[128];
 
 void textscr_set_color(uint8_t foreground, uint8_t background);
 uint16_t textscr_format_string_valist(uint8_t __far *formatstring, va_list ap);

@@ -50,6 +50,10 @@ bool quit_flag;
 static bool mouse_hidden = false;
 
 #pragma clang section bss="banked_bss" data="eh_data" rodata="eh_rodata" text="eh_text"
+    static uint8_t __far * const gbyescrmem_base = (uint8_t __far *)0x2d000;
+    static uint8_t __far * const gbyecolmem_base = (uint8_t __far *)0xff80000;
+    static uint16_t cursorpos;
+
 void engine_show_welcome_text(void) {
     VICIV.bordercol = COLOR_GREEN;
     textscr_set_color(COLOR_YELLOW, COLOR_BLACK);
@@ -80,6 +84,62 @@ void engine_askdisk_dialog(uint8_t disk_number) {
     memmanage_strcpy_near_far(print_string_buffer, (uint8_t *)"Please insert disk %d.");
     dialog_show_enginehigh(false, false, false, print_string_buffer, disk_number);
     select_volume_mem();
+}
+
+void engine_goodbye_print(char *printstring) {
+  char *printchar = printstring;
+  while (*printchar != '\0') {
+    if (*printchar == '\n') {
+      cursorpos += 80 - (cursorpos % 80);
+      printchar++;
+    } else {
+      *(gbyescrmem_base + cursorpos) = ascii_to_c64_screen[(uint8_t)*printchar];
+      *(gbyecolmem_base + cursorpos) = 0x01;
+      cursorpos++;
+      printchar++;
+    }
+  }
+}
+
+void engine_display_goodbye(void) {
+    gfx_hold_flip(true);
+    mouse_hide();
+
+    VICIV.ctrla = VICIV.ctrla | VIC3_PAL_MASK;
+    VICIV.ctrlb = VICIV.ctrlb & ~(VIC3_H640_MASK | VIC3_V400_MASK);
+    VICIV.ctrlc = (VICIV.ctrlc & ~(VIC4_FCLRLO_MASK)) | (VIC4_FCLRHI_MASK | VIC4_CHR16_MASK);
+
+    VICIV.ctrl1 = 0x1b;
+
+    VICIV.bordercol = COLOR_BLACK;
+    VICIV.screencol = COLOR_BLACK;
+    VICIV.chrxscl = 120;
+    VICIV.ctrlb = VICIV.ctrlb | VIC3_H640_MASK;
+    VICIV.ctrlc = VICIV.ctrlc & (~VIC4_CHR16_MASK);
+    VICIV.chrcount = 80;
+    VICIV.linestep = 80;
+    VICIV.sdbdrwd_msb = VICIV.sdbdrwd_msb & ~(VIC4_HOTREG_MASK);
+
+    VICIV.scrnptr = 0x0002d000;
+    VICIV.colptr = 0x0000;
+    VICIV.charptr = 0x29800;
+
+    for (uint16_t charpos = 0; charpos < 2000; charpos++) {
+        *(gbyescrmem_base + charpos) = 0x20;
+    }
+
+    cursorpos = 0;
+
+    engine_goodbye_print("GTC 1  TERMINATED\n");
+    engine_goodbye_print("GTC 2  TERMINATED\n");
+    engine_goodbye_print("GTC 3  TERMINATED\n");
+    engine_goodbye_print("ATC    TERMINATED\n");
+    engine_goodbye_print("GTC 4  TERMINATED\n");
+    engine_goodbye_print("SPARE  I HOPE WE GET AWAY WITH THIS\n");
+    uint32_t delay = 1000000;
+    while(delay > 0) {
+        delay--;
+    }
 }
 
 #pragma clang section bss="banked_bss" data="enginedata" rodata="enginerodata" text="enginetext"
@@ -325,6 +385,10 @@ void run_loop(void) {
         }
         engine_running = false;
     }
+
+    select_engine_enginehigh_mem();
+    engine_display_goodbye();
+
     __asm (
         " lda #0x7e\n"
         " sta 0xd640\n"

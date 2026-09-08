@@ -15,7 +15,6 @@ OBJS_DEBUG = $(ASM_SRCS:%.s=obj/%-debug.o) $(C_SRCS:%.c=obj/%-debug.o)
 
 # Deps
 DEPS := $(COBJS:.o=.d)
-$(info DEPS is $(DEPS))
 -include $(DEPS)
 
 # GIT repository information
